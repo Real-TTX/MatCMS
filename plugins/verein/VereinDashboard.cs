@@ -110,7 +110,7 @@ public static class VereinDashboard
                 Ui.Button("Dokument", R + "docs/new", UiButtonKind.Ghost, "ti-file-plus"),
                 Ui.Button("Sitzung", R + "meetings/new", UiButtonKind.Ghost, "ti-users-group"),
                 Ui.Button("Termin", R + "events/new", UiButtonKind.Ghost, "ti-calendar-plus"),
-                Ui.Button("Instagram-Bild", R + "instagram", UiButtonKind.Ghost, "ti-brand-instagram"))),
+                Ui.Button("Termine exportieren", VereinExport.Url("instagram"), UiButtonKind.Ghost, "ti-file-export"))),
             Ui.Columns(main, side),
             Ui.Muted("Auf der Website: Der Mitgliederbereich liegt unter " + VereinPublic.Base + ". Öffentliche Termine zeigt der Block „Vereinstermine“; als Kalender: " + VereinIcal.PublicFeed + ".")
         ), "Verein");

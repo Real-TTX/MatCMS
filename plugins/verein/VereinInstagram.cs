@@ -29,7 +29,7 @@ public static class VereinInstagram
     /// is one click) and draw them normal or compact, on as many pictures as they need — and the POSTER, one date big. The old "saison" link
     /// (a period, compact, the season's title) still lands on the list.
     /// </summary>
-    public static async Task<PluginResult> PageAsync(IPluginContext ctx, CancellationToken ct)
+    public static async Task<UiNode> BodyAsync(IPluginContext ctx, CancellationToken ct)
     {
         var store = new VereinStore(ctx.Data);
         string P(string k) => ctx.Request.IsPost ? ctx.Request.F(k) : ctx.Request.Q(k);
@@ -101,7 +101,7 @@ public static class VereinInstagram
 
         // ---- the form ----
         var kinds = everything.Select(e => e.Kind).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
-        string Link(string von, string bis) => VereinAdmin.Root + "instagram?vorlage=liste&stil=" + style + "&format=" + format.Key + "&von=" + von + "&bis=" + bis
+        string Link(string von, string bis) => VereinExport.Url("instagram") + "&vorlage=liste&stil=" + style + "&format=" + format.Key + "&von=" + von + "&bis=" + bis
             + (kind.Length > 0 ? "&art=" + Uri.EscapeDataString(kind) : "") + (onlyPublic ? "" : "&oeffentlich=0");
         // one click per month that has dates (from this month on, a year ahead), and the season
         var months = everything.Where(Fits).Select(e => e.Day[..7]).Where(m => string.CompareOrdinal(m, V.Today[..7]) >= 0).Distinct().OrderBy(m => m).Take(12).ToList();
@@ -170,9 +170,8 @@ public static class VereinInstagram
             preview = Ui.Html(html.ToString());
         }
 
-        return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Termine als Bild für Instagram, Facebook oder WhatsApp – auswählen, Vorschau ansehen, herunterladen", "Instagram-Bild"),
-            Ui.Columns(new UiNode?[] { Ui.Card("Einstellungen", form), Ui.Muted("Farbe, Logo, Saison und die Zeile unten stehen unter Einstellungen → Instagram-Bild.") }, new UiNode?[] { Ui.Card("Vorschau", preview) })), "Instagram-Bild");
+        return Ui.Columns(new UiNode?[] { Ui.Card("Bild für Instagram, Facebook oder WhatsApp", form), Ui.Muted("Farbe, Logo, Saison und die Zeile unten stehen unter Einstellungen → Instagram-Bild.") },
+            new UiNode?[] { Ui.Card("Vorschau", preview) });
     }
 
     /// <summary>How many dates the normal list draws on one picture (a row keeps at least 150 px — the date tile stays readable).</summary>

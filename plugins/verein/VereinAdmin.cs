@@ -30,10 +30,13 @@ public static class VereinAdmin
             .Page("meetings/{id}/pdf", null, MeetingPdfAsync)
             .Page("events", null, EventsAsync)
             .Page("events/lookup", null, EventLookupAsync)
+            .Page(VereinExport.Path, null, VereinExport.PageAsync)          // before events/{id}: "export" is no event number
+            .Page(VereinExport.Path + "/pdf", null, VereinExport.PdfAsync)
+            .Page(VereinExport.Path + "/csv", null, VereinExport.CsvAsync)
             .Page("events/{id}", null, EventAsync)
             .Page("events/{id}/pdf", null, EventPdfAsync)
             .Page("events/{id}/csv", null, EventCsvAsync)
-            .Page("instagram", null, VereinInstagram.PageAsync)
+            .Page("instagram", null, (ctx, ct) => Task.FromResult(VereinExport.FromInstagram(ctx)))
             .Page("uploads", null, UploadsAsync)
             .Page("uploads/{id}", null, UploadFileAsync)
             .Page("templates", null, TemplatesAsync)
@@ -43,7 +46,6 @@ public static class VereinAdmin
             .Link("Dokumente", "docs", "ti-file-check", also: new[] { "docs/" })
             .Link("Sitzungen", "meetings", "ti-users-group", also: new[] { "meetings/" })
             .Link("Termine", "events", "ti-calendar-event", also: new[] { "events/" })
-            .Link("Instagram-Bild", "instagram", "ti-brand-instagram")
             .Link("Bilder & Material", "uploads", "ti-photo", badge: true)
             .Link("Vorlagen", "templates", "ti-template", also: new[] { "templates/" })
             .Link("Einstellungen", "_settings", "ti-settings")
@@ -845,7 +847,7 @@ public static class VereinAdmin
         }
         var kinds = all.Select(e => e.Kind).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
         return Page(Ui.Stack(
-            Ui.PageHead("Öffentliche Termine erscheinen im Block „Vereinstermine“ auf der Website, interne nur im Mitgliederbereich", "Termine", Ui.Button("Als Instagram-Bild", Root + "instagram", UiButtonKind.Ghost, "ti-brand-instagram")),
+            Ui.PageHead("Öffentliche Termine erscheinen im Block „Vereinstermine“ auf der Website, interne nur im Mitgliederbereich", "Termine"),
             Ui.Tabs(Ui.Tab("Kommende", Root + "events", !past), Ui.Tab("Vergangene", Root + "events?vergangen=1", past)),
             Ui.Table(new[] { Ui.Column("Termin"), Ui.Column("Wann"), NotOnPhone(Ui.Column("Art")), Ui.Column("Ort"), Ui.Column("Teilnahme"), NotOnPhone(Ui.Column("Sichtbar")) },
                 list.Select(e => Ui.RowFor(e.Title + " " + e.Kind + " " + e.Place, Ui.Link(e.Title, Root + "events/" + e.Id), V.When(e.Starts), e.Kind, e.Place, Participation(e),
@@ -854,7 +856,7 @@ public static class VereinAdmin
                 searchPlaceholder: "Termine durchsuchen …", emptyText: past ? "Keine vergangenen Termine." : "Keine kommenden Termine.") with
             {
                 Filter = kinds.Count > 1 ? Ui.ListFilter("Art", new[] { ("", "Alle Arten") }.Concat(kinds.Select((k, i) => ("k" + i, k))).ToArray()) : null,
-                Below = new UiNode[] { Ui.Button("Neuer Termin", Root + "events/new", icon: "ti-calendar-plus") }
+                Below = new UiNode[] { Ui.Button("Neuer Termin", Root + "events/new", icon: "ti-calendar-plus"), Ui.Button("Exportieren", VereinExport.Url("instagram"), UiButtonKind.Ghost, "ti-file-export") }
             }), "Termine");
     }
 
@@ -944,7 +946,7 @@ public static class VereinAdmin
         return Page(Ui.Stack(Ui.PageHead(isNew ? "Erst als Entwurf planen, dann veröffentlichen" : V.When(e!.Starts) + (e.Draft ? " · Entwurf" : ""), isNew ? "Neuer Termin" : e!.Title),
             form,
             replyCard,
-            isNew || e!.Draft ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", Root + "instagram?vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")),
+            isNew || e!.Draft ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", VereinExport.Url("instagram") + "&vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")),
             isNew ? null : Ui.Card("Löschen", Act("Termin löschen", "delete", kind: UiButtonKind.Danger, confirm: "Termin löschen?", icon: "ti-trash"))), isNew ? "Neuer Termin" : e!.Title);
     }
 

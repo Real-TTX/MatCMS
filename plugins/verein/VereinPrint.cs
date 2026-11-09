@@ -124,6 +124,24 @@ public static class VereinPrint
         return p.ToBytes();
     }
 
+    /// <summary>The date plan (Termine → Exportieren → PDF): one table row per date — day, time, what, where — to hang up or hand out.</summary>
+    internal static byte[] Plan(Letterhead lh, string heading, string period, IReadOnlyList<Event> list)
+    {
+        var p = new PrintLayout(lh, heading);
+        p.Kicker("Termine · " + period);
+        p.Title(heading);
+        static string Time(Event e) => e.Starts.Length >= 16 && e.Starts[11..16] != "00:00" ? e.Starts[11..16] + (e.Ends.Length >= 16 && e.Ends[..10] == e.Day ? "–" + e.Ends[11..16] : "") : "";
+        if (list.Count == 0) p.Body("In diesem Zeitraum stehen keine Termine an.");
+        else
+            p.Table(new[] { "Datum", "Zeit", "Termin", "Ort" }, new[] { 0.18, 0.1, 0.41, 0.31 },
+                list.Select(e => new[]
+                {
+                    V.Badge(e.Starts).Weekday + " " + V.Date(e.Day) + (e.Ends.Length >= 10 && e.Ends[..10] != e.Day ? " – " + V.Date(e.Ends[..10]) : ""),
+                    Time(e), e.Title + (e.Kind.Length > 0 ? " (" + e.Kind + ")" : "") + (e.Public ? "" : " · intern"), e.Place
+                }).ToList());
+        return p.ToBytes();
+    }
+
     /// <summary>A meeting: the invitation with its agenda, or (<paramref name="minutes"/>) the minutes with places to sign.</summary>
     internal static byte[] Meeting(Letterhead lh, Meeting m, bool minutes)
     {

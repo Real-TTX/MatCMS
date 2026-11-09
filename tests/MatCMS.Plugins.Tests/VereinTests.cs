@@ -309,16 +309,50 @@ public class VereinTests : IClassFixture<VereinApp>
         var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Narrenball <script>x</script>", ["kind"] = "Ball", ["starts"] = day + "T19:00", ["place"] = "Bürgerhalle", ["public"] = "true" });
         var id = Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value;
 
-        var list = await admin.GetStringAsync("/admin/p/verein/instagram?format=story");
+        var list = await admin.GetStringAsync("/admin/p/verein/events/export?tab=instagram&format=story");
         Assert.Contains("<svg", list);
         Assert.Contains("viewBox=\"0 0 1080 1920\"", list);
         Assert.Contains("Narrenball", Text(list));
         Assert.DoesNotContain("<script>x</script>", list);
         Assert.Contains("PNG herunterladen", list);
 
-        var poster = await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=plakat&event=" + id);
+        var poster = await admin.GetStringAsync("/admin/p/verein/events/export?tab=instagram&vorlage=plakat&event=" + id);
         Assert.Contains("viewBox=\"0 0 1080 1080\"", poster);
         Assert.Contains("Bürgerhalle", Text(poster));
+    }
+
+    [Fact]
+    public async Task Exporting_the_dates_lives_under_events_as_tabs_and_the_old_instagram_address_still_lands_there()
+    {
+        var admin = await _app.AsAsync("admin");
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Plan Umzug", ["kind"] = "Planexport", ["starts"] = "2034-02-03T14:00", ["place"] = "Marktplatz", ["public"] = "true" });
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Plan Vorstand intern", ["kind"] = "Planexport", ["starts"] = "2034-02-05T19:30", ["place"] = "Vereinsheim" });
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Plan Entwurf", ["kind"] = "Planexport", ["starts"] = "2034-02-06T10:00", ["status"] = "draft" });
+
+        var events = await admin.GetStringAsync("/admin/p/verein/events");
+        Assert.Contains("Exportieren", events);
+        Assert.DoesNotContain("href=\"/admin/p/verein/instagram\"", events);              // no menu entry of its own any more
+
+        var old = await admin.GetAsync("/admin/p/verein/instagram?vorlage=plakat&event=7");
+        Assert.Equal(HttpStatusCode.Redirect, old.StatusCode);
+        Assert.Equal("/admin/p/verein/events/export?tab=instagram&vorlage=plakat&event=7", old.Headers.Location!.OriginalString);
+
+        var page = await admin.GetStringAsync("/admin/p/verein/events/export?tab=pdf&von=2034-02-01&bis=2034-02-28&art=Planexport");
+        foreach (var tab in new[] { "Instagram-Bild", "PDF", "Tabelle (CSV)", "Kalender-Abo" }) Assert.Contains(tab, page);
+        Assert.Contains("PDF öffnen (2 Termine)", page);                                      // the draft is not part of it
+
+        var pdf = await admin.GetAsync("/admin/p/verein/events/export/pdf?von=2034-02-01&bis=2034-02-28&art=Planexport");
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType!.MediaType);
+        Assert.StartsWith("%PDF", System.Text.Encoding.ASCII.GetString(await pdf.Content.ReadAsByteArrayAsync())[..4]);
+
+        var csv = await admin.GetStringAsync("/admin/p/verein/events/export/csv?von=2034-02-01&bis=2034-02-28&art=Planexport");
+        Assert.Contains("\"Plan Umzug\"", csv);
+        Assert.Contains("\"intern\"", csv);
+        Assert.DoesNotContain("Plan Entwurf", csv);
+        var onlyPublic = await admin.GetStringAsync("/admin/p/verein/events/export/csv?von=2034-02-01&bis=2034-02-28&art=Planexport&oeffentlich=1");
+        Assert.DoesNotContain("Plan Vorstand intern", onlyPublic);
+
+        Assert.Contains("webcal://", await admin.GetStringAsync("/admin/p/verein/events/export?tab=kalender"));
     }
 
     [Fact]
@@ -327,13 +361,13 @@ public class VereinTests : IClassFixture<VereinApp>
         var admin = await _app.AsAsync("admin");
         for (var i = 0; i < 9; i++)
             await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Saisontermin " + i, ["kind"] = "Saison", ["starts"] = $"2031-01-{10 + i}T14:00", ["place"] = "Ort " + i, ["public"] = "true" });
-        var page = await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=square");
+        var page = await admin.GetStringAsync("/admin/p/verein/events/export?tab=instagram&vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=square");
         Assert.Contains("Terminplan 2031", Text(page));                                      // the title of the setting "Überschrift der Saison" (a club names it Narrenfahrplan, Spielplan …)
         var pictures = Regex.Matches(page, "<svg ").Count;
         Assert.True(pictures >= 2, "square should not hold 9 dates: " + pictures);
         Assert.Contains("(1/" + pictures + ")", page);
         Assert.Contains("Saisontermin 8", Text(page));
-        Assert.Single(Regex.Matches(await admin.GetStringAsync("/admin/p/verein/instagram?vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=story"), "<svg "));
+        Assert.Single(Regex.Matches(await admin.GetStringAsync("/admin/p/verein/events/export?tab=instagram&vorlage=saison&von=2031-01-06&bis=2031-02-26&art=Saison&format=story"), "<svg "));
     }
 
     [Fact]
@@ -353,7 +387,7 @@ public class VereinTests : IClassFixture<VereinApp>
         var gerd = await _app.AsAsync("gerd");
         Assert.DoesNotContain("Narrentreffen Entwurf", Text(await gerd.GetStringAsync("/mitglied/termine")));
         Assert.Equal(HttpStatusCode.NotFound, (await gerd.GetAsync("/mitglied/termine/" + id)).StatusCode);
-        Assert.DoesNotContain("Narrentreffen Entwurf", Text(await admin.GetStringAsync("/admin/p/verein/instagram")));
+        Assert.DoesNotContain("Narrentreffen Entwurf", Text(await admin.GetStringAsync("/admin/p/verein/events/export")));
 
         fields["status"] = "published";
         await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/" + id, fields);
@@ -1007,7 +1041,7 @@ public class VereinTests : IClassFixture<VereinApp>
             var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/events/new", new() { ["title"] = "Märzturnier " + i, ["kind"] = "Turnier", ["starts"] = $"2033-03-{10 + i}T10:00", ["place"] = "Platz " + i, ["public"] = "true", ["status"] = "published" });
             ids.Add(Regex.Match(res.Headers.Location!.OriginalString, "events/(\\d+)").Groups[1].Value);
         }
-        var url = "/admin/p/verein/instagram?vorlage=liste&format=square&von=2033-03-01&bis=2033-03-31&art=Turnier";
+        var url = "/admin/p/verein/events/export?tab=instagram&vorlage=liste&format=square&von=2033-03-01&bis=2033-03-31&art=Turnier";
         var page = await admin.GetStringAsync(url);
         Assert.Contains("Termine im März 2033", Text(page));                               // the automatic heading names the month
         Assert.Contains("7 von 7 Terminen ausgewählt", Text(page));
@@ -1032,7 +1066,7 @@ public class VereinTests : IClassFixture<VereinApp>
         var none = new Dictionary<string, string>(fields) { ["sel"] = "keine" };
         Assert.Contains("Kein Termin ausgewählt", Text(await (await VereinApp.PostFormAsync(admin, url, none)).Content.ReadAsStringAsync()));
         // the month links: one per month with dates, with their count
-        var start = await admin.GetStringAsync("/admin/p/verein/instagram?art=Turnier&von=2033-03-01&bis=2033-03-31");
+        var start = await admin.GetStringAsync("/admin/p/verein/events/export?tab=instagram&art=Turnier&von=2033-03-01&bis=2033-03-31");
         Assert.Contains("März 2033 (7)", Text(start));
     }
     [Fact]

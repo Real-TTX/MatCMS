@@ -178,6 +178,9 @@ public sealed class BookingTests(BookingApp app) : IClassFixture<BookingApp>
     {
         var kids = await PriceAsync("a1", "2030-03-11", "2030-03-14", adults: 2, children: 2);
         Assert.Contains("Kurtaxe=1350", Lines(kids));                                           // (2 + 2 × ½) persons × 3 nights × 1,50 €
+        var tax = kids["lines"]!.AsArray().First(l => l!["kind"]!.GetValue<string>() == "tax")!;
+        Assert.Equal("13,50 €", tax["amountText"]!.GetValue<string>());                         // German by hand — the image has no culture data
+        Assert.Equal("1,50 € je Person und Nacht · 2 Erw., 2 Kinder zur Hälfte · 3 Nächte", tax["detail"]!.GetValue<string>());
         Assert.DoesNotContain("Haustier", Lines(kids));
         var pet = await PriceAsync("a1", "2030-03-11", "2030-03-14", extras: app.Ids["pet"].ToString());
         Assert.Contains("Haustier=3000", Lines(pet));

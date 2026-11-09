@@ -6,7 +6,8 @@ namespace MatCMS.Plugin.Booking;
 /// <summary>Small helpers shared by every part: encoding, money in whole cents, dates as yyyy-MM-dd.</summary>
 public static class B
 {
-    private static readonly CultureInfo De = CultureInfo.GetCultureInfo("de-DE");
+    // NO culture data: the image runs with invariant globalization, where "de-DE" silently formats like English ("523.50", "January").
+    // Every German number, month and weekday is written here by hand.
     public static string H(string? s) => WebUtility.HtmlEncode(s ?? "");
     public static string Clip(string? s, int max) { s = (s ?? "").Trim(); return s.Length > max ? s[..max] : s; }
     public static bool Checked(string v) => v is "true" or "on" or "1";
@@ -33,11 +34,26 @@ public static class B
     }
 
     /// <summary>Cents for an input field: "120" or "120,50" (no thousands separator — it is read back).</summary>
-    public static string MoneyField(long cents) => cents % 100 == 0 ? Num(cents / 100) : (cents / 100m).ToString("0.00", De);
+    public static string MoneyField(long cents) => cents % 100 == 0 ? Num(cents / 100) : Num(cents / 100) + "," + Math.Abs(cents % 100).ToString("00", CultureInfo.InvariantCulture);
 
     /// <summary>Cents for reading: "1.200,50 €".</summary>
     public static string Money(long cents, string currency = "EUR") =>
-        (cents / 100m).ToString(cents % 100 == 0 ? "#,##0" : "#,##0.00", De) + " " + Symbol(currency);
+        Grouped(cents) + " " + Symbol(currency);
+
+    /// <summary>"1.200" or "1.200,50" — German grouping and decimal comma, without culture data.</summary>
+    private static string Grouped(long cents)
+    {
+        var whole = Math.Abs(cents) / 100;
+        var digits = whole.ToString(CultureInfo.InvariantCulture);
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < digits.Length; i++)
+        {
+            if (i > 0 && (digits.Length - i) % 3 == 0) sb.Append('.');
+            sb.Append(digits[i]);
+        }
+        if (cents % 100 != 0) sb.Append(',').Append(Math.Abs(cents % 100).ToString("00", CultureInfo.InvariantCulture));
+        return (cents < 0 ? "−" : "") + sb;
+    }
 
     public static string Symbol(string currency) => currency switch { "EUR" or "" => "€", "CHF" => "CHF", "GBP" => "£", "USD" => "$", _ => currency };
 
@@ -47,7 +63,9 @@ public static class B
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static string Date(DateOnly d) => d.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
     public static string Date(string s) => Day(s) is { } d ? Date(d) : s;
-    public static string Weekday(DateOnly d) => De.DateTimeFormat.GetAbbreviatedDayName(d.DayOfWeek);
+    public static string Weekday(DateOnly d) => DayNames[IsoDay(d.DayOfWeek) - 1];
+    public static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
+    public static string Month(DateOnly d) => MonthNames[d.Month - 1] + " " + d.Year.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>A slug: lower case, a–z, 0–9 and dashes; umlauts spelled out.</summary>
     public static string Slug(string? s)

@@ -19,7 +19,7 @@ public sealed class UnavailableException(string message) : Exception(message);
 public sealed class BookingStore(IPluginData data)
 {
     public const string TProperties = "properties", TUnits = "units", TSeasons = "seasons", TRates = "rates", TFees = "fees", TNights = "nights",
-        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta";
+        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys";
 
     public static void Declare(IDataBuilder b)
     {
@@ -40,10 +40,17 @@ public sealed class BookingStore(IPluginData data)
             .UniqueIndex("unit_id", "night").Index("booking_id").Index("block_id"));
         b.Table(TBlocks, t => t.Int("unit_id", required: true).Text("from_day", required: true).Text("to_day", required: true).Text("reason").Text("source")
             .Text("uid").Timestamp("created").Index("unit_id").Index("source"));
-        // declared now so the nights can point at it; the request flow fills it in phase B2
+        // a stay asked for or booked. The guest's contact is kept ON the booking too (what they typed for THIS stay); the guest row is the card index
         b.Table(TBookings, t => t.Text("number").Int("unit_id", required: true).Int("guest_id", def: "0").Text("arrival", required: true).Text("departure", required: true)
-            .Int("adults", def: "1").Int("children", def: "0").Text("status", required: true).Text("source").Json("quote").Int("total", def: "0").Text("key_hash")
-            .Text("locale").Text("note").Timestamp("created").Timestamp("updated").Index("unit_id").Index("status").Index("arrival"));
+            .Int("adults", def: "1").Int("children", def: "0").Text("extras").Text("status", required: true).Text("source").Json("quote").Int("total", def: "0")
+            .Text("name").Text("email").Text("phone").Text("message").Text("host_note").Text("locale")
+            .Timestamp("hold_until").Timestamp("offer_until").Timestamp("created").Timestamp("updated").Json("history")
+            .Index("unit_id").Index("status").Index("arrival").Index("guest_id"));
+        b.Table(TGuests, t => t.Text("name").Text("email", required: true).Text("phone").Text("country").Text("locale").Text("note")
+            .Timestamp("created").Timestamp("updated").UniqueIndex("email"));
+        // the guest's secret links, as hashes. Each mail may carry a fresh one (only a hash is kept, so an old one cannot be sent again); all stay valid
+        b.Table(TKeys, t => t.Int("booking_id", required: true).Text("hash", required: true).Timestamp("created").UniqueIndex("hash").Index("booking_id"));
+        b.Table(TSequences, t => t.Text("name", required: true).Int("value", def: "0").UniqueIndex("name"));
         b.Table(TMeta, t => t.Text("name", required: true).Text("value").UniqueIndex("name"));
     }
 
@@ -198,6 +205,8 @@ public sealed class BookingStore(IPluginData data)
     public IDataTable Seasons => T(TSeasons);
     public IDataTable Fees => T(TFees);
     public IDataTable Meta => T(TMeta);
+    public IDataTable Bookings => T(TBookings);
+    public IDataTable Guests => T(TGuests);
 
     /// <summary>Writes a unit's rate in a season (one row per pair; an empty price removes it, so the base price applies again).</summary>
     public async Task SetRateAsync(long unitId, long seasonId, long? price, int minNights, IEnumerable<int> arrivalDays, long weekPrice, long extraPerson, CancellationToken ct = default)

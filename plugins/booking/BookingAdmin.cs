@@ -12,7 +12,7 @@ public static class BookingAdmin
 
     public static void Configure(IPluginBuilder b)
     {
-        b.Admin.Section("Buchungen", "ti-calendar-check", AdminGroup.Content, 26)
+        var section = b.Admin.Section("Buchungen", "ti-calendar-check", AdminGroup.Content, 26)
             .Page("dashboard", null, DashboardAsync)
             .Page("properties", null, PropertiesAsync)
             .Page("properties/{id}", null, PropertyAsync)
@@ -24,12 +24,15 @@ public static class BookingAdmin
             .Page("fees/{id}", null, FeeAsync)
             .Page("check", null, CheckAsync)
             .Link("Übersicht", "dashboard", "ti-layout-dashboard")
+            .Link("Anfragen & Buchungen", "bookings", "ti-calendar-event", badge: true, also: new[] { "bookings/" })
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })
             .Link("Preis prüfen", "check", "ti-calculator")
             .Link("Objekte", "properties", "ti-building-cottage", heading: "Einrichtung", also: new[] { "properties/" })
-            .Link("Einstellungen", "_settings", "ti-settings");
+            .Link("Einstellungen", "_settings", "ti-settings")
+            .Badge(async (c, ct) => (await BookingFlow.ListAsync(c.Data, new[] { BookingStatus.Request }, ct)).Count is var n and > 0 ? n.ToString(CultureInfo.InvariantCulture) : null);
+        BookingAdminBookings.Register(section);
     }
 
     private static long Id(IPluginContext ctx) => long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : 0;
@@ -60,13 +63,18 @@ public static class BookingAdmin
             ("Objekt anlegen (Haus, Villa)", houses.Count > 0, Root + "properties"),
             ("Einheiten anlegen (Apartments, Zimmer, ganzes Haus)", units.Count > 0, Root + "units"),
         };
+        var all = await BookingFlow.ListAsync(ctx.Data, null, ct);
+        var open = all.Count(x => x.Status is BookingStatus.Request or BookingStatus.Offer);
+        var coming = all.Count(x => x.Status == BookingStatus.Confirmed && x.Departure >= DateOnly.FromDateTime(DateTime.UtcNow));
         var seasons = 0; var fees = 0;
         foreach (var h in houses) { seasons += (await store.SeasonsAsync(h.Id, ct)).Count; fees += (await store.FeesAsync(h.Id, ct)).Count; }
         steps.Add(("Saisons und Preise festlegen", seasons > 0, Root + "seasons"));
         steps.Add(("Gebühren und Kurtaxe (Endreinigung, Bettwäsche …)", fees > 0, Root + "fees"));
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Häuser, Einheiten, Saisons und Preise – Anfragen, Gäste und Kalender-Abgleich folgen", "Buchungen"),
+            Ui.PageHead("Anfragen, Buchungen, Häuser, Saisons und Preise – Gästekartei und Kalender-Abgleich folgen", "Buchungen"),
             Ui.Stats(
+                Ui.Stat("Offene Anfragen", B.Num(open), tone: open > 0 ? UiTone.Warning : UiTone.Success, href: Root + "bookings"),
+                Ui.Stat("Kommende Buchungen", B.Num(coming), href: Root + "bookings?tab=kommend"),
                 Ui.Stat("Objekte", B.Num(houses.Count), href: Root + "properties"),
                 Ui.Stat("Einheiten", B.Num(units.Count(u => u.Active)), units.Any(u => !u.Active) ? units.Count(u => !u.Active) + " inaktiv" : null, href: Root + "units"),
                 Ui.Stat("Saisons", B.Num(seasons), href: Root + "seasons")),

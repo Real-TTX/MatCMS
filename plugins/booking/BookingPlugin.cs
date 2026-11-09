@@ -11,9 +11,13 @@ namespace MatCMS.Plugin.Booking;
 public sealed class BookingPlugin : IPlugin
 {
     public const string PricePath = "/buchung/preis";
-    public const string CurrencyKey = "currency";
+    public const string CurrencyKey = "currency", NotifyKey = "notifyEmail", HoldKey = "holdHours", OfferKey = "offerDays", PaymentInfoKey = "paymentInfo",
+        PrivacyKey = "privacyUrl";
 
     public static string Currency(IPluginContext ctx) => ctx.Settings.Get(CurrencyKey) is { Length: 3 } c ? c : "EUR";
+    public static string NotifyAddress(IPluginContext ctx) => (ctx.Settings.Get(NotifyKey) ?? "").Trim();
+    public static int HoldHours(IPluginContext ctx) => double.TryParse(ctx.Settings.Get(HoldKey), NumberStyles.Number, CultureInfo.InvariantCulture, out var h) && h >= 1 ? Math.Clamp((int)h, 1, 336) : 48;
+    public static int OfferDays(IPluginContext ctx) => double.TryParse(ctx.Settings.Get(OfferKey), NumberStyles.Number, CultureInfo.InvariantCulture, out var d) && d >= 1 ? Math.Clamp((int)d, 1, 30) : 3;
 
     /// <inheritdoc />
     public void Configure(IPluginBuilder b)
@@ -23,7 +27,36 @@ public sealed class BookingPlugin : IPlugin
         {
             new FieldOption("EUR", "Euro (€)"), new FieldOption("CHF", "Schweizer Franken"), new FieldOption("GBP", "Pfund (£)"), new FieldOption("USD", "US-Dollar ($)")
         }, "Eine Währung für alle Preise dieser Website.");
+        b.Settings.Text(NotifyKey, "Neue Anfragen an", "", "E-Mail-Adresse des Gastgebers. Leer = keine Mail, die Anfrage steht trotzdem im Admin.")
+            .Number(HoldKey, "Anfrage hält den Zeitraum (Stunden)", 48, 1, 336, "So lange sind die Nächte nach einer Anfrage für den Gast vorgemerkt – danach sind sie wieder frei, wenn nichts passiert ist.")
+            .Number(OfferKey, "Angebot gilt (Tage)", 3, 1, 30)
+            .TextArea(PaymentInfoKey, "Zahlungshinweis", "", "Steht in der Buchungsbestätigung und auf der Seite des Gastes, z. B. Bankverbindung, Anzahlung und bis wann.")
+            .Text(PrivacyKey, "Datenschutzerklärung", "/datenschutz", "Die Seite, auf die das Anfrageformular verweist.");
+        foreach (var spec in BookingMail.Specs) b.MailTemplate(spec);
         BookingAdmin.Configure(b);
+        BookingPublic.Configure(b);
+        BookingBlocks.Configure(b);
+
+        // what nobody answered in time runs out and frees the calendar; the guest is told
+        b.Job("expire", JobSchedule.EveryInterval(TimeSpan.FromMinutes(15)), async (ctx, ct) =>
+        {
+            var store = new BookingStore(ctx.Data);
+            foreach (var x in await BookingFlow.ExpireAsync(ctx.Data, ct))
+            {
+                var unit = await store.UnitAsync(x.UnitId, ct);
+                var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);
+                await BookingFlow.NoteAsync(ctx.Data, x.Id, "Mail an den Gast: " + await BookingMail.SendAsync(ctx, BookingMail.Expired, x.Email, BookingMail.Values(ctx, x, unit, house, null), ct), ct);
+            }
+        });
+        b.Admin.Attention(async (ctx, ct) =>
+        {
+            var open = (await BookingFlow.ListAsync(ctx.Data, new[] { BookingStatus.Request }, ct)).Count;
+            return open == 0 ? Array.Empty<AttentionNote>() : new[]
+            {
+                new AttentionNote(open == 1 ? "1 neue Buchungsanfrage" : open + " neue Buchungsanfragen", "Annehmen, Angebot schicken oder ablehnen – sonst läuft die Vormerkung ab.", BookingAdmin.Root + "bookings")
+                { Tone = UiTone.Warning, Icon = "ti-calendar-question" }
+            };
+        });
         b.Route(PricePath, PriceAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
 
         // the row the write lock of HoldAsync updates — a transaction that starts with a write queues behind another instead of being refused

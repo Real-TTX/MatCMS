@@ -51,6 +51,30 @@ public sealed class BotPlugin : IPlugin
             .Page("chats/{session}", null, BotAdmin.ChatAsync);
 
         b.Job("cleanup", JobSchedule.EveryInterval(TimeSpan.FromHours(6)), async (ctx, ct) => await new BotStore(ctx.Data).CleanAsync(BotConfig.From(ctx.Settings).KeepDays, ct));
+
+        // A member's conversations are personal data like an order: they go with the account and come out in its data-protection export. The daily
+        // counters need neither — a visitor there is a hash of address, browser and day, never an account.
+        b.On(HostEvents.MemberErase, async (ctx, payload) => { await new BotStore(ctx.Data).EraseMemberAsync(IdOf(payload)); });
+        b.On(HostEvents.MemberExport, ExportAsync);
+    }
+
+    private static long IdOf(JsonNode? payload) => payload?["id"] is JsonValue v && v.TryGetValue<long>(out var id) ? id : 0;
+
+    /// <summary>The member's questions and the bot's answers, with the time — in every case an answer, so the export says the bot was asked and held nothing
+    /// rather than leaving it out (conversations are only kept while the operator chose to keep them).</summary>
+    private static async Task<JsonNode?> ExportAsync(IPluginContext ctx, JsonNode? payload, CancellationToken ct)
+    {
+        var id = IdOf(payload);
+        if (id <= 0) return null;
+        var turns = new JsonArray();
+        foreach (var r in await new BotStore(ctx.Data).TurnsOfMemberAsync(id, ct))
+            turns.Add(new JsonObject
+            {
+                ["created"] = (r.Timestamp("created") ?? DateTime.UtcNow).ToString("yyyy-MM-ddTHH:mm:ssZ", System.Globalization.CultureInfo.InvariantCulture),
+                ["question"] = r.Text("question"),
+                ["answer"] = r.Text("answer")
+            });
+        return new JsonObject { ["plugin"] = "bot", ["data"] = new JsonObject { ["chats"] = turns } };
     }
 
     /// <summary>What the widget needs: whether to draw the bubble, the look, its words in the page's language. Per visitor (a signed-in customer reads a

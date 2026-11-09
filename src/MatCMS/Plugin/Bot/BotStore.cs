@@ -55,6 +55,27 @@ internal sealed class BotStore
             ["sources"] = sourcesJson, ["created"] = DateTime.UtcNow
         }, ct);
 
+    /// <summary>What a member asked and was answered, oldest first — ONLY the turns that carry the member's number. A conversation's id comes from the browser,
+    /// so a turn of somebody else under the same id must never come out in this member's data-protection export.</summary>
+    public Task<IReadOnlyList<DataRow>> TurnsOfMemberAsync(long memberId, CancellationToken ct = default) =>
+        _data.Table("chats").QueryAsync(DataQuery.Everything.Eq("member_id", memberId).OrderBy("created"), ct);
+
+    /// <summary>
+    /// An account is being deleted: its turns go, and so do the guest turns of the same conversations — what somebody asked in a tab before signing in is the
+    /// same person's words in the same conversation, and half a conversation kept is still theirs. Turns of OTHER members are never touched, whatever
+    /// conversation id they share.
+    /// </summary>
+    public async Task<int> EraseMemberAsync(long memberId, CancellationToken ct = default)
+    {
+        if (memberId <= 0) return 0;
+        var chats = _data.Table("chats");
+        var sessions = (await TurnsOfMemberAsync(memberId, ct)).Select(r => r.Text("session")).Where(s => s.Length > 0).Distinct().ToList();
+        var removed = await chats.DeleteWhereAsync(DataQuery.Everything.Eq("member_id", memberId), ct);
+        if (sessions.Count > 0)
+            removed += await chats.DeleteWhereAsync(DataQuery.Everything.Eq("member_id", 0L).Where("session", DataOp.In, sessions), ct);
+        return removed;
+    }
+
     /// <summary>The daily clean-up: visitor counters older than two days, the site's counters older than 13 months, conversations older than the operator's
     /// retention — all of them when nothing is to be kept.</summary>
     public async Task CleanAsync(int keepDays, CancellationToken ct = default)

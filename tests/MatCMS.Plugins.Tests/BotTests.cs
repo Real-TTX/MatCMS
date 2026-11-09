@@ -77,13 +77,13 @@ public class BotTests : IClassFixture<BotFixture>
         return c;
     }
 
-    private async Task<(JsonObject Answer, string Prompt)> AskAsync(HttpClient c, string question, string reply = "Antwort.", string history = "[]")
+    private async Task<(JsonObject Answer, string Prompt)> AskAsync(HttpClient c, string question, string reply = "Antwort.", string history = "[]", string? session = null)
     {
         _f.Ai.Say(reply);
         int before; lock (_f.Ai.Requests) before = _f.Ai.Requests.Count;
         var res = await c.PostAsync("/ai-bot/ask", new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["q"] = question, ["history"] = history, ["session"] = "testsession" + Guid.NewGuid().ToString("N")[..10], ["lang"] = "de"
+            ["q"] = question, ["history"] = history, ["session"] = session ?? "testsession" + Guid.NewGuid().ToString("N")[..10], ["lang"] = "de"
         }));
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var json = (JsonObject)JsonNode.Parse(await res.Content.ReadAsStringAsync())!;
@@ -265,5 +265,52 @@ public class BotTests : IClassFixture<BotFixture>
         Assert.Contains("Öffnungszeiten am Samstag?", chats);
         var overview = WebUtility.HtmlDecode(await admin.GetStringAsync("/admin/p/bot/overview"));
         Assert.True(overview.Contains("Fragen heute") || overview.Contains("Questions today"), "no usage figures on the overview");
+    }
+
+    [Fact]
+    public async Task A_deleted_account_takes_its_conversations_along_and_its_export_holds_only_its_own_turns()
+    {
+        var (lenaMail, password) = await MemberAsync("Lena Loesch");
+        var (paulMail, _) = await MemberAsync("Paul Bleib");
+        // the conversation id comes from the browser: a guest turn before signing in, the member's turn, and ANOTHER member under the same id
+        var session = "erase" + Guid.NewGuid().ToString("N")[..10];
+        var lena = Visitor();
+        await AskAsync(lena, "Frage vor der Anmeldung MARKLENA0", session: session);
+        await SignInAsync(lena, lenaMail, password);
+        await AskAsync(lena, "Lenas Frage MARKLENA1", session: session);
+        var paul = Visitor();
+        await SignInAsync(paul, paulMail, password);
+        await AskAsync(paul, "Pauls Frage MARKPAUL1", session: session);
+        await AskAsync(Visitor(), "Gastfrage MARKGAST1");
+
+        using var scope = _f.App.Services.CreateScope();
+        var members = scope.ServiceProvider.GetRequiredService<MemberService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account = await db.SiteMembers.SingleAsync(m => m.Email == lenaMail);
+
+        var export = (await members.ExportAsync(account)).ToJsonString();
+        Assert.Contains("\"plugin\":\"bot\"", export);
+        Assert.Contains("MARKLENA1", export);
+        Assert.DoesNotContain("MARKPAUL1", export);      // somebody else under the same conversation id
+        Assert.DoesNotContain("MARKLENA0", export);      // a guest turn carries no account — nothing proves it is hers
+
+        Assert.True(await members.DeleteAsync(account.Id));
+        var left = await QuestionsAsync(db);
+        Assert.DoesNotContain(left, q => q.Contains("MARKLENA1"));
+        Assert.DoesNotContain(left, q => q.Contains("MARKLENA0"));     // the same conversation before she signed in goes with it
+        Assert.Contains(left, q => q.Contains("MARKPAUL1"));            // another member's turn is never touched
+        Assert.Contains(left, q => q.Contains("MARKGAST1"));
+    }
+
+    private static async Task<List<string>> QuestionsAsync(AppDbContext db)
+    {
+        var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open) await conn.OpenAsync();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT question FROM p_bot_chats";
+        var list = new List<string>();
+        using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync()) list.Add(r.GetString(0));
+        return list;
     }
 }

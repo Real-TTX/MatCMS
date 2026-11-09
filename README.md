@@ -10,7 +10,7 @@
 A self-hosted, block-based CMS: build pages from blocks, publish in several languages, blog and sell –
 no plugin zoo, no database server. One Docker container, one volume, one SQLite file.
 
-[matcms.de](https://matcms.de) · [Quick start](#quick-start) · [Cloud](#cloud)
+[matcms.de](https://matcms.de) · [Quick start](#quick-start) · [Cloud](#cloud) · [Pricing & license](#pricing--license)
 
 </div>
 
@@ -179,6 +179,25 @@ from then on the cloud can:
 
 → **Full docs: [src/MatCMS.Cloud/README.md](src/MatCMS.Cloud/README.md)**
 (image `ghcr.io/real-ttx/matcms-cloud`, port `9100`).
+
+## Pricing & license
+
+MatCMS is **source-available**: the code is here to read, run and change – under the [MatCMS License](LICENSE.md).
+
+| Who | Price |
+|---|---|
+| **Personal use** – your own homepage, blog, hobby or family site | **free** |
+| **Non-profits** – charitable associations, clubs, schools, universities | **free** |
+| **Businesses** – companies, freelancers, shops, agencies (for their clients' sites) | **9 € / month** or **99 € / year** per website |
+
+- Development, test and staging instances need no licence; businesses may try MatCMS for 30 days.
+- MatCMS Cloud is included for managing your own licensed or free sites. Offering MatCMS or the cloud as a
+  hosting service to others needs a separate agreement.
+- Plugins, templates and content you make yourself are yours.
+- No VAT is charged (small business, § 19 UStG).
+
+Licence for a business site: [matcms.de/preise](https://matcms.de/preise) or **kontakt@matcms.de**.
+Third-party components keep their own licences (see section 9 of the [licence](LICENSE.md)).
 
 ## Monorepo
 

@@ -255,3 +255,8 @@ Also runs at **http://localhost:9100**.
   Behind a reverse proxy enable `ForwardedHeaders` so the real client IP counts.
 - **Instance tokens** are stored only as a SHA-256 hash and compared in constant time.
 - **The Docker socket is the most critical part.** Only mount it if the cloud should run updates.
+
+## License
+
+MatCMS Cloud is part of MatCMS and under the [MatCMS License](../../LICENSE.md): free for managing your own
+licensed or free sites; offering it as a hosting service to others needs a separate agreement. Pricing: [matcms.de/preise](https://matcms.de/preise).

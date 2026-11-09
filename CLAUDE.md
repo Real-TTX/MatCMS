@@ -537,6 +537,14 @@ and maintenance pages) goes through `LocalFonts.Rewrite` when rendered. If Googl
 empty, uncached stylesheet (system fonts) — never a link to Google. A new place that emits template/user HTML must call `Rewrite` too.
 Trap: a minimal-API lambda taking ONLY `HttpContext` and returning a Task binds to `RequestDelegate` and drops its IResult (empty 200).
 
+## License and pricing
+
+The repository is **source-available under `LICENSE.md` (MatCMS License)**, not open source: personal and non-profit use free, commercial use
+9 €/month or 99 €/year per production instance (Kleinunternehmer, § 19 UStG — never write "zzgl. USt."), the cloud free for managing own sites,
+hosting for others by separate agreement. Prices live in THREE places that must agree: `LICENSE.md` §4, the README's "Pricing & license" and
+matcms.de/preise. A new third-party dependency must allow this: **SixLabors.ImageSharp stays on 2.1.x** (Apache 2.0) — 3.x is under the Six Labors
+Split License, which needs a paid licence for commercial users above $1M revenue; check any new package's licence the same way.
+
 ## Conventions
 
 Code, identifiers and comments in **English**; user-facing strings in **German**, via `@T["key"]`

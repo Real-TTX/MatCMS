@@ -81,3 +81,8 @@ Vor jedem neuen Upload die Version in `meta.json` erhöhen — dasselbe wie bei 
 - MatCMS läuft mit `InvariantGlobalization`: deutsche Zahlen/Monate von Hand formatieren.
 - Block-CSS über `AddHeadHtml` kommt im `<head>` nach dem Template-CSS — Templates überschreiben mit
   höherer Spezifität (`body .x{…}`).
+
+## Lizenz
+
+Die Plugins in diesem Ordner stehen unter der [MatCMS License](../LICENSE.md) wie der Rest des Repos.
+Eigene Plugins, die nur gegen `MatCMS.Plugin.Abstractions` geschrieben sind, gehören ihren Autoren und dürfen beliebig lizenziert werden.

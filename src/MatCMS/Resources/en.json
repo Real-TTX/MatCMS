@@ -963,6 +963,8 @@
   "backup.pluginsHint": "Plugins are matched by their key on restore and come back exactly as they were in the backup — switched on or off.",
   "backup.users": "Users (incl. passwords)",
   "backup.usersWarn": "Contains credentials (password hashes). Only enable for migrations to a new instance and keep the backup file secure.",
+  "backup.members": "Member accounts (guest area, customers, club members)",
+  "backup.membersHint": "Member accounts go into the backup with their number (passwords only as hashes). That keeps orders, member areas and plugin data with the right person after a move. A restore only adds missing accounts — existing ones stay as they are.",
   "backup.yes": "yes",
   "backup.download": "Download backup",
   "backup.restoreHeading": "Restore",

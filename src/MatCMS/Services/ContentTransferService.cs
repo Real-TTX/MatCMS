@@ -78,6 +78,13 @@ public class ContentTransferService
         public bool PluginAssets { get; set; } = true;
         /// <summary>Admin users incl. password hashes. OFF by default — sensitive; only for full migrations.</summary>
         public bool Users { get; set; } = false;
+        /// <summary>
+        /// The site's member accounts (<see cref="SiteMember"/> — the guest area, a shop's customers, a club's members) WITH their numbers, and the
+        /// role names they hold. ON by default: plugin data refers to accounts by number (orders, a club's member area, forum posts, a guest area),
+        /// and a backup without the accounts, restored into another site, made those numbers point at whoever got them there next — a guest opened
+        /// another household's photos. Password hashes ride along (never a password), one-time links (confirmation, reset) do not.
+        /// </summary>
+        public bool Members { get; set; } = true;
 
         /// <summary>
         /// Granular selection within a section (non-empty = only these items; null/empty = the whole
@@ -89,7 +96,7 @@ public class ContentTransferService
         public List<string>? FormSlugs { get; set; }     // by form Slug
 
         public bool Any => Templates || Pages || Menus || Settings || Submissions || Forms || Assets
-                           || Plugins || PluginAssets || Users;
+                           || Plugins || PluginAssets || Users || Members;
     }
 
     /// <summary>Stable identity of a page for granular backup/restore: slug + content locale.</summary>
@@ -112,6 +119,8 @@ public class ContentTransferService
         public int Components { get; set; }
         public int Plugins { get; set; }
         public int Users { get; set; }
+        /// <summary>Member accounts in the backup (0 for a backup from before they were carried).</summary>
+        public int Members { get; set; }
         public bool HasAssets { get; set; }
         /// <summary>How many plugin-asset files the ZIP carries. Shown before a restore like every other
         /// section — a number nobody sees is a section that gets restored blind.</summary>
@@ -451,6 +460,18 @@ public class ContentTransferService
                 }).ToList();
         }
 
+        if (options.Members)
+        {
+            dto.Members = (await _db.SiteMembers.AsNoTracking().OrderBy(m => m.Id).ToListAsync())
+                .Select(m => new MemberDto
+                {
+                    Id = m.Id, Username = m.Username, DisplayName = m.DisplayName, PasswordHash = m.PasswordHash, RolesCsv = m.RolesCsv,
+                    IsActive = m.IsActive, CreatedAt = m.CreatedAt, Email = m.Email, EmailConfirmedAt = m.EmailConfirmedAt,
+                    TwoFactorEnabled = m.TwoFactorEnabled, TotpSecret = m.TotpSecret, RecoveryCodes = m.RecoveryCodes
+                }).ToList();
+            dto.MemberRoles = await _db.SiteRoles.AsNoTracking().OrderBy(r => r.Name).Select(r => r.Name).ToListAsync();
+        }
+
         return JsonSerializer.Serialize(dto, WriteOpts);
     }
 
@@ -696,6 +717,17 @@ public class ContentTransferService
             count++;
         }
         return count;
+    }
+
+    /// <summary>
+    /// Makes sure the next member account made on this site gets a number ABOVE <paramref name="top"/>. The table is AUTOINCREMENT, which keeps
+    /// its counter in <c>sqlite_sequence</c> (a row there exists only once an account was ever made); raising it never lowers it.
+    /// </summary>
+    private async Task RaiseMemberNumbersAsync(int top)
+    {
+        await _db.Database.ExecuteSqlRawAsync("UPDATE sqlite_sequence SET seq = {0} WHERE name = 'SiteMembers' AND seq < {0}", top);
+        await _db.Database.ExecuteSqlRawAsync(
+            "INSERT INTO sqlite_sequence (name, seq) SELECT 'SiteMembers', {0} WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = 'SiteMembers')", top);
     }
 
     /// <summary>The seeded "admin" account whose password is still "admin".</summary>
@@ -1295,6 +1327,60 @@ public class ContentTransferService
             summary.Add($"{n} Plugins ({enabled} aktiv)");
         }
 
+        // Member accounts: ADD-ONLY and BY NUMBER. Plugin data refers to accounts by their number, so a missing account comes back under the very
+        // number it had. An account that exists here keeps everything of its own: a restore can come from a foreign backup, and it must never set
+        // a password or strip a second factor (the same rule as for admin accounts). A number that belongs to SOMEBODY ELSE here is not taken over
+        // but reported — plugin data with that number would otherwise open the other person's area.
+        if (dto.Members is not null)
+        {
+            var roleNames = (await _db.SiteRoles.Select(r => r.Name).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var wanted = (dto.MemberRoles ?? new List<string>())
+                .Concat(dto.Members.SelectMany(m => (m.RolesCsv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
+            foreach (var role in wanted)
+            {
+                var name = role.Trim();
+                if (name.Length is 0 or > 100 || !roleNames.Add(name)) continue;
+                _db.SiteRoles.Add(new SiteRole { Name = name });
+            }
+            var accounts = await _db.SiteMembers.ToListAsync();
+            int added = 0, kept = 0;
+            var conflicts = new List<string>();
+            foreach (var m in dto.Members.Where(m => m.Id > 0).OrderBy(m => m.Id))
+            {
+                var username = (m.Username ?? "").Trim();
+                if (username.Length == 0) continue;
+                var email = (m.Email ?? "").Trim().ToLowerInvariant();
+                var same = accounts.FirstOrDefault(a => string.Equals(a.Username, username, StringComparison.OrdinalIgnoreCase) || (email.Length > 0 && a.Email == email));
+                if (same is not null)
+                {
+                    if (same.Id == m.Id) kept++;
+                    else conflicts.Add($"„{username}“ hat hier die Nummer {same.Id}, im Backup {m.Id}");
+                    continue;
+                }
+                if (accounts.FirstOrDefault(a => a.Id == m.Id) is SiteMember other)
+                {
+                    conflicts.Add($"Nummer {m.Id} gehört hier „{other.Username}“, „{username}“ nicht übernommen");
+                    continue;
+                }
+                var row = new SiteMember
+                {
+                    Id = m.Id, Username = username, DisplayName = m.DisplayName ?? "", PasswordHash = m.PasswordHash ?? "", RolesCsv = m.RolesCsv ?? "",
+                    IsActive = m.IsActive, CreatedAt = m.CreatedAt == default ? DateTime.UtcNow : m.CreatedAt, Email = email, EmailConfirmedAt = m.EmailConfirmedAt,
+                    TwoFactorEnabled = m.TwoFactorEnabled, TotpSecret = m.TotpSecret, RecoveryCodes = m.RecoveryCodes
+                };
+                _db.SiteMembers.Add(row);
+                accounts.Add(row);
+                added++;
+            }
+            await _db.SaveChangesAsync();
+            // No account made here afterwards may get a number the backup's data still refers to — also the numbers not taken over above.
+            if (dto.Members.Count > 0) await RaiseMemberNumbersAsync(dto.Members.Max(m => m.Id));
+            var line = $"{added} Mitgliederkonten übernommen" + (kept > 0 ? $", {kept} schon vorhanden" : "");
+            if (conflicts.Count > 0)
+                line += $"; {conflicts.Count} NICHT übernommen, weil ihre Nummer hier jemand anderem gehört ({string.Join("; ", conflicts.Take(5))}{(conflicts.Count > 5 ? " …" : "")})";
+            summary.Add(line);
+        }
+
         // Users: UPSERT by username (never a replace-all) so the current admin can't be locked out.
         if (dto.Users is not null)
         {
@@ -1514,6 +1600,7 @@ public class ContentTransferService
             Components = dto.Components?.Count ?? 0,
             Plugins = dto.Plugins?.Count ?? 0,
             Users = dto.Users?.Count ?? 0,
+            Members = dto.Members?.Count ?? 0,
             HasAssets = hasAssets,
             PluginAssets = pluginAssets,
             TemplatesPartial = dto.TemplatesPartial,
@@ -1545,8 +1632,31 @@ public class ContentTransferService
         public List<MediaDto>? Media { get; set; }
         public List<ComponentDto>? Components { get; set; }
         public List<UserDto>? Users { get; set; }
+        /// <summary>The member accounts with their numbers (null in a backup without them — restore leaves the accounts alone then).</summary>
+        public List<MemberDto>? Members { get; set; }
+        /// <summary>The role names the members hold (<see cref="SiteRole"/>), so a restored account keeps what its roles open.</summary>
+        public List<string>? MemberRoles { get; set; }
         public List<PostDto>? Posts { get; set; }
         public List<PluginDto>? Plugins { get; set; }
+    }
+
+    /// <summary>A member account as a backup carries it: its number is its identity for the plugin data that refers to it.</summary>
+    private sealed class MemberDto
+    {
+        public int Id { get; set; }
+        public string? Username { get; set; }
+        public string? DisplayName { get; set; }
+        public string? PasswordHash { get; set; }
+        public string? RolesCsv { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; }
+        public string? Email { get; set; }
+        public DateTime? EmailConfirmedAt { get; set; }
+        public bool TwoFactorEnabled { get; set; }
+        /// <summary>Encrypted with THIS site's keys: on another site it does not decrypt, so there the account signs in with its recovery codes
+        /// (key-independent hashes) until it sets the second factor up again — the same rule as for admin accounts.</summary>
+        public string? TotpSecret { get; set; }
+        public string? RecoveryCodes { get; set; }
     }
 
     private sealed class PluginDto

@@ -46,6 +46,7 @@ public class IndexModel : PageModel
     [BindProperty] public bool IncPlugins { get; set; }
     [BindProperty] public bool IncPluginAssets { get; set; }
     [BindProperty] public bool IncUsers { get; set; }
+    [BindProperty] public bool IncMembers { get; set; }
     // Granular within-section selection (empty = the whole section).
     [BindProperty] public List<string> TemplateNames { get; set; } = new();
     [BindProperty] public List<string> PageKeys { get; set; } = new();
@@ -103,6 +104,7 @@ public class IndexModel : PageModel
             Plugins = IncPlugins,
             PluginAssets = IncPluginAssets,
             Users = IncUsers,
+            Members = IncMembers,
             TemplateNames = Subset(TemplateNames, tplTotal),
             PageKeys = Subset(PageKeys, pageTotal),
             FormSlugs = Subset(FormSlugs, formTotal)

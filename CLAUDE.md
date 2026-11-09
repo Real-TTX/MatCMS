@@ -239,6 +239,15 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   (validated, then looked up — never from a request), values are parameters, a plugin's tables are `p_{key}_{name}` and
   `__plugin_tables` records the owner; a restore recomputes the destination and never trusts a table name from the backup; only a
   built-in plugin may `Adopt` an existing table. The cleanup reads the text of ALL plugin tables, loaded or not.
+- **Member accounts travel in backups WITH their numbers** (`BackupOptions.Members` / schedule `Members`, default ON, so cloud and scheduled
+  backups carry them; `ContentTransferService`, tests `MemberBackupTests`). Plugin data refers to accounts by number (orders, a club's member
+  area, forum posts, a guest area); before, a backup carried no accounts and, restored into ANOTHER site, those numbers pointed at whoever got
+  them there next — a Moments guest opened another household's photos. Restore is ADD-ONLY: a missing account comes back under its old number
+  (with roles, password hash, confirmation; never a one-time token); an existing account is never changed; a number that belongs to somebody
+  else here, or the same person under another number, is NOT merged but reported in the restore summary; and the member sequence is raised
+  above every number in the backup, so no account made later takes one. A backup from before (no `Members`) leaves accounts alone. Local
+  build scripts (`matcms-websites/*/build/export.mjs`) untick `IncMembers` — a build container's test accounts must never reach a live site.
+  A plugin that keeps its own account reference should still check it (Moments binds number AND the account's address).
 - **A plugin's admin pages answer with the same headers and cookies as its public routes** (`PluginResults.Apply` in `Pages/Admin/P/Index` too — it was
   missing, so a PDF's `Content-Disposition` or a `Cache-Control` silently fell away in the back office).
 - **`IPluginSite.LogoUrl`** is the site's own logo ("" while MatCMS's default is shown) — a DEFAULT interface member, so a plugin built against it still

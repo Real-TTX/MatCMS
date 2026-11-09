@@ -962,6 +962,8 @@
   "backup.pluginsHint": "Plugins werden beim Wiederherstellen anhand ihres Schlüssels abgeglichen und kommen genau so zurück, wie sie im Backup waren — eingeschaltet oder ausgeschaltet.",
   "backup.users": "Benutzer (inkl. Passwörter)",
   "backup.usersWarn": "Enthält Anmeldedaten (Passwort-Hashes). Nur für Umzüge auf eine neue Instanz aktivieren und die Backup-Datei sicher aufbewahren.",
+  "backup.members": "Mitgliederkonten (Gästebereich, Kunden, Vereinsmitglieder)",
+  "backup.membersHint": "Mitgliederkonten kommen mit ihrer Nummer ins Backup (Passwörter nur als Hash). So bleiben Bestellungen, Mitgliederbereiche und Plugin-Daten nach einem Umzug bei der richtigen Person. Beim Wiederherstellen werden nur fehlende Konten ergänzt – vorhandene bleiben, wie sie sind.",
   "backup.yes": "ja",
   "backup.download": "Backup herunterladen",
   "backup.restoreHeading": "Wiederherstellen (Restore)",

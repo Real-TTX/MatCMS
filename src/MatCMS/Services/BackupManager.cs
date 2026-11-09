@@ -79,6 +79,7 @@ public class BackupManager
         Assets = cfg.Assets,
         Plugins = cfg.Plugins,
         PluginAssets = cfg.PluginAssets,
+        Members = cfg.Members,
         TemplateNames = cfg.TemplateNames is { Count: > 0 } ? cfg.TemplateNames : null,
         PageKeys = cfg.PageKeys is { Count: > 0 } ? cfg.PageKeys : null,
         FormSlugs = cfg.FormSlugs is { Count: > 0 } ? cfg.FormSlugs : null

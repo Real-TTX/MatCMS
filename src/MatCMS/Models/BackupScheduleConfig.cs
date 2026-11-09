@@ -31,6 +31,9 @@ public class BackupScheduleConfig
     /// carrying them on the next run instead of only after someone re-saves the form. Its own tick
     /// because these are binaries: they can grow a backup, and the backup quota is finite.</summary>
     public bool PluginAssets { get; set; } = true;
+    /// <summary>The member accounts with their numbers (see <c>ContentTransferService.BackupOptions.Members</c>). Default ON — a stored schedule from
+    /// before this field falls back to it, so the next scheduled and cloud backup already carries the accounts plugin data refers to.</summary>
+    public bool Members { get; set; } = true;
 
     // Granular within-section selection. Empty = the whole section; otherwise only these items.
     /// <summary>Template names to back up (empty = all).</summary>

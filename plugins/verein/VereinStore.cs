@@ -8,8 +8,11 @@ namespace MatCMS.Plugin.Verein;
 /// </summary>
 public sealed record Person(long Id, long MemberId, string First, string Last, string Email, string Phone, IReadOnlyList<string> Roles, string Joined,
     bool Active, string Note, DateTime? Created, bool Child = false, IReadOnlyList<long>? GuardianIds = null, string Born = "",
-    string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "", string Photo = "")
+    string Street = "", string Zip = "", string City = "", IReadOnlyDictionary<string, string>? ExtraValues = null, string CalToken = "", string Photo = "",
+    bool Passive = false)
 {
+    // Two different things that clubs both call "aktiv": Active = still in the club (false = a former member: left, died) — Passive = a supporting member
+    // who pays but does not take part (no Häs, no parade). A passive member is a member: in the directory, gets mails, can sign in.
     public string Name => (First + " " + Last).Trim();
     /// <summary>Has a site account (can sign in, gets mails). A child never; a grown-up member taken over from a list may not yet either.</summary>
     public bool HasAccount => MemberId > 0;
@@ -80,14 +83,14 @@ public sealed class VereinStore(IPluginData data)
     public const string Planned = "planned", Held = "held", Cancelled = "cancelled";
     public const string Draft = "draft", Final = "final";
     public const string Yes = "yes", No = "no", Maybe = "maybe";
-    public const string AudienceAll = "all", AudienceBoard = "board";
+    public const string AudienceAll = "all", AudienceBoard = "board", AudienceActive = "active";
     public const string TplDocument = "document", TplAgenda = "agenda", TplMinutes = "minutes";
 
     public static void Declare(IDataBuilder b)
     {
         b.Table(TPeople, t => t.Int("member_id", required: true).Text("first").Text("last").Text("email").Text("phone").Text("roles")
             .Text("joined").Bool("active", def: "1").Text("note").Timestamp("created")
-            .Bool("child", def: "0").Text("guardians").Text("born").Text("street").Text("zip").Text("city").Json("extra").Text("cal_token").Text("photo").UniqueIndex("member_id"));
+            .Bool("child", def: "0").Text("guardians").Text("born").Text("street").Text("zip").Text("city").Json("extra").Text("cal_token").Text("photo").Bool("passive", def: "0").UniqueIndex("member_id"));
         b.Table(TDocs, t => t.Text("title", required: true).Text("body").Text("kind", required: true).Text("audience", required: true)
             .Text("file").Text("file_name").Text("file_type").Text("due").Bool("archived", def: "0").Timestamp("created").Text("created_by").Index("archived"));
         b.Table(TAnswers, t => t.Int("doc_id", required: true).Int("member_id", required: true).Text("status", required: true).Text("signature")
@@ -128,7 +131,37 @@ public sealed class VereinStore(IPluginData data)
     private static Person P(DataRow r) => new(r.Id, r.Int("member_id"), r.Text("first"), r.Text("last"), r.Text("email"), r.Text("phone"),
         SplitRoles(r.Text("roles")), r.Text("joined"), r.Bool("active"), r.Text("note"), r.Timestamp("created"), r.Bool("child"),
         r.Text("guardians").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var g) ? g : 0).Where(g => g > 0).Distinct().ToList(), r.Text("born"),
-        r.Text("street"), r.Text("zip"), r.Text("city"), ReadExtra(r), r.Text("cal_token"), r.Text("photo"));
+        r.Text("street"), r.Text("zip"), r.Text("city"), ReadExtra(r), r.Text("cal_token"), r.Text("photo"), r.Bool("passive"));
+
+    /// <summary>Active or passive membership (a separate write: the person forms post it, the older save methods stay as they are).</summary>
+    public Task<int> SetPassiveAsync(long id, bool passive, CancellationToken ct = default) =>
+        People.UpdateAsync(id, new Dictionary<string, object?> { ["passive"] = passive }, ct);
+
+    /// <summary>
+    /// Before there was a membership type a club wrote "passiv" into one of its own fields (Figur: "passiv", "Hexe (passiv)"). Taken over once: the
+    /// person becomes passive and the field keeps what is left ("Hexe") or is emptied. Returns how many people changed.
+    /// </summary>
+    public async Task<int> TakeOverPassiveFromFieldsAsync(CancellationToken ct = default)
+    {
+        var changed = 0;
+        foreach (var p in await PeopleAsync(ct))
+        {
+            var extra = new Dictionary<string, string>(p.Extra);
+            var found = false;
+            foreach (var (k, v) in p.Extra)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(v.Trim(), @"^(.*?)[\s,;/-]*\(?\s*(?<!\p{L})passiv(?:es Mitglied|mitglied)?\s*\)?$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (!m.Success) continue;
+                found = true;
+                extra[k] = m.Groups[1].Value.Trim();
+            }
+            if (!found) continue;
+            await SaveDetailsAsync(p.Id, p.Born, p.Street, p.Zip, p.City, extra, ct);
+            if (!p.Passive) await SetPassiveAsync(p.Id, true, ct);
+            changed++;
+        }
+        return changed;
+    }
 
     private static IReadOnlyDictionary<string, string> ReadExtra(DataRow r)
     {
@@ -209,6 +242,7 @@ public sealed class VereinStore(IPluginData data)
     public static bool InAudience(Person p, string audience, IReadOnlyCollection<string> boardRoles)
     {
         if (audience == AudienceAll) return true;
+        if (audience == AudienceActive) return !p.Passive;
         if (audience == AudienceBoard) return p.Roles.Any(r => boardRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
         return audience.StartsWith("role:", StringComparison.Ordinal) && p.Has(audience[5..]);
     }
@@ -280,11 +314,11 @@ public sealed class VereinStore(IPluginData data)
         (await EventsAsync(ct)).Where(e => !e.Draft && (!publicOnly || e.Public) && string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, today) >= 0)
             .Take(Math.Max(1, max)).ToList();
 
-    /// <summary>Who is asked to reply: the active members of the chosen audience; with „alle“ the children too (their guardians answer for them).</summary>
+    /// <summary>Who is asked to reply: the current members of the chosen audience; with „alle“ / „aktive“ the (active) children too (their guardians answer for them).</summary>
     public static IEnumerable<Person> Asked(IEnumerable<Person> people, Event e, IReadOnlyCollection<string> boardRoles)
     {
         var audience = e.AskAudience.Length > 0 ? e.AskAudience : AudienceAll;
-        return people.Where(p => p.Active && (p.Child ? audience == AudienceAll : InAudience(p, audience, boardRoles)));
+        return people.Where(p => p.Active && (p.Child ? audience == AudienceAll || (audience == AudienceActive && !p.Passive) : InAudience(p, audience, boardRoles)));
     }
 
     /// <summary>The people a member answers for: themself (when asked) and their asked children.</summary>

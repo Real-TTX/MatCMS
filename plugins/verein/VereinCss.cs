@@ -227,12 +227,14 @@ public static class VereinCss
 .vm .vm-seg .vm-pick+.vm-pick{border-left:1px solid var(--vm-line)}
 .vm .vm-seg .vm-pick.on:not(.yes):not(.no){background:var(--vm-accent);color:#fff}
 /* the member list: one line per person, the rest folds out */
-.vm .vm-people{gap:10px}
+.vm .vm-people{gap:10px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 .vm details.vm-person{display:block;padding:0;border:1px solid var(--vm-line);border-radius:12px;background:#fff}
 .vm details.vm-person summary{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;list-style:none}
 .vm details.vm-person summary::-webkit-details-marker{display:none}
 .vm .vm-person-main{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
-.vm .vm-person-main strong{overflow-wrap:anywhere}.vm .vm-person-main small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* a name breaks between words (a card is wide enough for "Baumgärtner"); the roles may take two lines instead of being cut to "Mitglied, Kas…" */
+.vm .vm-person-main strong{overflow-wrap:break-word;line-height:1.3}
+.vm .vm-person-main small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35}
 .vm .vm-person-acts{display:flex;gap:6px;flex:none}
 .vm .vm-icon-btn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;border:1px solid var(--vm-line);color:var(--vm-accent);background:#fff;text-decoration:none;font-size:18px}
 .vm .vm-icon-btn:hover{background:var(--vm-soft)}
@@ -256,7 +258,7 @@ public static class VereinCss
 }
 /* a long word (an e-mail address, a name) may not widen its column — it made the profile's card and the member list wider than the phone */
 .vm .vm-grid2>*,.vm .vm-row2>*,.vm .vm-people>*,.vm .vm-main>*{min-width:0}
-.vm .vm-facts dd,.vm .vm-person-more a{overflow-wrap:anywhere;min-width:0}
+.vm .vm-facts dd,.vm .vm-person-more a{overflow-wrap:break-word;min-width:0}
 .vm .vm-reply h3{margin-top:22px}
 """;
 }

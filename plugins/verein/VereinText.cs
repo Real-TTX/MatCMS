@@ -87,6 +87,9 @@ public static class V
 {
     public static string H(string? s) => WebUtility.HtmlEncode(s ?? "");
 
+    /// <summary>An e-mail address that may wrap only after the "@" and before a dot — "overflow-wrap:anywhere" cut it into "markus@schalksteinnarr|en.de".</summary>
+    public static string Mail(string? s) => H(s).Replace("@", "@<wbr>").Replace(".", "<wbr>.");
+
     public static string Clip(string? s, int max)
     {
         var t = (s ?? "").Replace("\r\n", "\n").Trim();

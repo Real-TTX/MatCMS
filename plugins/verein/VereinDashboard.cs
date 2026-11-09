@@ -98,7 +98,9 @@ public static class VereinDashboard
             Ui.PageHead("Mitglieder, Dokumente, Sitzungen und Termine auf einen Blick", VereinSettings.Club(ctx),
                 Ui.Button("Mitgliederbereich öffnen", VereinPublic.Base, UiButtonKind.Ghost, "ti-external-link", small: true)),
             Ui.Stats(
-                Ui.Stat("Aktive Mitglieder", people.Count.ToString(CultureInfo.InvariantCulture), people.Count(p => p.Child) is var k and > 0 ? "davon " + k + " Kinder" : null, href: R + "members"),
+                Ui.Stat("Mitglieder", people.Count.ToString(CultureInfo.InvariantCulture),
+                    new[] { people.Count(p => p.Child) is var k and > 0 ? k + " Kinder" : null, people.Count(p => p.Passive) is var pa and > 0 ? pa + " passiv" : null }
+                        .Where(x => x is not null).ToList() is { Count: > 0 } of ? "davon " + string.Join(", ", of) : null, href: R + "members"),
                 Ui.Stat("Ohne Zugang", people.Count(p => !p.Child && !p.HasAccount).ToString(CultureInfo.InvariantCulture), "nur geführt", href: R + "members?status=ohne-zugang"),
                 Ui.Stat("Offene Bestätigungen", open.ToString(CultureInfo.InvariantCulture), tone: open > 0 ? UiTone.Warning : UiTone.Success, href: R + "docs"),
                 Ui.Stat("Uploads zur Freigabe", waiting.ToString(CultureInfo.InvariantCulture), tone: waiting > 0 ? UiTone.Warning : UiTone.Default, href: R + "uploads?status=offen")),

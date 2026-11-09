@@ -57,6 +57,13 @@ public sealed class VereinPlugin : IPlugin
         b.Lifecycle.OnLoad(async ctx =>
         {
             var store = new VereinStore(ctx.Data);
+            // 1.14 brought the membership type: "passiv" written into a club field before is taken over once (a marker, so a later field value stays)
+            if (await store.Meta.FindAsync(DataQuery.Everything.Eq("name", "passive-from-fields"), default) is null)
+            {
+                var n = await store.TakeOverPassiveFromFieldsAsync();
+                await store.Meta.InsertAsync(new Dictionary<string, object?> { ["name"] = "passive-from-fields", ["value"] = n.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+                if (n > 0) ctx.Log(n + " Mitglied(er) aus dem Feldwert „passiv“ als Passivmitglied übernommen.");
+            }
             if (await store.Meta.FindAsync(DataQuery.Everything.Eq("name", "seeded"), default) is not null) return;
             if (await store.Templates.CountAsync(null) == 0)
                 foreach (var (name, kind, title, body) in VereinSeed.Templates)

@@ -774,19 +774,60 @@ public class VereinTests : IClassFixture<VereinApp>
         var admin = await _app.AsAsync("admin");
         var html = await admin.GetStringAsync("/admin/p/verein/members");
         var page = Text(html);
-        foreach (var tab in new[] { "Aktiv (", "Erwachsene (", "Kinder (", "Ohne Zugang (", "Inaktiv (", "Alle (" }) Assert.Contains(tab, page);
+        foreach (var tab in new[] { "Mitglieder (", "Erwachsene (", "Kinder (", "Passiv (", "Ohne Zugang (", "Ehemalige (", "Alle (" }) Assert.Contains(tab, page);
         Assert.Contains("Ottilie Muster", page);
         Assert.Contains("Mitglied seit", page);
         Assert.Contains("Rolle: Kassierer/in", page);                                     // the role filter …
         Assert.Matches("<option value=\"\"[^>]*>Alle Rollen", html);                       // … opening on everybody
         Assert.Matches("data-tags=\"[^\"]*\\br\\d+\\b", html);                            // rows carry their role tags for it
-        Assert.Contains("aktiv · Zugang", page);
-        // switched off: gone from the default view, there under "Inaktiv"
-        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + id, new() { ["first"] = "Ottilie", ["last"] = "Muster", ["note"] = "Ausgetreten" });
+        Assert.Contains("Zugang", page);
+        // ticked as former member: gone from the default view, there under "Ehemalige"
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + id, new() { ["first"] = "Ottilie", ["last"] = "Muster", ["note"] = "Ausgetreten", ["former"] = "true" });
         Assert.DoesNotContain("Ottilie Muster", Text(await admin.GetStringAsync("/admin/p/verein/members")));
         var inactive = Text(await admin.GetStringAsync("/admin/p/verein/members?status=inaktiv"));
         Assert.Contains("Ottilie Muster", inactive);
         Assert.Contains("Ausgetreten", inactive);
+    }
+
+    [Fact]
+    public async Task Passive_members_are_a_membership_type_taken_over_from_a_field_and_left_out_of_what_is_only_for_active_ones()
+    {
+        var pia = await JoinAsync("pia", "Mitglied");
+        var paul = await JoinAsync("paul", "Mitglied");
+        // before 1.14 a club wrote "passiv" into its own field; the next load takes it over once and leaves the rest of the value
+        _app.Db(db =>
+        {
+            db.Database.ExecuteSqlRaw("UPDATE p_verein_people SET extra = '{{\"Figur\":\"Hexe (passiv)\"}}' WHERE id = " + paul);
+            db.Database.ExecuteSqlRaw("DELETE FROM p_verein_meta WHERE name = 'passive-from-fields'");
+            return 0;
+        });
+        using (var scope = _app.App.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(_app.Db(db => db.Plugins.First(p => p.Key == "verein").Id));
+        Assert.Equal(1L, _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT passive AS Value FROM p_verein_people WHERE id = " + paul).AsEnumerable().Single()));
+        Assert.Contains("\"Hexe\"", _app.Db(db => db.Database.SqlQueryRaw<string>("SELECT extra AS Value FROM p_verein_people WHERE id = " + paul).AsEnumerable().Single()));
+
+        var admin = await _app.AsAsync("admin");
+        var passive = Text(await admin.GetStringAsync("/admin/p/verein/members?status=passiv"));
+        Assert.Contains("Paul Muster", passive);
+        Assert.DoesNotContain("Pia Muster", passive);
+        Assert.Contains("passiv", Text(await admin.GetStringAsync("/admin/p/verein/members")));   // the page head counts them
+        // still a member: in the directory, marked
+        var dir = Text(await (await _app.AsAsync("paul")).GetStringAsync("/mitglied/profil"));
+        Assert.Contains("passiv (Fördermitglied)", dir);
+
+        // a document only for the active members leaves the passive one out
+        var docId = await NewDocAsync("Häs-Ausgabe", "confirm", "active");
+        var doc = Text(await admin.GetStringAsync("/admin/p/verein/docs/" + docId));
+        Assert.Contains("Pia Muster", doc);
+        Assert.DoesNotContain("Paul Muster", doc);
+
+        // the form sets the type; "Ausgetreten" is a separate box, and saving without it keeps the person in the club
+        await VereinApp.PostFormAsync(admin, "/admin/p/verein/members/" + pia, new() { ["first"] = "Pia", ["last"] = "Muster", ["roles"] = "Mitglied", ["membership"] = "passive" });
+        Assert.Equal(1L, _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT passive AS Value FROM p_verein_people WHERE id = " + pia).AsEnumerable().Single()));
+        Assert.Equal(1L, _app.Db(db => db.Database.SqlQueryRaw<long>("SELECT active AS Value FROM p_verein_people WHERE id = " + pia).AsEnumerable().Single()));
+        var csv = await admin.GetStringAsync("/admin/p/verein/members/csv");
+        Assert.Contains("\"Mitgliedschaft\"", csv);
+        Assert.Matches("\"Muster\";\"Pia\";[^\\r\\n]*\"passiv\";\"Mitglied\"", csv);
     }
 
     private string LogOfVerein()

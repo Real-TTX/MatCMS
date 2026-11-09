@@ -898,9 +898,9 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
         {
             var mailable = p.Email.Length > 0 && !VereinMail.Parkable(p.Email);   // a parked address (xxx_…, a list taken over) is the board's record, not a way to write to somebody
             var firstPhone = p.Phone.Split(new[] { " · ", ";" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "";
-            var more = PhoneLinks(p.Phone) + (mailable ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.H(p.Email) + "</a>" : "") + Details(p);
+            var more = PhoneLinks(p.Phone) + (mailable ? "<a href=\"mailto:" + V.H(p.Email) + "\">" + V.Mail(p.Email) + "</a>" : "") + Details(p);
             return "<details class=\"vm-person\"><summary>" + VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p), 40) + "<span class=\"vm-person-main\"><strong>" + V.H(p.Name) + "</strong><small>" +
-                V.H(string.Join(", ", p.Roles)) + "</small></span><span class=\"vm-person-acts\">" +
+                V.H(string.Join(", ", p.Roles)) + (p.Passive ? " · passiv" : "") + "</small></span><span class=\"vm-person-acts\">" +
                 (firstPhone.Length > 0 ? "<a class=\"vm-icon-btn\" href=\"tel:" + V.H(new string(firstPhone.Where(c => char.IsDigit(c) || c == '+').ToArray())) + "\" title=\"Anrufen: " + V.H(firstPhone) + "\" aria-label=\"" + V.H(p.Name) + " anrufen\"><i class=\"ti ti-phone\" aria-hidden=\"true\"></i></a>" : "") +
                 (mailable ? "<a class=\"vm-icon-btn\" href=\"mailto:" + V.H(p.Email) + "\" title=\"E-Mail: " + V.H(p.Email) + "\" aria-label=\"E-Mail an " + V.H(p.Name) + "\"><i class=\"ti ti-mail\" aria-hidden=\"true\"></i></a>" : "") +
                 "</span></summary>" + (more.Length > 0 ? "<div class=\"vm-person-more\">" + more + "</div>" : "") + "</details>";
@@ -1029,7 +1029,7 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
           .Append(p.Photo.Length > 0 ? "<button class=\"vm-btn ghost\" type=\"submit\" name=\"action\" value=\"nophoto\" formnovalidate data-confirm=\"Profilbild entfernen?\">Entfernen</button>" : "")
           .Append("</div></form></div><p class=\"vm-muted\">Das Bild sehen andere Mitglieder in der Mitgliederliste – auf der Website erscheint es nicht.</p></section>").Append(VereinPhoto.Script);
         sb.Append("<div class=\"vm-grid2\"><section class=\"vm-card\"><h2>Meine Angaben</h2><dl class=\"vm-facts\"><dt>Name</dt><dd>").Append(V.H(p.Name)).Append("</dd><dt>E-Mail</dt><dd>")
-          .Append(V.H(p.Email)).Append("</dd><dt>Rollen</dt><dd>").Append(V.H(p.Roles.Count > 0 ? string.Join(", ", p.Roles) : "–")).Append("</dd>");
+          .Append(V.Mail(p.Email)).Append("</dd><dt>Mitgliedschaft</dt><dd>").Append(p.Passive ? "passiv (Fördermitglied)" : "aktiv").Append("</dd><dt>Rollen</dt><dd>").Append(V.H(p.Roles.Count > 0 ? string.Join(", ", p.Roles) : "–")).Append("</dd>");
         if (p.Joined.Length > 0) sb.Append("<dt>Mitglied seit</dt><dd>").Append(V.H(V.Date(p.Joined))).Append("</dd>");
         if (p.Born.Length > 0) sb.Append("<dt>Geburtsdatum</dt><dd>").Append(V.H(V.Date(p.Born))).Append("</dd>");
         foreach (var f in VereinSettings.Fields(ctx))

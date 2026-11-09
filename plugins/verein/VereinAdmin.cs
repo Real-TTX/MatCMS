@@ -84,10 +84,10 @@ public static class VereinAdmin
     private static PluginResult Page(UiNode tree, string title) => PluginResult.Page(tree, title);
 
     private static UiOption[] AudienceOptions(IPluginContext ctx) =>
-        new[] { Ui.Option(VereinStore.AudienceAll, "Alle Mitglieder"), Ui.Option(VereinStore.AudienceBoard, "Nur der Vorstand") }
+        new[] { Ui.Option(VereinStore.AudienceAll, "Alle Mitglieder"), Ui.Option(VereinStore.AudienceActive, "Nur aktive Mitglieder (ohne Passive)"), Ui.Option(VereinStore.AudienceBoard, "Nur der Vorstand") }
             .Concat(VereinSettings.RoleList(ctx).Select(r => Ui.Option("role:" + r, "Rolle: " + r))).ToArray();
 
-    private static string AudienceLabel(string a) => a == VereinStore.AudienceAll ? "Alle" : a == VereinStore.AudienceBoard ? "Vorstand" : a.StartsWith("role:") ? a[5..] : a;
+    private static string AudienceLabel(string a) => a == VereinStore.AudienceAll ? "Alle" : a == VereinStore.AudienceActive ? "Aktive" : a == VereinStore.AudienceBoard ? "Vorstand" : a.StartsWith("role:") ? a[5..] : a;
 
     private static string Sent(int sent, int failed) => failed == 0 ? $"{sent} E-Mail(s) verschickt." : $"{sent} E-Mail(s) verschickt, {failed} nicht (siehe Plugin-Protokoll).";
 
@@ -106,14 +106,16 @@ public static class VereinAdmin
         var byId = people.ToDictionary(p => p.Id);
         string Guardians(Person c) => string.Join(", ", c.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : "").Where(n => n.Length > 0));
 
-        // Status as tabs (the list opens on the active members), role and the club's own fields (Figur …) as the toolbar's filter.
+        // Status as tabs (the list opens on the current members), role and the club's own fields (Figur …) as the toolbar's filter. The keys are
+        // addresses (bookmarks, links) and stay: "aktiv" = everybody still in the club, "inaktiv" = the former members.
         var tabs = new (string Key, string Label, Func<Person, bool> Fits)[]
         {
-            ("aktiv", "Aktiv", p => p.Active),
+            ("aktiv", "Mitglieder", p => p.Active),
             ("erwachsene", "Erwachsene", p => p.Active && !p.Child),
             ("kinder", "Kinder", p => p.Active && p.Child),
+            ("passiv", "Passiv", p => p.Active && p.Passive),
             ("ohne-zugang", "Ohne Zugang", p => p.Active && !p.Child && !p.HasAccount),
-            ("inaktiv", "Inaktiv", p => !p.Active),
+            ("inaktiv", "Ehemalige", p => !p.Active),
             ("alle", "Alle", _ => true)
         };
         var chosen = tabs.FirstOrDefault(t => t.Key == ctx.Request.Q("status")) is { Key: not null } tt ? tt : tabs[0];
@@ -139,16 +141,16 @@ public static class VereinAdmin
             {
                 var cells = new List<object?>
                 {
-                    Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null),
+                    Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null, p.Passive ? Ui.Badge("passiv") : null),
                     string.Join(", ", p.Roles)
                 };
                 cells.AddRange(fields.Take(3).Select(f => (object?)(p.Extra.TryGetValue(f.Label, out var v) ? v : "")));
                 cells.Add(p.Born.Length > 0 ? V.Date(p.Born) + (Age(p.Born) is int a ? " (" + a + ")" : "") : "");
                 cells.Add(p.Joined.Length > 0 ? V.Date(p.Joined) : "");
-                cells.Add(p.Child ? Guardians(p) : string.Join(" · ", new[] { p.Phone, VereinMail.Parkable(p.Email) ? "" : p.Email }.Where(x => x.Length > 0)));
+                cells.Add(p.Child ? Guardians(p) : Contact(p));
                 cells.Add(p.Active ? OpenOf(p) : 0);
-                cells.Add(!p.Active ? Ui.Badge(InactiveLabel(p)) : p.Child ? Ui.Badge("aktiv", UiTone.Success) : p.HasAccount ? Ui.Badge("aktiv · Zugang", UiTone.Success) : Ui.Badge("aktiv · ohne Zugang", UiTone.Warning));
-                return Ui.RowFor(p.Name + " " + p.Email + " " + p.Phone + " " + string.Join(" ", p.Roles) + " " + string.Join(" ", p.Extra.Values) + " " + p.City + (p.Child ? " kind " + Guardians(p) : ""), cells.ToArray()) with { Tags = Tags(p) };
+                cells.Add(!p.Active ? Ui.Badge(InactiveLabel(p)) : p.Child ? Ui.Badge("Mitglied", UiTone.Success) : p.HasAccount ? Ui.Badge("Zugang", UiTone.Success) : Ui.Badge("ohne Zugang", UiTone.Warning));
+                return Ui.RowFor(p.Name + " " + p.Email + " " + p.Phone + " " + string.Join(" ", p.Roles) + " " + string.Join(" ", p.Extra.Values) + " " + p.City + (p.Child ? " kind " + Guardians(p) : "") + (p.Passive ? " passiv" : ""), cells.ToArray()) with { Tags = Tags(p) };
             }), searchPlaceholder: "Name, Ort, Telefon, Nr. …", pageSize: 50,
             emptyText: people.Count == 0 ? "Noch keine Mitglieder. Lege das erste an." : "In dieser Ansicht ist niemand.") with
         {
@@ -157,8 +159,10 @@ public static class VereinAdmin
         };
         var activeCount = people.Count(p => p.Active);
         var kids = people.Count(p => p.Active && p.Child);
+        var passive = people.Count(p => p.Active && p.Passive);
+        var of = new[] { kids > 0 ? kids + " Kinder" : null, passive > 0 ? passive + " passiv" : null }.Where(x => x is not null).ToList();
         return Page(Ui.Stack(
-            Ui.PageHead(activeCount + " aktive Mitglieder" + (kids > 0 ? ", davon " + kids + " Kinder" : "") + (people.Count > activeCount ? " · " + (people.Count - activeCount) + " inaktiv" : ""), "Mitglieder",
+            Ui.PageHead(activeCount + " Mitglieder" + (of.Count > 0 ? ", davon " + string.Join(", ", of) : "") + (people.Count > activeCount ? " · " + (people.Count - activeCount) + " ehemalige" : ""), "Mitglieder",
                 Ui.Button("Liste als CSV", Root + "members/csv", UiButtonKind.Ghost, "ti-file-spreadsheet")),
             Ui.Tabs(tabs.Select(t => Ui.Tab(t.Label + " (" + people.Count(t.Fits) + ")", Root + "members" + (t.Key == "aktiv" ? "" : "?status=" + t.Key), t.Key == chosen.Key)).ToArray()),
             table), "Mitglieder");
@@ -173,8 +177,25 @@ public static class VereinAdmin
         return age is >= 0 and < 130 ? age : null;
     }
 
-    /// <summary>Why someone is inactive, as the board wrote it on the note's first line ("Ausgetreten", "Verstorben") — else "inaktiv".</summary>
-    internal static string InactiveLabel(Person p) => p.Note.Split('\n')[0].Trim() is { Length: > 0 and <= 24 } first ? first : "inaktiv";
+    /// <summary>Why someone is a former member, as the board wrote it on the note's first line ("Ausgetreten", "Verstorben") — else "ehemalig".</summary>
+    internal static string InactiveLabel(Person p) => p.Note.Split('\n')[0].Trim() is { Length: > 0 and <= 24 } first ? first : "ehemalig";
+
+    /// <summary>Phone and mail as two pieces that wrap as a whole (one string joined by " · " broke in the middle of the address); a parked address (xxx_…) is not shown.</summary>
+    private static UiNode Contact(Person p)
+    {
+        var phone = p.Phone.Length > 0 ? Ui.Text(p.Phone) : null;
+        var mail = p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? Ui.Muted(p.Email) : null;
+        return phone is null && mail is null ? Ui.Text("") : Ui.Inline(phone, mail);
+    }
+
+    /// <summary>The membership type: active (takes part) or passive (supporting member). Not "aktiv" as in still a member — that is the "Ausgetreten" box.</summary>
+    private static UiNode MembershipField(Person? p) =>
+        Ui.Select("membership", "Mitgliedschaft", p?.Passive == true ? "passive" : "active", Ui.Option("active", "Aktives Mitglied"), Ui.Option("passive", "Passives Mitglied (Fördermitglied)"));
+
+    private static bool PostedPassive(IPluginContext ctx) => ctx.Request.F("membership") == "passive";
+
+    private static UiNode FormerBox(Person p) =>
+        Ui.Checkbox("former", "Ausgetreten / ehemaliges Mitglied", !p.Active) with { Help = "Bleibt in der Liste unter „Ehemalige“ und bekommt keine Nachrichten mehr." };
 
     /// <summary>A child: name, birthday, roles, guardians (one or more grown-up members) — no mail, no account; documents and mails go to the guardians.</summary>
     private static async Task<PluginResult> ChildAsync(IPluginContext ctx, CancellationToken ct)
@@ -203,8 +224,9 @@ public static class VereinAdmin
             if (first.Length == 0) return PluginResult.Redirect(Root + "children/" + (isNew ? "new" : c!.Id), "Bitte einen Vornamen eingeben.", true);
             if (guardians.Count == 0) return PluginResult.Redirect(Root + "children/" + (isNew ? "new" : c!.Id), "Bitte mindestens ein Elternteil / eine erziehungsberechtigte Person auswählen.", true);
             var id = await store.SaveChildAsync(c?.Id ?? 0, first, last, V.CleanDate(ctx.Request.F("born")), PostedRoles(ctx),
-                V.CleanDate(ctx.Request.F("joined")), isNew || V.Checked(ctx.Request.F("active")), V.Clip(ctx.Request.F("note"), 2000), guardians, ct);
+                V.CleanDate(ctx.Request.F("joined")), isNew || !V.Checked(ctx.Request.F("former")), V.Clip(ctx.Request.F("note"), 2000), guardians, ct);
             await store.SaveDetailsAsync(id, V.CleanDate(ctx.Request.F("born")), "", "", "", PostedFields(ctx), ct);
+            await store.SetPassiveAsync(id, PostedPassive(ctx), ct);
             return PluginResult.Redirect(Root + "children/" + id, isNew ? first + " ist eingetragen." : "Gespeichert.");
         }
 
@@ -221,10 +243,11 @@ public static class VereinAdmin
                 : Ui.Tags("guardians", "Eltern / Erziehungsberechtigte", string.Join(", ", currentGuardians), adults.Where(a => a.Active).Select(a => a.Name).OrderBy(n => n))
                     with { Help = "Mindestens eine Person – sie bekommt die Nachrichten und antwortet für das Kind." },
             Ui.Heading("Im Verein", 3),
+            MembershipField(c),
             RolesField(ctx, c?.Roles ?? new[] { roles[^1] }),
             FieldInputs(ctx, c),
             Ui.TextArea("note", "Notiz (nur im Admin)", c?.Note ?? "", 3),
-            isNew ? null : Ui.Checkbox("active", "Aktiv", c!.Active),
+            isNew ? null : FormerBox(c!),
             Ui.FormActions(Ui.Submit(isNew ? "Eintragen" : "Speichern"), Ui.Button("Zurück", Root + "members?status=kinder", UiButtonKind.Ghost)));
         if (isNew)
             return Page(Ui.Stack(Ui.PageHead("Ein Kind hat keine eigene E-Mail und keinen Zugang – Dokumente und Nachrichten gehen an die Eltern", "Kind eintragen"), Ui.Card(form)), "Kind eintragen");
@@ -316,13 +339,14 @@ public static class VereinAdmin
             var phone = V.Clip(ctx.Request.F("phone"), 40);
             var joined = V.CleanDate(ctx.Request.F("joined"));
             var note = V.Clip(ctx.Request.F("note"), 2000);
-            var active = isNew || V.Checked(ctx.Request.F("active"));
+            var active = isNew || !V.Checked(ctx.Request.F("former"));
             if (first.Length == 0 && last.Length == 0) return PluginResult.Redirect(Root + "members/" + (isNew ? "new" : p!.Id), "Bitte einen Namen eingeben.", true);
 
             // a new member WITHOUT access (no account, no mail) — most of a club's people never sign in; access can be set up later
             if (isNew && !V.Checked(ctx.Request.F("access")))
             {
                 var nid = await store.SavePersonAsync(0, VereinStore.Placeholder(), first, last, email, phone, chosen, joined, true, note, ct);
+                await store.SetPassiveAsync(nid, PostedPassive(ctx), ct);
                 await store.SaveDetailsAsync(nid, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
                 ctx.Log($"Mitglied {(first + " " + last).Trim()} (ohne Zugang) angelegt von {ctx.User.Name}");
                 return PluginResult.Redirect(Root + "members/" + nid, (first + " " + last).Trim() + " ist angelegt (ohne Zugang zum Mitgliederbereich).");
@@ -339,6 +363,7 @@ public static class VereinAdmin
                 if (await store.PersonOfMemberAsync(account.Id, ct) is Person existing)
                     return PluginResult.Redirect(Root + "members/" + existing.Id, "Zu dieser E-Mail-Adresse gibt es schon ein Mitglied.", true);
                 var id = await store.SavePersonAsync(0, account.Id, first, last, email, phone, chosen, joined, true, note, ct);
+                await store.SetPassiveAsync(id, PostedPassive(ctx), ct);
                 await store.SaveDetailsAsync(id, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
                 var person = (await store.PersonAsync(id, ct))!;
                 var notice = (first + " " + last).Trim() + " ist angelegt.";
@@ -360,6 +385,7 @@ public static class VereinAdmin
             // without an account the address is only the club's record (parked as xxx_… until access is set up) and may be edited here
             var keptEmail = p!.HasAccount ? p.Email : V.Clip(ctx.Request.F("email"), 160);
             await store.SavePersonAsync(p.Id, p.MemberId, first, last, keptEmail, phone, chosen, joined, active, note, ct);
+            await store.SetPassiveAsync(p.Id, PostedPassive(ctx), ct);
             await store.SaveDetailsAsync(p.Id, V.CleanDate(ctx.Request.F("born")), V.Clip(ctx.Request.F("street"), 120), V.Clip(ctx.Request.F("zip"), 10), V.Clip(ctx.Request.F("city"), 80), PostedFields(ctx), ct);
             return PluginResult.Redirect(Root + "members/" + p.Id, "Gespeichert.");
         }
@@ -376,13 +402,14 @@ public static class VereinAdmin
                 Ui.Input("phone", "Telefon", p?.Phone ?? "", UiInputType.Tel)),
             Ui.Grid(200, Ui.Input("street", "Straße und Hausnummer", p?.Street ?? ""), Ui.Input("zip", "PLZ", p?.Zip ?? ""), Ui.Input("city", "Ort", p?.City ?? "")),
             Ui.Heading("Im Verein", 3),
+            MembershipField(p),
             RolesField(ctx, p?.Roles ?? new[] { roles[^1] }),
             FieldInputs(ctx, p),
-            Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3) with { Help = isNew ? null : "Die erste Zeile erscheint bei inaktiven Mitgliedern als Kennzeichen in der Liste (z. B. „Ausgetreten“)." },
+            Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3) with { Help = isNew ? null : "Die erste Zeile erscheint bei ehemaligen Mitgliedern als Kennzeichen in der Liste (z. B. „Ausgetreten“, „Verstorben“)." },
             isNew ? Ui.Heading("Zugang zum Mitgliederbereich", 3) : null,
             isNew ? Ui.Checkbox("access", "Konto anlegen (Anmeldung unter " + VereinPublic.Base + ")", true) with { Help = "Ohne Haken wird das Mitglied nur geführt – den Zugang kannst du später einrichten." } : null,
             isNew ? Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Persönlich weitergeben – es wird nie per E-Mail verschickt." } : null,
-            isNew ? Ui.Checkbox("sendInvite", "Einladung per E-Mail schicken", true) : Ui.Checkbox("active", "Aktiv", p!.Active),
+            isNew ? Ui.Checkbox("sendInvite", "Einladung per E-Mail schicken", true) : FormerBox(p!),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost)));
 
         if (isNew) return Page(Ui.Stack(Ui.PageHead("Mit Zugang zum Mitgliederbereich oder nur geführt", "Neues Mitglied"), Ui.Card(form)), "Neues Mitglied");
@@ -1155,12 +1182,12 @@ public static class VereinAdmin
         var byId = people.ToDictionary(p => p.Id);
         var fields = VereinSettings.Fields(ctx);
         static string C(string s) { s ??= ""; if (s.Length > 0 && "=+-@".Contains(s[0])) s = "'" + s; return "\"" + s.Replace("\"", "\"\"") + "\""; }
-        var sb = new StringBuilder("﻿" + string.Join(";", new[] { "Nachname", "Vorname", "Art", "Rollen", "E-Mail", "Telefon", "Geburtsdatum", "Straße", "PLZ", "Ort", "Mitglied seit", "Aktiv", "Gehört zu" }
+        var sb = new StringBuilder("﻿" + string.Join(";", new[] { "Nachname", "Vorname", "Art", "Rollen", "E-Mail", "Telefon", "Geburtsdatum", "Straße", "PLZ", "Ort", "Mitglied seit", "Mitgliedschaft", "Status", "Gehört zu" }
             .Concat(fields.Select(f => f.Label)).Select(C)) + "\r\n");
         foreach (var p in people)
             sb.Append(string.Join(";", new[]
             {
-                p.Last, p.First, p.Child ? "Kind" : "Mitglied", string.Join(", ", p.Roles), p.Email, p.Phone, V.Date(p.Born), p.Street, p.Zip, p.City, V.Date(p.Joined), p.Active ? "ja" : "nein",
+                p.Last, p.First, p.Child ? "Kind" : "Mitglied", string.Join(", ", p.Roles), p.Email, p.Phone, V.Date(p.Born), p.Street, p.Zip, p.City, V.Date(p.Joined), p.Passive ? "passiv" : "aktiv", p.Active ? "Mitglied" : InactiveLabel(p),
                 string.Join(", ", p.Guardians.Select(g => byId.TryGetValue(g, out var x) ? x.Name : ""))
             }.Concat(fields.Select(f => p.Extra.TryGetValue(f.Label, out var v) ? v : "")).Select(C))).Append("\r\n");
         return PluginResult.File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv; charset=utf-8", "mitgliederliste-" + V.Today + ".csv");

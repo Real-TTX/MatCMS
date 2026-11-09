@@ -321,7 +321,8 @@ compose file, no `.env`; Matcad reads the key only from configuration, it has no
 proxy settings stay in its DB (set once in the UI or via `PUT /api/v1/hosting/proxy`). The Caddy service
 MUST be named `caddy` — Matcad's admin address `http://caddy:2019` is hard-wired.
 
-There is **no test project** in MatCMS; don't invent one unless asked.
+Tests: `dotnet test tests/MatCMS.Cloud.Tests` (in-memory SQLite, no web host) — profile inheritance, the effective
+configuration and the mail relay. Start a new cloud test there; it needs no running cloud.
 
 ## CI/CD & versioning — identical scheme
 
@@ -553,6 +554,43 @@ the connection as it was when taken, so restoring one used to rewind the token a
 the cloud seconds after a restore the cloud itself had triggered, and a foreign ZIP restored by hand
 would have handed this container another instance's identity); and imported plugins stay **disabled**
 because plugin code runs server-side.
+
+### Profile inheritance ("Erbt von")
+
+A profile may inherit from another (`Profile.ParentId`, General tab "Vererbung", REST `PATCH /api/v1/profiles/{id}`
+`parentId` (0 = none), MCP `update_profile parentId`). The rule: **a child adds and overrides, it never takes away** —
+everything the parent rolls out reaches the child's instances, and the child's own items win per identity. The rules live
+in ONE place, `Services/ProfileInheritance.cs` (`Effective` folds the chain into a detached profile), and
+`ProfileService.BuildConfigAsync` gathers every payload over the chain, root first. Load-bearing details:
+
+- **Per layer, the layer's own switch.** A profile's rows count only while ITS switch for that group is on — a parent's
+  stored-but-off SMTP never leaks into a child. Group switches are on when on anywhere in the chain.
+- **Mail**: the nearest profile with the mail group decides the source (relay / global / own) and "Name der Website als
+  Absender". Own SMTP below own or global SMTP only overrides what it fills in (an empty field = "not mine to say"), so a
+  child that needs only another sender address enters only that; a profile WITHOUT a parent still rolls out exactly what
+  it stores, empty fields included. The SSL box on such a child starts from the inherited value.
+- **Everything that reads a profile reads the EFFECTIVE one**: the relay (`MailSpool`), the AI relay and its budget
+  (`AiService`), backup-before-AI (`InstanceService`), backup quota and retention (`BackupStore`: child → parent →
+  default profile), the plugin bundle download (`FindPluginBundleAsync`, nearest first), the instance page. A new reader
+  must do the same, or a child silently behaves as if it had no parent.
+- **`TouchAsync` bumps every descendant too** — instances compare only their own profile's revision.
+- Guards: no loop, not itself, at most `MaxDepth` (5) profiles in a chain (`ParentProblem`); a profile with children
+  cannot be deleted (page, REST, MCP); the configuration backup carries the parent by NAME and sets it after all
+  profiles exist. Not inherited: name, join code, approval, default flag, notifications, auto-update.
+- "Wirksam" tab on the profile page and `GET /api/v1/profiles/{id}/effective` (MCP `get_profile_effective`): what the
+  instances get, each item with the profile it comes from — built by the same `BuildConfigAsync` (origins dictionary).
+
+### Sender name per site
+
+The address stays the profile's (or the cloud's, for the relay); the NAME can be the site's own: `Profile.MailFromSiteName`
+(mail page, REST `PUT …/smtp` `fromSiteName`, MCP `set_profile_smtp fromSiteName`) and, for one instance,
+`Instance.MailFromName` (Details → Konfiguration "Absendername", REST `PUT /api/v1/instances/{id}/mail-sender`, MCP
+`set_instance_mail_sender`; requests a resync). Relay: the cloud decides the name when the mail is QUEUED
+(`ProfileInheritance.SenderName`: instance name → site name the request offers in `MailRequest.SiteName` → the
+instance's name) and stores it on `SpooledMail.FromName`; the request never sets it directly. Rolled-out SMTP: the
+setting `smtp.fromSiteName` (the CMS's own switch too, Einstellungen → SMTP) or, with an instance name, `smtp.fromName`
+overwritten per instance in `BuildConfigForAsync` (the /config endpoint). Line breaks are stripped — it ends up in a header.
+The relay now also keeps `IsHtml` (`SpooledMail.IsHtml`): HTML mails used to go out as plain text, tags and all.
 
 ### Sync modes and the report back
 

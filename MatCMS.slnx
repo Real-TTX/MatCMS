@@ -5,5 +5,6 @@
   <Project Path="src/MatCMS/MatCMS.csproj" />
   <Project Path="src/MatCMS.Cloud/MatCMS.Cloud.csproj" />
   <Project Path="tests/MatCMS.Plugins.Tests/MatCMS.Plugins.Tests.csproj" />
+  <Project Path="tests/MatCMS.Cloud.Tests/MatCMS.Cloud.Tests.csproj" />
   <Project Path="tests/Fixtures/RefPlugin/RefPlugin.csproj" />
 </Solution>

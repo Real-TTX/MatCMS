@@ -78,7 +78,7 @@ public class MailSpoolService : BackgroundService
 
             // The cloud's own sender, always. What the instance may steer is where a reply goes —
             // that is the difference between a relay and an open door.
-            var (ok, error) = await email.SendAsync(recipients, mail.Subject, mail.Body, mail.ReplyTo);
+            var (ok, error) = await email.SendAsync(recipients, mail.Subject, mail.Body, mail.ReplyTo, mail.FromName, mail.IsHtml);
 
             mail.Attempts++;
             if (ok)

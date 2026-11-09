@@ -74,6 +74,25 @@ public class Profile
     /// applied revision — that is the entire "is this instance in sync?" question.</summary>
     public int Revision { get; set; } = 1;
 
+    /// <summary>
+    /// The profile this one inherits from ("Erbt von"), or null. Everything the parent rolls out reaches this profile's
+    /// instances too; what this profile carries itself is added on top and wins per identity (setting key, user name,
+    /// plugin key, …). A child can add and override, never take away. See <c>ProfileInheritance</c> for the exact rules.
+    /// <para>A plain column, not a navigation: the chain is resolved over the (tiny) set of profiles in memory, guarded
+    /// against loops and capped at <c>ProfileInheritance.MaxDepth</c>, and a profile with children cannot be deleted.</para>
+    /// </summary>
+    public int? ParentId { get; set; }
+
+    /// <summary>
+    /// The sender NAME of every mail is the site's own name ("Schalksteinnarren Besigheim &lt;noreply@…&gt;") while the
+    /// address stays the profile's (or the cloud's, for the relay). Part of the mail group: it only counts while
+    /// <see cref="SyncSmtp"/> is on. An instance can still be given a name of its own (<see cref="Instance.MailFromName"/>).
+    /// </summary>
+    public bool MailFromSiteName { get; set; }
+
+    /// <summary>A detached copy, for the effective (inherited) view of a profile — never to be saved.</summary>
+    public Profile Clone() => (Profile)MemberwiseClone();
+
     // --- Policy (was global before profiles existed; global settings are now only the fallback) ---
     public bool AutoUpdateLocal { get; set; }
     public bool NotifyOffline { get; set; } = true;

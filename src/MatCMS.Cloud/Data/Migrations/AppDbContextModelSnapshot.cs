@@ -367,6 +367,9 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<DateTime?>("LogFetchRequestedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MailFromName")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1062,6 +1065,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("MailFromSiteName")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("MailSource")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1084,6 +1090,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("NotifyUpdate")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ParentId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("PluginsMode")
@@ -1560,7 +1569,13 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("FromName")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("InstanceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsHtml")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("LastError")

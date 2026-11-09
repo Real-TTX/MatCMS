@@ -48,6 +48,10 @@ public class ProfileTools
     public static async Task<object> GetProfile(ProfileOpsService ops, [Description("Profile id (from list_profiles).")] int profileId) =>
         Unwrap(await ops.GetAsync(profileId));
 
+    [McpServerTool(Name = "get_profile_effective"), Description("What a profile's sites actually receive, WITH everything the profile inherits from its parent profile(s): settings (secrets masked), users, plugins, components, templates, mail templates, mail/AI transport — each item with the profile it comes from.")]
+    public static async Task<object> GetProfileEffective(ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
+        Unwrap(await ops.EffectiveAsync(profileId));
+
     [McpServerTool(Name = "get_recommended_settings"), Description("The settings every profile should carry for the full feature set, and which of them this profile is missing.")]
     public static async Task<object> GetRecommendedSettings(ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
         Unwrap(await ops.RecommendedAsync(profileId));
@@ -66,10 +70,11 @@ public class ProfileTools
         bool? syncSettings = null, bool? syncUsers = null, bool? syncPlugins = null, bool? syncComponents = null, bool? syncTemplates = null, bool? syncMailTemplates = null,
         bool? removeDefaultAdmin = null,
         [Description("Compiled (native) plugins on the profile's sites: allow | deny | empty string = leave each site's own switch alone.")] string? nativePlugins = null,
-        string? settingsMode = null, string? usersMode = null, string? pluginsMode = null, string? componentsMode = null, string? templatesMode = null, string? mailTemplatesMode = null) =>
+        string? settingsMode = null, string? usersMode = null, string? pluginsMode = null, string? componentsMode = null, string? templatesMode = null, string? mailTemplatesMode = null,
+        [Description("The profile this one INHERITS from: everything the parent rolls out reaches this profile's sites too, this profile adds and overrides (never removes). 0 = inherit from nothing. A loop or more than 5 levels is refused.")] int? parentId = null) =>
         WriteAsync(me, () => ops.PatchAsync(profileId, new ProfileOpsService.Patch(name, description, autoApprove, autoUpdateLocal,
             notifyOffline, notifyUpdate, notifyRecipients, activateTemplateName, syncSettings, syncUsers, syncPlugins, syncComponents,
-            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode, nativePlugins)));
+            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode, nativePlugins, parentId)));
 
     [McpServerTool(Name = "set_profile_ai"), Description("AI settings of a profile: whether its sites may use the cloud's AI, a monthly token budget per site (0 = unlimited), an instruction added to every request, and whether a site takes a backup before an AI change." + Rollout)]
     public static Task<object> SetProfileAi(McpContext me, ProfileOpsService ops, int profileId,
@@ -112,8 +117,9 @@ public class ProfileTools
 
     [McpServerTool(Name = "set_profile_smtp"), Description("Switch the SMTP group on. mailSource: 'own' = the sites send through the SMTP server given here, 'cloud' = they hand mail to the cloud. An empty password keeps the stored one." + Rollout)]
     public static Task<object> SetProfileSmtp(McpContext me, ProfileOpsService ops, int profileId, string? mailSource = null, string? host = null,
-        int? port = null, string? user = null, string? password = null, string? fromEmail = null, string? fromName = null, bool? ssl = null) =>
-        WriteAsync(me, () => ops.SetSmtpAsync(profileId, mailSource, host, port, user, password, fromEmail, fromName, ssl));
+        int? port = null, string? user = null, string? password = null, string? fromEmail = null, string? fromName = null, bool? ssl = null,
+        [Description("true = every mail's sender NAME is the site's own name (the address stays this profile's, or the cloud's for the relay).")] bool? fromSiteName = null) =>
+        WriteAsync(me, () => ops.SetSmtpAsync(profileId, mailSource, host, port, user, password, fromEmail, fromName, ssl, fromSiteName));
 
     [McpServerTool(Name = "disable_profile_smtp"), Description("Stop rolling out SMTP; the sites keep their own mail configuration. The stored values survive." + Rollout)]
     public static Task<object> DisableProfileSmtp(McpContext me, ProfileOpsService ops, int profileId) =>
@@ -198,5 +204,12 @@ public class ProfileTools
     {
         RequireManage(me);
         return Unwrap(await ops.SetNativePluginsAsync(await InstanceAsync(instances, me, instanceId, ct), nativePlugins));
+    }
+
+    [McpServerTool(Name = "set_instance_mail_sender"), Description("The sender NAME of ONE site's mails (e.g. the club's name for its forum and member mails), over its profile; empty string = the profile's choice. Only the name — the address stays the profile's or the cloud's. Applies to the cloud relay and to SMTP the profile rolls out.")]
+    public static async Task<object> SetInstanceMailSender(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, string name, CancellationToken ct)
+    {
+        RequireManage(me);
+        return Unwrap(await ops.SetMailSenderAsync(await InstanceAsync(instances, me, instanceId, ct), name));
     }
 }

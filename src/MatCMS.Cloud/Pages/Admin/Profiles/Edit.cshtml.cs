@@ -204,13 +204,51 @@ public class EditModel : PageModel
 
     public bool BackupToCloud { get; private set; }
 
+    // --- Inheritance ---------------------------------------------------------------------------
+    /// <summary>The profiles this one may inherit from (never itself or one below it).</summary>
+    public List<Profile> ParentChoices { get; private set; } = new();
+    /// <summary>What the parent chain rolls out, folded — drives the "vom Elternprofil an" notes. Null without a parent.</summary>
+    public Profile? Inherited { get; private set; }
+    public string? ParentName { get; private set; }
+    public List<string> Children { get; private set; } = new();
+    /// <summary>One row per item the instances get: area, identity, value (secrets masked), the profile it comes from.</summary>
+    public List<(string Area, string Item, string Value, string From)> Effective { get; private set; } = new();
+
     public async Task<IActionResult> OnGetAsync(int id)
     {
         if (!await LoadAsync(id)) return RedirectToPage("Index");
         DefaultProfile = Item.IsDefault ? null : await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault);
         MissingRecommended = await _profiles.MissingRecommendedAsync(Item.Id);
         GlobalQuotaGb = Item.IsDefault ? BackupStore.DefaultQuotaGb : await _backups.DefaultQuotaGbAsync();
+        await LoadInheritanceAsync();
         return Page();
+    }
+
+    private async Task LoadInheritanceAsync()
+    {
+        ParentChoices = await _profiles.ParentChoicesAsync(Item.Id);
+        Children = await _profiles.ChildNamesAsync(Item.Id);
+        if (Item.ParentId is int pid && await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid) is { } parent)
+        {
+            ParentName = parent.Name;
+            Inherited = await ProfileInheritance.EffectiveAsync(_db, parent);
+        }
+
+        // The SAME build the instances get, so this tab cannot disagree with what arrives.
+        var origins = new Dictionary<string, string>();
+        var c = await _profiles.BuildConfigAsync(Item, HttpContext.RequestAborted, origins);
+        string Of(string kind, string key) => origins.TryGetValue(kind + ":" + key, out var n) ? n : Item.Name;
+        static bool Secret(string k) => k.Contains("password", StringComparison.OrdinalIgnoreCase) || k.Contains("apikey", StringComparison.OrdinalIgnoreCase)
+            || k.Contains("secret", StringComparison.OrdinalIgnoreCase) || k.Contains("token", StringComparison.OrdinalIgnoreCase);
+        static string Short(string? v) => v is null ? "" : v.Length > 80 ? v[..80] + "…" : v;
+        if (c.MailTransport == "cloud") Effective.Add(("Mail", "Versand", "über die Cloud", ""));
+        foreach (var kv in (c.Settings ?? new()).OrderBy(k => k.Key))
+            Effective.Add(("Einstellung", kv.Key, Secret(kv.Key) && !string.IsNullOrEmpty(kv.Value) ? "•••" : Short(kv.Value), Of("setting", kv.Key)));
+        foreach (var u in c.Users ?? new()) Effective.Add(("Benutzer", u.Username, u.Role, Of("user", u.Username)));
+        foreach (var p in c.Plugins ?? new()) Effective.Add(("Plugin", p.Key, p.Version, Of("plugin", p.Key)));
+        foreach (var x in c.Components ?? new()) Effective.Add(("Komponente", x.Type, x.Name, Of("component", x.Type)));
+        foreach (var t in c.Templates ?? new()) Effective.Add(("Template", t.Name, t.Name == c.ActivateTemplate ? "wird aktiviert" : "", Of("template", t.Name)));
+        foreach (var m in c.MailTemplates ?? new()) Effective.Add(("Mailvorlage", m.Key, m.Subject, Of("mail", m.Key)));
     }
 
     private async Task<bool> LoadAsync(int id)
@@ -368,7 +406,7 @@ public class EditModel : PageModel
         string? activateTemplateName,
         string? backupQuotaGb = null,
         string? backupKeepDaily = null, string? backupKeepWeekly = null,
-        string? backupKeepMonthly = null, string? backupMaxCount = null, string? nativePlugins = null)
+        string? backupKeepMonthly = null, string? backupMaxCount = null, string? nativePlugins = null, string? parentId = null)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -415,6 +453,14 @@ public class EditModel : PageModel
         // Exactly one profile is the default, so this both sets and clears. Unticking the box on the
         // current default is ignored — some profile has to catch instances that resolve to none.
         if (isDefault && !profile.IsDefault) await _profiles.SetDefaultAsync(id);
+
+        // "Erbt von": only when the form carried the field. A loop or too deep a chain is refused, the rest is saved.
+        if (parentId is not null && await _profiles.SetParentAsync(id, int.TryParse(parentId, out var pid) ? pid : null) is { } problem)
+        {
+            await _profiles.TouchAsync(id);
+            TempData["FlashError"] = "Gespeichert, aber „Erbt von“ nicht: " + problem;
+            return RedirectToPage(new { id });
+        }
 
         await _profiles.TouchAsync(id);
         TempData["Flash"] = "Profil gespeichert.";

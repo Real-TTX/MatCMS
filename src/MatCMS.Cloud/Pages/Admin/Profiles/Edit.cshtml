@@ -17,6 +17,7 @@
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
     <button type="button" class="tab" data-tab="mailtemplates">@T["profiles.tabMailTemplates"]</button>
     <button type="button" class="tab" data-tab="ai">@T["profiles.tabAi"]</button>
+    <button type="button" class="tab" data-tab="effective">Wirksam</button>
 </div>
 
 
@@ -61,6 +62,29 @@
     </div>
 
     <form method="post" asp-page-handler="General" asp-route-id="@Model.Item.Id">
+        @* Inheritance first: it changes what every other card on this page means. *@
+        <div class="card">
+            <h2>Vererbung</h2>
+            <div class="form-field">
+                <label for="parentId">Erbt von</label>
+                <select id="parentId" name="parentId">
+                    <option value="">– kein Profil –</option>
+                    @foreach (var p in Model.ParentChoices)
+                    {
+                        <option value="@p.Id" selected="@(Model.Item.ParentId == p.Id ? "selected" : null)">@p.Name</option>
+                    }
+                </select>
+                <div class="help">Alles, was das gewählte Profil ausrollt (Einstellungen, Mail, KI, Backup, Benutzer, Plugins, Komponenten, Vorlagen), bekommen auch die Instanzen dieses Profils. Was dieses Profil selbst einträgt, kommt dazu und gewinnt bei gleichem Namen – wegnehmen kann es nichts. Was am Ende ankommt, zeigt der Reiter „Wirksam“.</div>
+            </div>
+            @if (Model.Children.Count > 0)
+            {
+                <div class="kv">
+                    <div class="kv-label">Davon erben</div>
+                    <div class="kv-value">@string.Join(", ", Model.Children)</div>
+                </div>
+            }
+        </div>
+
         <div class="card">
             <h2>@T["profiles.tabGeneral"]</h2>
             <div class="form-field">
@@ -125,26 +149,32 @@
             <label class="checkbox-row">
                 <input type="checkbox" name="syncSettings" value="true" checked="@(Model.Item.SyncSettings ? "checked" : null)" />
                 @T["profiles.payloadSettings"]
+                @if (Model.Inherited?.SyncSettings == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncUsers" value="true" checked="@(Model.Item.SyncUsers ? "checked" : null)" />
                 @T["profiles.payloadUsers"]
+                @if (Model.Inherited?.SyncUsers == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncPlugins" value="true" checked="@(Model.Item.SyncPlugins ? "checked" : null)" />
                 @T["profiles.payloadPlugins"]
+                @if (Model.Inherited?.SyncPlugins == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncComponents" value="true" checked="@(Model.Item.SyncComponents ? "checked" : null)" />
                 @T["profiles.payloadComponents"]
+                @if (Model.Inherited?.SyncComponents == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncTemplates" value="true" checked="@(Model.Item.SyncTemplates ? "checked" : null)" />
                 @T["profiles.payloadTemplates"]
+                @if (Model.Inherited?.SyncTemplates == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
             <label class="checkbox-row">
                 <input type="checkbox" name="syncMailTemplates" value="true" checked="@(Model.Item.SyncMailTemplates ? "checked" : null)" />
                 @T["profiles.payloadMailTemplates"]
+                @if (Model.Inherited?.SyncMailTemplates == true) { <span class="badge badge-new">von „@Model.ParentName“ an</span> }
             </label>
 
             <div class="form-field" style="margin-top:12px;">
@@ -895,6 +925,33 @@
         </form>
     </div>
 </div>
+@* ============ EFFECTIVE ============ *@
+@* What the instances of this profile actually receive, with what it inherits — built by the same code as their /config. *@
+<div class="tab-panel" data-panel="effective" hidden>
+    <div class="card">
+        <h2>Was die Instanzen bekommen</h2>
+        <div class="help">@(Model.ParentName is null ? "Dieses Profil erbt von keinem anderen." : $"Mit allem, was von „{Model.ParentName}“ geerbt wird.") Die Spalte „Von“ nennt das Profil, aus dem ein Eintrag stammt.</div>
+        <table class="data">
+            <thead><tr><th>Bereich</th><th>Eintrag</th><th>Wert</th><th>Von</th></tr></thead>
+            <tbody>
+                @if (Model.Effective.Count == 0)
+                {
+                    @await Html.PartialAsync("_EmptyRow", "Dieses Profil rollt nichts aus.")
+                }
+                @foreach (var row in Model.Effective)
+                {
+                    <tr>
+                        <td>@row.Area</td>
+                        <td class="mono">@row.Item</td>
+                        <td>@row.Value</td>
+                        <td>@if (row.From.Length > 0 && row.From != Model.Item.Name) { <span class="badge">@row.From</span> } else if (row.From.Length > 0) { <span>eigenes</span> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_CodeEditorAssets" />
     <partial name="_TabsScript" />

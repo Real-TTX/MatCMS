@@ -522,6 +522,12 @@ public sealed class MailRequest
     /// text alternative it derives itself — the instance already rendered the markup, and deriving
     /// the fallback where the message is actually built keeps one implementation of it.</summary>
     public bool IsHtml { get; set; }
+
+    /// <summary>The name the site goes by (its "site.name"). Only an OFFER: the cloud uses it as the sender NAME when the
+    /// site's profile says so ("Name der Website als Absender") and the operator gave the instance no name of its own — the
+    /// address is always the cloud's. Additive: an older cloud ignores it, an older site sends none (the cloud then takes
+    /// the instance's name).</summary>
+    public string? SiteName { get; set; }
 }
 
 /// <summary>

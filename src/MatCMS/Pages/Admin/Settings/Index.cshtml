@@ -455,6 +455,13 @@
                     <input name="Values[@SettingKeys.SmtpFromName]" value="@V(SettingKeys.SmtpFromName)" placeholder="@V(SettingKeys.SiteName)" />
                 </div>
                 <div class="form-field">
+                    <label>@T["settings.smtpFromSiteName"]</label>
+                    <select name="Values[@SettingKeys.SmtpFromSiteName]">
+                        <option value="0" selected="@(V(SettingKeys.SmtpFromSiteName) != "1")">@T["settings.smtpFromSiteNameOff"]</option>
+                        <option value="1" selected="@(V(SettingKeys.SmtpFromSiteName) == "1")">@T["settings.smtpFromSiteNameOn"]</option>
+                    </select>
+                </div>
+                <div class="form-field">
                     <label>@T["settings.smtpSsl"]</label>
                     <select name="Values[@SettingKeys.SmtpSsl]">
                         <option value="true" selected="@(V(SettingKeys.SmtpSsl) == "true")">@T["settings.smtpSslOn"]</option>

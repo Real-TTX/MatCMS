@@ -65,10 +65,9 @@ public class BackupStore
     /// </summary>
     public async Task<long> QuotaBytesAsync(int instanceId, CancellationToken ct = default)
     {
-        var profileQuota = await _db.Instances.AsNoTracking()
-            .Where(i => i.Id == instanceId)
-            .Select(i => i.Profile != null ? i.Profile.BackupQuotaGb : null)
-            .FirstOrDefaultAsync(ct);
+        // The profile with what it inherits: empty on the profile = its parent's, before the default profile's.
+        var prof = await _db.Instances.AsNoTracking().Where(i => i.Id == instanceId).Select(i => i.Profile).FirstOrDefaultAsync(ct);
+        var profileQuota = prof is null ? null : (await ProfileInheritance.EffectiveAsync(_db, prof, ct)).BackupQuotaGb;
 
         var gb = profileQuota is double q && q > 0 ? q : await DefaultQuotaGbAsync(ct);
         return (long)(gb * 1024 * 1024 * 1024);
@@ -193,8 +192,10 @@ public class BackupStore
 
     public async Task<Retention> ResolveRetentionAsync(int instanceId, CancellationToken ct = default)
     {
-        var prof = await _db.Instances.AsNoTracking()
+        var own = await _db.Instances.AsNoTracking()
             .Where(i => i.Id == instanceId).Select(i => i.Profile).FirstOrDefaultAsync(ct);
+        // With what the profile inherits (a parent's tiers before the default profile's).
+        var prof = own is null ? null : await ProfileInheritance.EffectiveAsync(_db, own, ct);
         var def = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.IsDefault, ct);
 
         // Own profile wins (0 = off on purpose), then the default profile, then off.

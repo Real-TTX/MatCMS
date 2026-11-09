@@ -54,6 +54,14 @@ public class Instance
     /// <summary>Admin-editable label. Defaults to the site name the instance reports.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// The sender NAME this site's mails carry, over whatever its profile says (null/empty = the profile's choice: its own
+    /// name, or the site's name with <see cref="Profile.MailFromSiteName"/>). Only the name — the address is never the
+    /// instance's to choose. Applies to the cloud relay and to SMTP the profile rolls out; a site that keeps its own mail
+    /// configuration is left alone.
+    /// </summary>
+    public string? MailFromName { get; set; }
+
     /// <summary>The operator set this name explicitly (on adoption or by renaming), so it must NOT be
     /// overwritten by the site-name the instance reports on its heartbeat. Without this, an operator's
     /// label was replaced by the fresh site's default ("MatCMS") on the very first beat.</summary>

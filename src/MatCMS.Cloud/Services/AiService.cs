@@ -96,12 +96,14 @@ public class AiService
     {
         if (instance.Status != InstanceStatus.Approved)
             return new AiResponse { Ok = false, Error = "Instanz ist nicht freigegeben." };
-        if (instance.Profile is null || !instance.Profile.SyncAi)
+        // The profile with what it inherits: a child of a profile with AI on uses AI too, under the nearest budget.
+        var profile = instance.Profile is null ? null : await ProfileInheritance.EffectiveAsync(_db, instance.Profile, ct);
+        if (profile is null || !profile.SyncAi)
             return new AiResponse { Ok = false, Error = "KI ist für dieses Profil nicht aktiviert." };
 
         var period = DateTime.UtcNow.ToString("yyyy-MM");
         var usage = await _db.AiUsages.FirstOrDefaultAsync(u => u.InstanceId == instance.Id && u.Period == period);
-        var budget = instance.Profile.AiMonthlyTokenBudget ?? 0;
+        var budget = profile.AiMonthlyTokenBudget ?? 0;
         if (budget > 0 && (usage?.Tokens ?? 0) >= budget)
             return new AiResponse { Ok = false, Error = "Das monatliche KI-Budget dieser Instanz ist aufgebraucht." };
 

@@ -621,6 +621,28 @@
         </div>
     }
 
+    @* The sender NAME of this one site's mails (a club's name on its forum and member mails), over its profile. The address is
+       never the site's to choose. Admin-only, like the native-plugin switch. *@
+    @if (Model.IsAdmin)
+    {
+        var eff = Model.EffectiveProfile;
+        <div class="card">
+            <h2>Absendername</h2>
+            <form method="post" asp-page-handler="MailSender" asp-route-id="@Model.Item.Id">
+                <div class="form-field">
+                    <label for="mailFromName">Name in den Mails dieser Website</label>
+                    <input id="mailFromName" name="mailFromName" value="@Model.Item.MailFromName" maxlength="100"
+                           placeholder="@(eff is { SyncSmtp: true, MailFromSiteName: true } ? "Name der Website" : "wie im Profil")" />
+                    <div class="help">
+                        Nur der Name – die Absenderadresse bleibt @(Model.UsesRelay ? "die der Cloud" : "die aus dem Profil"). Leer = wie im Profil@(eff is { SyncSmtp: true, MailFromSiteName: true } ? " (dort: Name der Website)" : "").
+                        @if (!Model.ProfileDecidesMail) { <text>Das Profil dieser Instanz entscheidet den Mailversand nicht – die Website verschickt mit ihren eigenen SMTP-Einstellungen, ein Name hier wirkt erst, wenn das Profil Mail ausrollt.</text> }
+                    </div>
+                </div>
+                <button type="submit" class="btn">@T["settings.save"]</button>
+            </form>
+        </div>
+    }
+
     @* Every completed apply, newest first. Appended only when the instance reports a NEW run, so a
        repeated heartbeat does not fill this with duplicates. *@
     @if (Model.Runs.Count > 0)

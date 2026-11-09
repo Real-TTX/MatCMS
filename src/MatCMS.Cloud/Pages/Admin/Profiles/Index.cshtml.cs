@@ -40,6 +40,14 @@ public class IndexModel : PageModel
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage();
 
+        // A parent cannot go: the profiles inheriting from it would silently lose everything they inherit.
+        var children = await _db.Profiles.AsNoTracking().Where(p => p.ParentId == id).Select(p => p.Name).ToListAsync();
+        if (children.Count > 0)
+        {
+            TempData["FlashError"] = $"„{profile.Name}“ kann nicht gelöscht werden – davon erben noch: {string.Join(", ", children)}. Erst dort „Erbt von“ ändern.";
+            return RedirectToPage();
+        }
+
         // Assigned instances survive with ProfileId = null (see the DbContext relation) — they just
         // stop receiving configuration. Losing a profile must never orphan a running site.
         _db.Profiles.Remove(profile);

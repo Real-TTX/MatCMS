@@ -64,6 +64,7 @@ public sealed class ProfileOpsService
         isDefault = p.IsDefault,
         revision = p.Revision,
         joinCode = p.JoinCode,
+        parentId = p.ParentId,
         instanceCount = _db.Instances.Count(i => i.ProfileId == p.Id)
     }).ToListAsync();
 
@@ -84,11 +85,16 @@ public sealed class ProfileOpsService
         var mailTemplates = await _db.ProfileMailTemplates.AsNoTracking().Where(x => x.ProfileId == id)
             .Select(x => new { x.Key, x.Name, x.Subject, x.Enabled, x.IsHtml }).ToListAsync();
         var instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id)
-            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins }).ToListAsync();
+            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins, mailFromName = i.MailFromName }).ToListAsync();
+        var parentName = p.ParentId is int ppid ? await _db.Profiles.AsNoTracking().Where(x => x.Id == ppid).Select(x => x.Name).FirstOrDefaultAsync() : null;
+        var children = await _profiles.ChildNamesAsync(id);
         return Result.Done(new
         {
             p.Id, p.Name, p.Description, p.JoinCode, p.AutoApprove, p.IsDefault, p.Revision,
             p.ActivateTemplateName,
+            // Inheritance: what it inherits from, and who inherits from it. The lists below are this profile's OWN items;
+            // what its instances actually get (with the inherited ones) is GET …/effective.
+            parentId = p.ParentId, parentName, children,
             nativePlugins = p.NativePlugins,
             sync = new { p.SyncSettings, p.SyncSmtp, p.SyncTranslation, p.SyncBackup, p.SyncUsers, p.SyncPlugins, p.SyncComponents, p.SyncTemplates, p.SyncMailTemplates, p.SyncAi },
             modes = new
@@ -102,6 +108,7 @@ public sealed class ProfileOpsService
             },
             ai = new { p.SyncAi, p.AiMonthlyTokenBudget, p.AiInstruction, p.BackupBeforeAiChange },
             mailSource = p.MailSource,
+            mailFromSiteName = p.MailFromSiteName,
             settings, users, plugins, components, templates, mailTemplates, instances
         });
     }
@@ -119,7 +126,7 @@ public sealed class ProfileOpsService
         bool? NotifyOffline, bool? NotifyUpdate, string? NotifyRecipients, string? ActivateTemplateName,
         bool? SyncSettings, bool? SyncUsers, bool? SyncPlugins, bool? SyncComponents, bool? SyncTemplates, bool? SyncMailTemplates,
         bool? RemoveDefaultAdmin, string? SettingsMode, string? UsersMode, string? PluginsMode, string? ComponentsMode,
-        string? TemplatesMode, string? MailTemplatesMode, string? NativePlugins = null);
+        string? TemplatesMode, string? MailTemplatesMode, string? NativePlugins = null, int? ParentId = null);
 
     /// <summary>Only the fields given change.</summary>
     public async Task<Result> PatchAsync(int id, Patch b)
@@ -151,6 +158,9 @@ public sealed class ProfileOpsService
         if (b.TemplatesMode is not null) p.TemplatesMode = ParseMode(b.TemplatesMode, p.TemplatesMode);
         if (b.MailTemplatesMode is not null) p.MailTemplatesMode = ParseMode(b.MailTemplatesMode, p.MailTemplatesMode);
         await _db.SaveChangesAsync();
+        // 0 = inherit from nothing; a parent that would make a loop (or too deep a chain) is refused with the reason.
+        if (b.ParentId is int parent && await _profiles.SetParentAsync(id, parent <= 0 ? null : parent) is { } problem)
+            return Result.Bad(problem);
         await _profiles.TouchAsync(id);
         return Result.Done();
     }
@@ -199,6 +209,9 @@ public sealed class ProfileOpsService
     {
         var p = await _db.Profiles.FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NoProfile;
+        // A parent cannot go: its children would silently lose everything they inherit.
+        if (await _profiles.ChildNamesAsync(id) is { Count: > 0 } kids)
+            return Result.Bad($"Von diesem Profil erben noch: {string.Join(", ", kids)}. Erst dort „Erbt von“ ändern.");
         // Detach any instances first so they fall back to the default profile rather than a dangling id.
         await _db.Instances.Where(i => i.ProfileId == id).ExecuteUpdateAsync(s => s.SetProperty(i => i.ProfileId, (int?)null));
         _db.Profiles.Remove(p);
@@ -414,11 +427,12 @@ public sealed class ProfileOpsService
 
     // ---- groups: SMTP / translation ---------------------------------------------------------------
 
-    public async Task<Result> SetSmtpAsync(int id, string? mailSource, string? host, int? port, string? user, string? password, string? fromEmail, string? fromName, bool? ssl)
+    public async Task<Result> SetSmtpAsync(int id, string? mailSource, string? host, int? port, string? user, string? password, string? fromEmail, string? fromName, bool? ssl, bool? fromSiteName = null)
     {
         var p = await _db.Profiles.FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NoProfile;
         p.SyncSmtp = true;
+        if (fromSiteName is { } fsn) p.MailFromSiteName = fsn;
         p.MailSource = MailSources.Normalise(mailSource);
         if (p.MailSource == MailSources.Own)
         {
@@ -583,6 +597,47 @@ public sealed class ProfileOpsService
             message = inst.ProfileId is null
                 ? $"Native Plugins: {what}. Die Instanz hat kein Profil und bekommt erst mit einem Profil eine Konfiguration."
                 : $"Native Plugins: {what}. Die Instanz übernimmt das beim nächsten Kontakt."
+        });
+    }
+
+    /// <summary>What the instances of a profile actually get, with everything it inherits — and from which profile each item comes.
+    /// Secrets are masked. The same build as the instances' own /config, so it cannot disagree with what they receive.</summary>
+    public async Task<Result> EffectiveAsync(int id)
+    {
+        var p = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (p is null) return NoProfile;
+        var origins = new Dictionary<string, string>();
+        var c = await _profiles.BuildConfigAsync(p, default, origins);
+        string Of(string kind, string key) => origins.TryGetValue(kind + ":" + key, out var n) ? n : p.Name;
+        static bool Secret(string k) => k.Contains("password", StringComparison.OrdinalIgnoreCase) || k.Contains("apikey", StringComparison.OrdinalIgnoreCase) || k.Contains("secret", StringComparison.OrdinalIgnoreCase) || k.Contains("token", StringComparison.OrdinalIgnoreCase);
+        var chain = await ProfileInheritance.ChainAsync(_db, p);
+        return Result.Done(new
+        {
+            chain = chain.Select(x => new { x.Id, x.Name }),
+            mailTransport = c.MailTransport, aiTransport = c.AiTransport, activateTemplate = c.ActivateTemplate, nativePlugins = c.NativePlugins,
+            settings = c.Settings?.Select(kv => new { key = kv.Key, value = Secret(kv.Key) && !string.IsNullOrEmpty(kv.Value) ? "***" : kv.Value, from = Of("setting", kv.Key) }),
+            users = c.Users?.Select(u => new { u.Username, u.Role, from = Of("user", u.Username) }),
+            plugins = c.Plugins?.Select(x => new { x.Key, x.Version, from = Of("plugin", x.Key) }),
+            components = c.Components?.Select(x => new { x.Type, x.Name, from = Of("component", x.Type) }),
+            templates = c.Templates?.Select(x => new { x.Name, from = Of("template", x.Name) }),
+            mailTemplates = c.MailTemplates?.Select(x => new { x.Key, from = Of("mail", x.Key) })
+        });
+    }
+
+    /// <summary>The sender NAME of one site's mails, over its profile (empty = the profile's choice). Only the name — the address
+    /// stays the profile's or the cloud's. Requests a resync so SMTP the profile rolls out picks it up; the relay uses it on the
+    /// next message anyway.</summary>
+    public async Task<Result> SetMailSenderAsync(Instance inst, string? name)
+    {
+        var clean = (name ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
+        if (clean.Length > 100) return Result.Bad("Der Absendername darf höchstens 100 Zeichen haben.");
+        inst.MailFromName = clean.Length == 0 ? null : clean;
+        if (inst.ProfileId is not null) { inst.ResyncRequestedAt = DateTime.UtcNow; inst.LastSyncError = null; }
+        await _db.SaveChangesAsync();
+        return Result.Done(new
+        {
+            ok = true, mailFromName = inst.MailFromName ?? "",
+            message = inst.MailFromName is null ? "Absendername: wie im Profil." : $"Absendername: „{inst.MailFromName}“."
         });
     }
 

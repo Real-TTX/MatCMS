@@ -34,9 +34,11 @@ public class MailSpool
     {
         // The profile has to have asked for this. An instance holding a valid token is not by itself
         // permission to send mail through somebody else's server.
-        var profile = instance.ProfileId is int pid
+        var own = instance.ProfileId is int pid
             ? await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid, ct)
             : null;
+        // With what it inherits: a profile below one that sends through the cloud sends through the cloud too.
+        var profile = own is null ? null : await ProfileInheritance.EffectiveAsync(_db, own, ct);
         if (profile is null || !profile.SyncSmtp || profile.MailSource != MailSources.Cloud)
             return new Result(false, "Für dieses Profil ist der Mailversand über die Cloud nicht aktiviert.");
 
@@ -63,6 +65,10 @@ public class MailSpool
             Subject = req.Subject.Trim(),
             Body = req.Body ?? "",
             ReplyTo = string.IsNullOrWhiteSpace(req.ReplyTo) ? null : req.ReplyTo.Trim(),
+            // The NAME only, decided here: the operator's name for this instance, else — with the profile's switch — the
+            // name the site goes by. The address stays the cloud's, so no instance can send as somebody else.
+            FromName = ProfileInheritance.SenderName(instance, profile, req.SiteName),
+            IsHtml = req.IsHtml,
             NextAttemptAt = DateTime.UtcNow,
         });
 

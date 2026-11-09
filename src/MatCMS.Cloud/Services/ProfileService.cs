@@ -160,15 +160,55 @@ public class ProfileService
     /// overrides the store entry it selected, so an instance never gets a different bundle than the config promised. Null when neither has it.</summary>
     public async Task<byte[]?> FindPluginBundleAsync(int profileId, string key)
     {
-        var bundle = (await _db.ProfilePlugins.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.ProfileId == profileId && p.Key == key))?.Bundle;
+        // With inheritance: nearest profile first, the same order in which the config lets a child's plugin win. The
+        // profile itself is always asked (as before); a parent only while it rolls plugins out at all.
+        var self = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == profileId);
+        var chain = self is null ? new List<Profile>() : await ProfileInheritance.ChainAsync(_db, self);
+        var ids = chain.Count == 0 ? new List<int> { profileId }
+            : chain.AsEnumerable().Reverse().Where(p => p.Id == profileId || p.SyncPlugins).Select(p => p.Id).ToList();
+        foreach (var id in ids)
+        {
+            var bundle = (await _db.ProfilePlugins.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ProfileId == id && p.Key == key))?.Bundle;
 
-        bundle ??= (await _db.ProfileStorePlugins.AsNoTracking()
-            .Where(x => x.ProfileId == profileId && x.StorePlugin!.Key == key)
-            .Select(x => x.StorePlugin!)
-            .FirstOrDefaultAsync())?.Bundle;
-        return bundle;
+            bundle ??= (await _db.ProfileStorePlugins.AsNoTracking()
+                .Where(x => x.ProfileId == id && x.StorePlugin!.Key == key)
+                .Select(x => x.StorePlugin!)
+                .FirstOrDefaultAsync())?.Bundle;
+            if (bundle is not null) return bundle;
+        }
+        return null;
     }
+
+    /// <summary>Sets (or clears, with null) the profile <paramref name="profileId"/> inherits from. Refuses a loop, itself, a
+    /// missing profile and a chain deeper than <see cref="ProfileInheritance.MaxDepth"/>; returns the reason, or null when
+    /// done. Bumps the revision (of the profile and everything below it) — a new parent is a new configuration.</summary>
+    public async Task<string?> SetParentAsync(int profileId, int? parentId)
+    {
+        var all = await _db.Profiles.ToDictionaryAsync(p => p.Id);
+        if (!all.TryGetValue(profileId, out var profile)) return "Profil nicht gefunden.";
+        if (parentId is <= 0) parentId = null;
+        if (profile.ParentId == parentId) return null;
+        if (ProfileInheritance.ParentProblem(profileId, parentId, all) is { } problem) return problem;
+        profile.ParentId = parentId;
+        await _db.SaveChangesAsync();
+        await TouchAsync(profileId);
+        return null;
+    }
+
+    /// <summary>The profiles <paramref name="profileId"/> may inherit from: every other profile except the ones below it.</summary>
+    public async Task<List<Profile>> ParentChoicesAsync(int profileId)
+    {
+        var all = await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        var below = ProfileInheritance.Descendants(profileId, all);
+        var map = all.ToDictionary(p => p.Id);
+        return all.Where(p => p.Id != profileId && !below.Contains(p.Id) && ProfileInheritance.ParentProblem(profileId, p.Id, map) is null).ToList();
+    }
+
+    /// <summary>The names of the profiles that inherit directly from <paramref name="profileId"/> — a profile with children
+    /// cannot be deleted (they would silently lose half their configuration).</summary>
+    public async Task<List<string>> ChildNamesAsync(int profileId) =>
+        await _db.Profiles.AsNoTracking().Where(p => p.ParentId == profileId).OrderBy(p => p.Name).Select(p => p.Name).ToListAsync();
 
     public async Task<Profile?> DefaultProfileAsync() =>
         await _db.Profiles.FirstOrDefaultAsync(p => p.IsDefault);
@@ -199,6 +239,11 @@ public class ProfileService
         var profile = await _db.Profiles.FindAsync(profileId);
         if (profile is null) return;
         profile.Revision++;
+        // A change to a parent is a change to every profile that inherits from it: their instances compare only their OWN
+        // profile's revision, so each one below is bumped too (otherwise a parent's edit would silently never arrive there).
+        var all = await _db.Profiles.ToListAsync();
+        foreach (var id in ProfileInheritance.Descendants(profileId, all))
+            all.First(p => p.Id == id).Revision++;
         await _db.SaveChangesAsync();
     }
 
@@ -259,27 +304,35 @@ public class ProfileService
         || string.Equals(key, "mail.transport", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Builds the payload an approved instance downloads. Sections the profile does not
-    /// sync are left null, which the instance reads as "don't touch this".</summary>
-    public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default)
+    /// sync are left null, which the instance reads as "don't touch this".
+    /// <para>With inheritance (<see cref="ProfileInheritance"/>) every section is gathered over the chain, root first, so a
+    /// child's item of the same identity is written last and wins. A profile's rows count only while ITS OWN switch for
+    /// that group is on. <paramref name="origins"/>, when given, learns which profile each item came from ("kind:identity" →
+    /// profile name) — that is what the profile page's "Wirksam" tab shows.</para></summary>
+    public async Task<InstanceConfig> BuildConfigAsync(Profile profile, CancellationToken ct = default, Dictionary<string, string>? origins = null)
     {
+        var chain = await ProfileInheritance.ChainAsync(_db, profile, ct);
+        var eff = ProfileInheritance.Effective(chain);
+        void From(string kind, string id, Profile layer) { if (origins is not null) origins[kind + ":" + id] = layer.Name; }
+
         var config = new InstanceConfig
         {
             Revision = profile.Revision,
             ProfileName = profile.Name,
             ProfileId = profile.Id,
-            SettingsMode = Wire(profile.SettingsMode),
-            ComponentsMode = Wire(profile.ComponentsMode),
-            PluginsMode = Wire(profile.PluginsMode),
-            TemplatesMode = Wire(profile.TemplatesMode),
-            MailTemplatesMode = Wire(profile.MailTemplatesMode),
-            UsersMode = Wire(profile.UsersMode),
+            SettingsMode = Wire(eff.SettingsMode),
+            ComponentsMode = Wire(eff.ComponentsMode),
+            PluginsMode = Wire(eff.PluginsMode),
+            TemplatesMode = Wire(eff.TemplatesMode),
+            MailTemplatesMode = Wire(eff.MailTemplatesMode),
+            UsersMode = Wire(eff.UsersMode),
             // Only meaningful when templates are actually rolled out — otherwise the instance would
             // be told to activate a design it never received.
-            ActivateTemplate = profile.SyncTemplates ? profile.ActivateTemplateName : null,
+            ActivateTemplate = eff.SyncTemplates ? eff.ActivateTemplateName : null,
             // Independent of the user rollout: the instance's own guards (default password untouched +
             // another Admin present) decide whether it is safe to drop the default admin.
-            RemoveDefaultAdmin = profile.RemoveDefaultAdmin,
-            NativePlugins = NativePluginsPolicy.Normalize(profile.NativePlugins) is { Length: > 0 } np ? np : null
+            RemoveDefaultAdmin = eff.RemoveDefaultAdmin,
+            NativePlugins = NativePluginsPolicy.Normalize(eff.NativePlugins) is { Length: > 0 } np ? np : null
         };
 
         // Each payload is resolved the same way: what the profile SELECTED from the global store,
@@ -293,51 +346,71 @@ public class ProfileService
         // nothing at all unless the umbrella switch happened to be on too, and nothing said so. The
         // profile's Einstellungen tab lists the three as separate things, so they have to behave as
         // separate things.
-        if (profile.SyncSettings || profile.SyncSmtp || profile.SyncTranslation || profile.SyncBackup)
+        if (eff.SyncSettings || eff.SyncSmtp || eff.SyncTranslation || eff.SyncBackup)
         {
             // Secrets are stored encrypted and only decrypted here, on the way to the instance over
             // its authenticated channel — they are never held in the clear at rest.
             var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            void DropSmtp() { foreach (var k in settings.Keys.Where(IsSmtpKey).ToList()) settings.Remove(k); }
+            string? mailState = null;
 
-            // Global first: the cloud's own SMTP configuration, if this profile passes it on.
-            if (profile.SyncSmtp && profile.MailSource == MailSources.Global)
+            foreach (var layer in chain)
             {
-                var smtpKeys = SettingKeys.Smtp;
-                foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
-                    settings[row.Key] = _secrets.Unprotect(row.Value);
+                // Mail, per layer: the global values or this layer's own, never a half-merge of global and own within one
+                // profile — that is what the read-only form promises. With the relay there is nothing to roll out at all,
+                // because the instance will not be sending anything itself. Own SMTP below another own or global block
+                // (inheritance) only overrides what it fills in.
+                var overlay = false;
+                if (layer.SyncSmtp)
+                {
+                    if (layer.MailSource == MailSources.Global)
+                    {
+                        DropSmtp();
+                        var smtpKeys = SettingKeys.Smtp;
+                        foreach (var row in await _db.CloudSettings.AsNoTracking().Where(s => smtpKeys.Contains(s.Key)).ToListAsync(ct))
+                        {
+                            settings[row.Key] = _secrets.Unprotect(row.Value);
+                            From("setting", row.Key, layer);
+                        }
+                    }
+                    else if (layer.MailSource == MailSources.Cloud) DropSmtp();
+                    else if (mailState is MailSources.Own or MailSources.Global) overlay = true;
+                    else DropSmtp();
+                    mailState = layer.MailSource;
+                }
+
+                // The layer's own rows. Each group only while its own switch is on: values stay stored here so
+                // unticking loses nothing, but a group nobody switched on must not overwrite a live site.
+                foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == layer.Id).ToListAsync(ct))
+                {
+                    if (IsSmtpKey(local.Key))
+                    {
+                        if (!layer.SyncSmtp || layer.MailSource != MailSources.Own) continue;
+                        var value = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
+                        // Over SMTP values from above, an empty field is "not mine to say" — a child that only needs another
+                        // sender address enters only that. A profile on its own rolls out exactly what it stores.
+                        if (overlay && string.IsNullOrEmpty(value)) continue;
+                        settings[local.Key] = value;
+                        From("setting", local.Key, layer);
+                        continue;
+                    }
+                    // Same rule for the translation credentials and the backup policy: stored here either way, rolled
+                    // out only when their own group is switched on.
+                    if (IsTranslateKey(local.Key)) { if (!layer.SyncTranslation) continue; }
+                    else if (IsBackupKey(local.Key)) { if (!layer.SyncBackup) continue; }
+                    // Everything else is a free key/value row and belongs to the free-settings switch.
+                    else if (!layer.SyncSettings) continue;
+
+                    settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
+                    From("setting", local.Key, layer);
+                }
             }
 
-            // The profile's own rows on top — that is the override. SMTP is skipped unless the group
-            // is ticked ON: values stay stored here so unticking loses nothing, but a group nobody
-            // switched on must not overwrite a live site's mail configuration.
-            foreach (var local in await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == profile.Id).ToListAsync(ct))
-            {
-                // Skipped unless the profile's OWN values are the source: it is either the
-                // global values or this profile's, never a half-merge — that is what the read-only
-                // form promises. With the relay there is nothing to roll out at all, because the
-                // instance will not be sending anything itself.
-                if (IsSmtpKey(local.Key))
-                {
-                    if (!profile.SyncSmtp || profile.MailSource != MailSources.Own) continue;
-                }
-                // Same rule for the translation credentials: stored here either way, rolled out only
-                // when their own group is switched on.
-                else if (IsTranslateKey(local.Key))
-                {
-                    if (!profile.SyncTranslation) continue;
-                }
-                // And the backup policy. Same rule again: stored here either way, rolled out only
-                // when its own group is on — otherwise moving a profile's backup settings around
-                // would start writing over what each site decided for itself.
-                else if (IsBackupKey(local.Key))
-                {
-                    if (!profile.SyncBackup) continue;
-                }
-                // Everything else is a free key/value row and belongs to the free-settings switch.
-                else if (!profile.SyncSettings) continue;
-
-                settings[local.Key] = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
-            }
+            // "The site's name as sender name" travels with SMTP the instance sends through itself; for the relay the
+            // cloud names the sender on each message (MailSpool). Always written while such SMTP is in effect, so switching
+            // it off reaches the sites too. An older instance stores it as an unknown row and ignores it.
+            if (eff.SyncSmtp && eff.MailSource != MailSources.Cloud)
+                settings[SmtpFromSiteNameKey] = eff.MailFromSiteName ? "1" : "0";
 
             config.Settings = settings;
         }
@@ -345,146 +418,170 @@ public class ProfileService
         // How the instance should send. Only when this profile actually decides mail delivery —
         // otherwise the site keeps doing whatever it was doing, which is the whole point of the
         // group switch.
-        if (profile.SyncSmtp && profile.MailSource == MailSources.Cloud)
+        if (eff.SyncSmtp && eff.MailSource == MailSources.Cloud)
             config.MailTransport = "cloud";
 
         // AI: when the profile's AI group is on, the instance relays model calls through the cloud.
         // The credential itself is never rolled out — only this "use the relay" flag.
-        if (profile.SyncAi)
+        if (eff.SyncAi)
         {
             config.AiTransport = "cloud";
-            config.AiInstruction = string.IsNullOrWhiteSpace(profile.AiInstruction) ? null : profile.AiInstruction.Trim();
+            config.AiInstruction = string.IsNullOrWhiteSpace(eff.AiInstruction) ? null : eff.AiInstruction.Trim();
             // Per-action guidance map (empty/"{}" = only built-in defaults on the instance).
-            var guides = (profile.AiActionGuidesJson ?? "").Trim();
+            var guides = (eff.AiActionGuidesJson ?? "").Trim();
             config.AiActionGuidesJson = guides is "" or "{}" ? null : guides;
         }
 
-        if (profile.SyncUsers)
+        if (eff.SyncUsers)
         {
-            // Global first: the cloud's own accounts that were assigned to this profile. Same hash
-            // format as MatCMS uses, so the account works on the instance as it does here.
-            var globalUsers = await _db.ProfileGlobalUsers.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.User!)
-                .ToListAsync(ct);
-            var users = Index(globalUsers, u => u.Username, u => new ConfigUser
+            var users = new Dictionary<string, ConfigUser>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in chain.Where(l => l.SyncUsers))
+            {
+                // Global first: the cloud's own accounts that were assigned to this profile. Same hash
+                // format as MatCMS uses, so the account works on the instance as it does here.
+                foreach (var u in await _db.ProfileGlobalUsers.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.User!).ToListAsync(ct))
                 {
-                    Username = u.Username, Email = u.Email, DisplayName = u.DisplayName,
-                    PasswordHash = u.PasswordHash, Role = u.Role
-                });
-
-            foreach (var local in await _db.ProfileUsers.AsNoTracking().Where(u => u.ProfileId == profile.Id).ToListAsync(ct))
-                users[local.Username] = new ConfigUser
+                    users[u.Username] = new ConfigUser { Username = u.Username, Email = u.Email, DisplayName = u.DisplayName, PasswordHash = u.PasswordHash, Role = u.Role };
+                    From("user", u.Username, layer);
+                }
+                foreach (var local in await _db.ProfileUsers.AsNoTracking().Where(u => u.ProfileId == layer.Id).ToListAsync(ct))
                 {
-                    Username = local.Username, Email = local.Email, DisplayName = local.DisplayName,
-                    PasswordHash = local.PasswordHash, Role = local.Role
-                };
-
+                    users[local.Username] = new ConfigUser { Username = local.Username, Email = local.Email, DisplayName = local.DisplayName, PasswordHash = local.PasswordHash, Role = local.Role };
+                    From("user", local.Username, layer);
+                }
+            }
             config.Users = users.Values.ToList();
         }
 
-        if (profile.SyncComponents)
+        if (eff.SyncComponents)
         {
-            var storeComponents = await _db.ProfileStoreComponents.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StoreComponent!)
-                .ToListAsync(ct);
-            var components = Index(storeComponents, c => c.Type, c => new ConfigComponent
+            var components = new Dictionary<string, ConfigComponent>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in chain.Where(l => l.SyncComponents))
+            {
+                foreach (var c in await _db.ProfileStoreComponents.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.StoreComponent!).ToListAsync(ct))
                 {
-                    Type = c.Type, Name = c.Name, Description = c.Description,
-                    Icon = c.Icon, FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml
-                });
-
-            foreach (var local in await _db.ProfileComponents.AsNoTracking().Where(c => c.ProfileId == profile.Id).ToListAsync(ct))
-                components[local.Type] = new ConfigComponent
+                    components[c.Type] = new ConfigComponent { Type = c.Type, Name = c.Name, Description = c.Description, Icon = c.Icon, FieldsJson = c.FieldsJson, TemplateHtml = c.TemplateHtml };
+                    From("component", c.Type, layer);
+                }
+                foreach (var local in await _db.ProfileComponents.AsNoTracking().Where(c => c.ProfileId == layer.Id).ToListAsync(ct))
                 {
-                    Type = local.Type, Name = local.Name, Description = local.Description,
-                    Icon = local.Icon, FieldsJson = local.FieldsJson, TemplateHtml = local.TemplateHtml
-                };
-
+                    components[local.Type] = new ConfigComponent { Type = local.Type, Name = local.Name, Description = local.Description, Icon = local.Icon, FieldsJson = local.FieldsJson, TemplateHtml = local.TemplateHtml };
+                    From("component", local.Type, layer);
+                }
+            }
             config.Components = components.Values.ToList();
         }
 
-        if (profile.SyncMailTemplates)
+        if (eff.SyncMailTemplates)
         {
-            var storeMails = await _db.ProfileStoreMailTemplates.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StoreMailTemplate!)
-                .ToListAsync(ct);
-            var mails = Index(storeMails, m => m.Key, m => new ConfigMailTemplate
+            var mails = new Dictionary<string, ConfigMailTemplate>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in chain.Where(l => l.SyncMailTemplates))
+            {
+                foreach (var m in await _db.ProfileStoreMailTemplates.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.StoreMailTemplate!).ToListAsync(ct))
                 {
-                    Key = m.Key, Name = m.Name, Description = m.Description,
-                    Subject = m.Subject, Body = m.Body, Enabled = m.Enabled, IsHtml = m.IsHtml
-                });
-
-            foreach (var local in await _db.ProfileMailTemplates.AsNoTracking().Where(m => m.ProfileId == profile.Id).ToListAsync(ct))
-                mails[local.Key] = new ConfigMailTemplate
+                    mails[m.Key] = new ConfigMailTemplate { Key = m.Key, Name = m.Name, Description = m.Description, Subject = m.Subject, Body = m.Body, Enabled = m.Enabled, IsHtml = m.IsHtml };
+                    From("mail", m.Key, layer);
+                }
+                foreach (var local in await _db.ProfileMailTemplates.AsNoTracking().Where(m => m.ProfileId == layer.Id).ToListAsync(ct))
                 {
-                    Key = local.Key, Name = local.Name, Description = local.Description,
-                    Subject = local.Subject, Body = local.Body, Enabled = local.Enabled, IsHtml = local.IsHtml
-                };
-
+                    mails[local.Key] = new ConfigMailTemplate { Key = local.Key, Name = local.Name, Description = local.Description, Subject = local.Subject, Body = local.Body, Enabled = local.Enabled, IsHtml = local.IsHtml };
+                    From("mail", local.Key, layer);
+                }
+            }
             config.MailTemplates = mails.Values.ToList();
         }
 
-        if (profile.SyncTemplates)
+        if (eff.SyncTemplates)
         {
-            var storeTemplates = await _db.ProfileStoreTemplates.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StoreTemplate!)
-                .ToListAsync(ct);
-            var templates = Index(storeTemplates, t => t.Name, t => new ConfigTemplate
+            var templates = new Dictionary<string, ConfigTemplate>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in chain.Where(l => l.SyncTemplates))
+            {
+                foreach (var t in await _db.ProfileStoreTemplates.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.StoreTemplate!).ToListAsync(ct))
                 {
-                    Name = t.Name,
-                    AccentColor = t.AccentColor, SecondaryColor = t.SecondaryColor,
-                    HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle,
-                    HeadingColor = t.HeadingColor, TextColor = t.TextColor,
-                    BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
-                    ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
-                    HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor,
-                    HeaderPadding = t.HeaderPadding, CustomCss = t.CustomCss, CustomJs = t.CustomJs,
-                    LayoutHtml = t.LayoutHtml, MenuMapJson = t.MenuMapJson,
-                    ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
-                    SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
-                });
-
-            foreach (var local in await _db.ProfileTemplates.AsNoTracking().Where(t => t.ProfileId == profile.Id).ToListAsync(ct))
-                templates[local.Name] = new ConfigTemplate
+                    templates[t.Name] = new ConfigTemplate
+                    {
+                        Name = t.Name,
+                        AccentColor = t.AccentColor, SecondaryColor = t.SecondaryColor,
+                        HeadingFont = t.HeadingFont, BodyFont = t.BodyFont, ButtonStyle = t.ButtonStyle,
+                        HeadingColor = t.HeadingColor, TextColor = t.TextColor,
+                        BackgroundColor = t.BackgroundColor, AltBackground = t.AltBackground,
+                        ContainerWidth = t.ContainerWidth, ButtonRadius = t.ButtonRadius,
+                        HeaderBackground = t.HeaderBackground, HeaderTextColor = t.HeaderTextColor,
+                        HeaderPadding = t.HeaderPadding, CustomCss = t.CustomCss, CustomJs = t.CustomJs,
+                        LayoutHtml = t.LayoutHtml, MenuMapJson = t.MenuMapJson,
+                        ParametersJson = t.ParametersJson, ParamValuesJson = t.ParamValuesJson,
+                        SchemaVersion = t.SchemaVersion, PartsJson = t.PartsJson
+                    };
+                    From("template", t.Name, layer);
+                }
+                foreach (var local in await _db.ProfileTemplates.AsNoTracking().Where(t => t.ProfileId == layer.Id).ToListAsync(ct))
                 {
-                    Name = local.Name,
-                    AccentColor = local.AccentColor, SecondaryColor = local.SecondaryColor,
-                    HeadingFont = local.HeadingFont, BodyFont = local.BodyFont, ButtonStyle = local.ButtonStyle,
-                    HeadingColor = local.HeadingColor, TextColor = local.TextColor,
-                    BackgroundColor = local.BackgroundColor, AltBackground = local.AltBackground,
-                    ContainerWidth = local.ContainerWidth, ButtonRadius = local.ButtonRadius,
-                    HeaderBackground = local.HeaderBackground, HeaderTextColor = local.HeaderTextColor,
-                    HeaderPadding = local.HeaderPadding, CustomCss = local.CustomCss, CustomJs = local.CustomJs,
-                    LayoutHtml = local.LayoutHtml, MenuMapJson = local.MenuMapJson,
-                    ParametersJson = local.ParametersJson, ParamValuesJson = local.ParamValuesJson,
-                    SchemaVersion = local.SchemaVersion, PartsJson = local.PartsJson
-                };
-
+                    templates[local.Name] = new ConfigTemplate
+                    {
+                        Name = local.Name,
+                        AccentColor = local.AccentColor, SecondaryColor = local.SecondaryColor,
+                        HeadingFont = local.HeadingFont, BodyFont = local.BodyFont, ButtonStyle = local.ButtonStyle,
+                        HeadingColor = local.HeadingColor, TextColor = local.TextColor,
+                        BackgroundColor = local.BackgroundColor, AltBackground = local.AltBackground,
+                        ContainerWidth = local.ContainerWidth, ButtonRadius = local.ButtonRadius,
+                        HeaderBackground = local.HeaderBackground, HeaderTextColor = local.HeaderTextColor,
+                        HeaderPadding = local.HeaderPadding, CustomCss = local.CustomCss, CustomJs = local.CustomJs,
+                        LayoutHtml = local.LayoutHtml, MenuMapJson = local.MenuMapJson,
+                        ParametersJson = local.ParametersJson, ParamValuesJson = local.ParamValuesJson,
+                        SchemaVersion = local.SchemaVersion, PartsJson = local.PartsJson
+                    };
+                    From("template", local.Name, layer);
+                }
+            }
             config.Templates = templates.Values.ToList();
         }
 
-        if (profile.SyncPlugins)
+        if (eff.SyncPlugins)
         {
             // Metadata only — the bundles are fetched one by one, and only for plugins whose version
-            // actually differs from what the instance already has.
-            var storePlugins = await _db.ProfileStorePlugins.AsNoTracking()
-                .Where(x => x.ProfileId == profile.Id)
-                .Select(x => x.StorePlugin!)
-                .ToListAsync(ct);
-            var plugins = Index(storePlugins, p => p.Key, p => new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version });
-
-            foreach (var local in await _db.ProfilePlugins.AsNoTracking()
-                         .Where(p => p.ProfileId == profile.Id)
-                         .Select(p => new { p.Key, p.Name, p.Version }).ToListAsync(ct))
-                plugins[local.Key] = new ConfigPlugin { Key = local.Key, Name = local.Name, Version = local.Version };
-
+            // actually differs from what the instance already has (FindPluginBundleAsync walks the same chain).
+            var plugins = new Dictionary<string, ConfigPlugin>(StringComparer.OrdinalIgnoreCase);
+            foreach (var layer in chain.Where(l => l.SyncPlugins))
+            {
+                foreach (var p in await _db.ProfileStorePlugins.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.StorePlugin!).ToListAsync(ct))
+                {
+                    plugins[p.Key] = new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version };
+                    From("plugin", p.Key, layer);
+                }
+                foreach (var local in await _db.ProfilePlugins.AsNoTracking().Where(p => p.ProfileId == layer.Id)
+                             .Select(p => new { p.Key, p.Name, p.Version }).ToListAsync(ct))
+                {
+                    plugins[local.Key] = new ConfigPlugin { Key = local.Key, Name = local.Name, Version = local.Version };
+                    From("plugin", local.Key, layer);
+                }
+            }
             config.Plugins = plugins.Values.ToList();
         }
 
+        return config;
+    }
+
+    /// <summary>The instance setting that makes a site use its own name as the sender name of SMTP it sends itself.</summary>
+    public const string SmtpFromSiteNameKey = "smtp.fromSiteName";
+
+    /// <summary>
+    /// The configuration ONE instance gets: its profile's (with inheritance) plus what the operator decided for this site alone —
+    /// its native-plugin switch and its sender name. The sender name only reaches SMTP the profile rolls out (a fixed name over
+    /// "the site's name"); for the relay the cloud names the sender on each message, and a site that keeps its own mail
+    /// configuration is left alone.
+    /// </summary>
+    public async Task<InstanceConfig> BuildConfigForAsync(Instance instance, CancellationToken ct = default)
+    {
+        if (instance.Profile is null) return new InstanceConfig { Revision = 0 };
+        var config = await BuildConfigAsync(instance.Profile, ct);
+        // A site's own native-plugin decision wins over its profile's (Instance.NativePlugins).
+        if (NativePluginsPolicy.Normalize(instance.NativePlugins) is { Length: > 0 } own) config.NativePlugins = own;
+        var name = (instance.MailFromName ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
+        if (name.Length > 0 && config.Settings is { } settings && settings.ContainsKey(SmtpFromSiteNameKey))
+        {
+            settings[SettingKeys.SmtpFromName] = name.Length > 100 ? name[..100] : name;
+            settings[SmtpFromSiteNameKey] = "0";
+        }
         return config;
     }
 

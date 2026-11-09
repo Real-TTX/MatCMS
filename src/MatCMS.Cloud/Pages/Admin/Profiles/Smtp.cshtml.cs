@@ -49,6 +49,16 @@ public class SmtpModel : PageModel
     /// it, and nothing is in effect until it is saved.</summary>
     public bool IsNew { get; private set; }
 
+    /// <summary>What the parent chain decides about mail (null without a parent, or when no profile above has the mail group on).</summary>
+    public Profile? Inherited { get; private set; }
+    public string? ParentName { get; private set; }
+    /// <summary>The SMTP values the parent chain rolls out (password left out) — shown as placeholders: with own SMTP on top of
+    /// them, an empty field here keeps the inherited value.</summary>
+    public Dictionary<string, string?> InheritedSmtp { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public string Placeholder(string key) => InheritedSmtp.TryGetValue(key, out var v) ? v ?? "" : "";
+    /// <summary>Own SMTP here only overrides what is filled in (the parent chain already rolls SMTP values out).</summary>
+    public bool Overlays => Inherited is { SyncSmtp: true } i && i.MailSource != MailSources.Cloud;
+
     /// <param name="source">"global", "own" or "cloud", from the add dialog's second step. It only
     /// PRESELECTS where mail comes from; nothing is in effect until the operator saves. Answering a
     /// menu must not silently change how a live site sends its mail.</param>
@@ -71,16 +81,31 @@ public class SmtpModel : PageModel
         var smtpKeys = SettingKeys.Smtp;
         GlobalSmtp = await _db.CloudSettings.AsNoTracking().Where(x => smtpKeys.Contains(x.Key))
             .ToDictionaryAsync(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
+        if (owner.ParentId is int pid && await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == pid) is { } parent)
+        {
+            ParentName = parent.Name;
+            var eff = await ProfileInheritance.EffectiveAsync(_db, parent);
+            if (eff.SyncSmtp)
+            {
+                Inherited = eff;
+                var cfg = await _profiles.BuildConfigAsync(parent);
+                foreach (var kv in cfg.Settings ?? new())
+                    if (ProfileService.IsSmtpKey(kv.Key) && !kv.Key.Contains("password", StringComparison.OrdinalIgnoreCase))
+                        InheritedSmtp[kv.Key] = kv.Value;
+            }
+        }
         return true;
     }
 
     public async Task<IActionResult> OnPostAsync(
         int profileId, string? mailSource, bool clearPassword,
         string? host, string? port, string? user, string? password,
-        string? fromEmail, string? fromName, bool ssl)
+        string? fromEmail, string? fromName, bool ssl, bool fromSiteName = false)
     {
         var profile = await _db.Profiles.FindAsync(profileId);
         if (profile is null) return RedirectToPage("Index");
+        // Applies to all three sources: own or global SMTP the sites send through, and the cloud relay.
+        profile.MailFromSiteName = fromSiteName;
 
         // Being on this page at all means the profile decides mail delivery; the switch that decides
         // THAT lives in the add dialog and in the row's delete, not in a checkbox halfway down a form.

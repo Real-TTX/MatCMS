@@ -144,6 +144,8 @@ public sealed class CloudConfigBackupService
     public sealed class ProfileDoc
     {
         public Profile Profile { get; set; } = new();
+        /// <summary>The profile it inherits from, by NAME — ids differ between clouds (Profile.ParentId is not trusted on restore).</summary>
+        public string? ParentName { get; set; }
         public List<ProfileSetting> Settings { get; set; } = new();
         public List<ProfileUser> Users { get; set; } = new();
         public List<ProfilePlugin> Plugins { get; set; } = new();
@@ -322,11 +324,13 @@ public sealed class CloudConfigBackupService
         if (secs.Contains("profiles"))
         {
             d.Profiles = new();
-            foreach (var p in await _db.Profiles.AsNoTracking().OrderBy(p => p.Id).ToListAsync(ct))
+            var allProfiles = await _db.Profiles.AsNoTracking().OrderBy(p => p.Id).ToListAsync(ct);
+            foreach (var p in allProfiles)
             {
                 var pd = new ProfileDoc
                 {
                     Profile = p,
+                    ParentName = allProfiles.FirstOrDefault(x => x.Id == p.ParentId)?.Name,
                     Settings = await _db.ProfileSettings.AsNoTracking().Where(x => x.ProfileId == p.Id).ToListAsync(ct),
                     Users = await _db.ProfileUsers.AsNoTracking().Where(x => x.ProfileId == p.Id).ToListAsync(ct),
                     Plugins = await _db.ProfilePlugins.AsNoTracking().Where(x => x.ProfileId == p.Id).ToListAsync(ct),
@@ -572,8 +576,10 @@ public sealed class CloudConfigBackupService
             var keepId = target.Id;
             var keepCode = target.JoinCode;
             var wasDefault = target.IsDefault;
+            var keepParent = target.ParentId;
             CopyScalars(src, target, false);
             target.Id = keepId;
+            target.ParentId = keepParent;   // set by NAME after all profiles are in (see below) — the backup's id means nothing here
             // There is always a default profile: restoring a non-default one over it must not leave the cloud without.
             target.IsDefault = src.IsDefault || wasDefault;
             target.Revision = keepRevision + 1;   // the instances pick the restored configuration up on their next beat
@@ -633,6 +639,19 @@ public sealed class CloudConfigBackupService
             await _db.SaveChangesAsync(ct);
             lines.Add(what + (notes.Count > 0 ? " (" + string.Join("; ", notes) + ")." : "."));
         }
+
+        // Inheritance, once every profile exists: by name, and only what makes no loop here.
+        if (dryRun) return;
+        var all = await _db.Profiles.ToDictionaryAsync(p => p.Id, ct);
+        foreach (var pd in profiles)
+        {
+            if (all.Values.FirstOrDefault(p => p.Name == pd.Profile.Name) is not { } target) continue;
+            var parent = pd.ParentName is null ? null : all.Values.FirstOrDefault(p => p.Name == pd.ParentName);
+            if (pd.ParentName is not null && parent is null) { lines.Add($"Profil „{target.Name}“: erbt von „{pd.ParentName}“, das es hier nicht gibt – ohne Vererbung."); continue; }
+            if (ProfileInheritance.ParentProblem(target.Id, parent?.Id, all) is { } problem) { lines.Add($"Profil „{target.Name}“: Vererbung nicht übernommen – {problem}"); continue; }
+            target.ParentId = parent?.Id;
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     private async Task RestoreAssignmentsAsync(List<AssignmentDoc> list, bool dryRun, List<string> lines, CancellationToken ct)

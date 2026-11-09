@@ -116,6 +116,7 @@ src/MatCMS.Shared/               # the cloud↔instance contract, referenced by 
 src/MatCMS.Shared.Web/           # the shared admin shell (RCL): css, admin-list.js, vendor libs
 src/MatCMS.Plugin.Abstractions/  # the API plugins are written against (CMS image only; no ASP.NET, no EF)
 tests/MatCMS.Plugins.Tests/      # plugin system tests; tests/Fixtures/RefPlugin = the reference plugin (native)
+tests/MatCMS.Cloud.Tests/        # cloud tests (profile inheritance, effective config, mail relay) — in-memory SQLite
 src/MatCMS/                      # each app keeps its own Dockerfile, compose,
 src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
 plugins/                         # plugin SOURCES (plugin.csx + meta.json each) + pack.ps1 → store bundle

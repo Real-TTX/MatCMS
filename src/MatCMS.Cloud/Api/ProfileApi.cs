@@ -263,7 +263,7 @@ public static class ProfileApi
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireManage(key!) is { } g) return g;
-            var r = await ops.SetSmtpAsync(id, b.MailSource, b.Host, b.Port, b.User, b.Password, b.FromEmail, b.FromName, b.Ssl);
+            var r = await ops.SetSmtpAsync(id, b.MailSource, b.Host, b.Port, b.User, b.Password, b.FromEmail, b.FromName, b.Ssl, b.FromSiteName);
             return Send(r);
         }).RequireRateLimiting("operatorApi");
 
@@ -380,9 +380,29 @@ public static class ProfileApi
             if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
             return Send(await ops.SetNativePluginsAsync(inst, body.NativePlugins));
         }).RequireRateLimiting("operatorApi");
+
+        // { "name": "Schalksteinnarren Besigheim" } — the sender NAME of this site's mails, over its profile ("" = the profile's).
+        app.MapPut("/api/v1/instances/{publicId}/mail-sender", async (HttpContext ctx, string publicId, MailSenderBody body, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
+            return Send(await ops.SetMailSenderAsync(inst, body.Name));
+        }).RequireRateLimiting("operatorApi");
+
+        // What a profile's instances actually get — with everything it inherits, and where each item comes from.
+        app.MapGet("/api/v1/profiles/{id:int}/effective", async (HttpContext ctx, int id, ApiKeyService keys, ProfileOpsService ops) =>
+        {
+            var (_, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            return Send(await ops.EffectiveAsync(id));
+        }).RequireRateLimiting("operatorApi");
     }
 
     private sealed record NativePluginsBody(string? NativePlugins);
+    private sealed record MailSenderBody(string? Name);
 
     /// <summary>A service result as HTTP: the data on success, <c>{ error }</c> with its status otherwise.</summary>
     private static IResult Send(ProfileOpsService.Result r) =>
@@ -402,7 +422,7 @@ public static class ProfileApi
     public record ProfileUserDto(string Username, string? Email, string? DisplayName, string? Password, string? PasswordHash, string? Role);
     public record ComponentDto(string Type, string Name, string? Description, string? Icon, string? FieldsJson, string? TemplateHtml);
     public record MailTemplateDto(string Key, string? Name, string? Description, string Subject, string? Body, bool? Enabled, bool? IsHtml);
-    public record SmtpDto(string? MailSource, string? Host, int? Port, string? User, string? Password, string? FromEmail, string? FromName, bool? Ssl);
+    public record SmtpDto(string? MailSource, string? Host, int? Port, string? User, string? Password, string? FromEmail, string? FromName, bool? Ssl, bool? FromSiteName = null);
     public record TranslationDto(string? Provider, string? ApiKey, string? Url);
     public record AssignDto(int? ProfileId);
 }

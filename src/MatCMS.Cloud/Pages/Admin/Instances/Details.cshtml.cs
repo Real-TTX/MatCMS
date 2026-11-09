@@ -172,7 +172,14 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     /// <summary>True when this instance's profile actually routes mail through the cloud — the tab
     /// then explains itself instead of showing an empty table nobody asked for.</summary>
-    public bool UsesRelay => Item.Profile is { SyncSmtp: true } p && p.MailSource == MailSources.Cloud;
+    public bool UsesRelay => EffectiveProfile is { SyncSmtp: true } p && p.MailSource == MailSources.Cloud;
+
+    /// <summary>The instance's profile with what it inherits (null without a profile) — what the site actually gets.</summary>
+    public Profile? EffectiveProfile { get; private set; }
+
+    /// <summary>Whether this site's mail goes through something the profile decides (relay or rolled-out SMTP) — only then does a
+    /// sender name set here reach its mails.</summary>
+    public bool ProfileDecidesMail => EffectiveProfile is { SyncSmtp: true };
 
 
     public bool OutOfSync => InstanceService.IsOutOfSync(Item);
@@ -226,6 +233,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         BackupQuota = Pages.Admin.Backups.IndexModel.Size(quota);
         BackupPercent = quota > 0 ? (int)Math.Min(100, used * 100 / quota) : 0;
         BackupQuotaFromProfile = Item.Profile?.BackupQuotaGb is > 0 ? Item.Profile.Name : null;
+        EffectiveProfile = Item.Profile is null ? null : await Services.ProfileInheritance.EffectiveAsync(_db, Item.Profile);
         ExtraDomains = await _db.InstanceDomains.AsNoTracking().Where(d => d.InstanceId == id).OrderBy(d => d.Domain).ToListAsync();
         return Page();
     }
@@ -460,6 +468,17 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         await ops.SetNativePluginsAsync(item, nativePlugins);
         TempData["Flash"] = (item.NativePlugins switch { "allow" => "Native Plugins erlaubt", "deny" => "Native Plugins verboten", _ => "Native Plugins wie im Profil" })
             + (item.ProfileId is null ? " — die Instanz hat noch kein Profil und bekommt den Wert erst mit einem." : " — die Instanz übernimmt das beim nächsten Kontakt.");
+        return Redirect(Url.Page("Details", new { id }) + "?tab=config");
+    }
+
+    /// <summary>The sender NAME of this site's mails (over its profile); the work is ProfileOpsService's, shared with REST/MCP.</summary>
+    public async Task<IActionResult> OnPostMailSenderAsync(int id, string? mailFromName, [FromServices] Services.ProfileOpsService ops)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        var r = await ops.SetMailSenderAsync(item, mailFromName);
+        if (r.Ok) TempData["Flash"] = item.MailFromName is null ? "Absendername wie im Profil." : $"Absendername „{item.MailFromName}“ gespeichert.";
+        else TempData["FlashError"] = r.Error;
         return Redirect(Url.Page("Details", new { id }) + "?tab=config");
     }
 

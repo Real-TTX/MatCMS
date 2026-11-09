@@ -41,7 +41,7 @@ public class EmailService
 
     public async Task<SmtpConfig> GetConfigAsync()
     {
-        var keys = SettingKeys.Smtp;
+        var keys = SettingKeys.Smtp.Append(SettingKeys.SiteName).ToArray();
         var map = await _db.SiteSettings.AsNoTracking()
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key, s => s.Value);
@@ -52,7 +52,10 @@ public class EmailService
 
         return new SmtpConfig(
             G(SettingKeys.SmtpHost).Trim(), port, G(SettingKeys.SmtpUser), G(SettingKeys.SmtpPassword),
-            G(SettingKeys.SmtpFromEmail).Trim(), G(SettingKeys.SmtpFromName).Trim(),
+            G(SettingKeys.SmtpFromEmail).Trim(),
+            // "The site's name as sender": one address for many sites (a cloud profile's), each mail still says whose it is.
+            (G(SettingKeys.SmtpFromSiteName).Trim() == "1" && G(SettingKeys.SiteName).Trim().Length > 0
+                ? G(SettingKeys.SiteName) : G(SettingKeys.SmtpFromName)).Trim(),
             ssl is "true" or "on" or "1" or "yes");
     }
 

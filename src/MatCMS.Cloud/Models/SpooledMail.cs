@@ -27,6 +27,15 @@ public class SpooledMail
     /// FROM is always the cloud's own, so no instance can send as somebody else.</summary>
     public string? ReplyTo { get; set; }
 
+    /// <summary>The sender NAME this message goes out under (the site's name, or the one the operator gave the instance);
+    /// null = the cloud's own. Decided by the cloud when the mail is queued, never taken from the request as it came —
+    /// and only ever the name: the address stays the cloud's.</summary>
+    public string? FromName { get; set; }
+
+    /// <summary>Whether <see cref="Body"/> is HTML. It used to be dropped here, and a site's HTML mail arrived as a wall of
+    /// tags; it now goes out as multipart with a text part derived from the markup.</summary>
+    public bool IsHtml { get; set; }
+
     public SpoolStatus Status { get; set; } = SpoolStatus.Queued;
 
     public int Attempts { get; set; }

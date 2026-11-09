@@ -66,9 +66,16 @@ public class EmailService
     // "configured list, else EVERY user" fallback would mail an Operator about sites it has no business seeing.
 
     /// <summary>Sends a plain-text mail using the saved SMTP config. Returns (ok, error); never throws.</summary>
+    /// <param name="fromName">The sender NAME for this one message (a relayed site's name), or null for the configured one.
+    /// Only the name: the address is always the configured sender, so a relayed site never sends as somebody else.</param>
+    /// <param name="isHtml">The body is HTML: sent as multipart with a text part derived from the markup.</param>
     public async Task<(bool ok, string? error)> SendAsync(
-        IEnumerable<string> to, string subject, string body, string? replyTo = null)
-        => await SendCoreAsync(await GetConfigAsync(), to, subject, body, replyTo);
+        IEnumerable<string> to, string subject, string body, string? replyTo = null, string? fromName = null, bool isHtml = false)
+    {
+        var cfg = await GetConfigAsync();
+        if (!string.IsNullOrWhiteSpace(fromName)) cfg = cfg with { FromName = fromName.Trim() };
+        return await SendCoreAsync(cfg, to, subject, body, replyTo, isHtml);
+    }
 
     /// <summary>Sends a test e-mail with an explicit (possibly unsaved) config — used by the SMTP test button.</summary>
     public async Task<(bool ok, string? error)> SendTestAsync(SmtpConfig cfg, string to)
@@ -77,7 +84,7 @@ public class EmailService
             "Diese Test-E-Mail bestätigt, dass die SMTP-Einstellungen funktionieren.\r\n\r\n– MatCMS.Cloud");
 
     private async Task<(bool ok, string? error)> SendCoreAsync(
-        SmtpConfig cfg, IEnumerable<string> to, string subject, string body, string? replyTo = null)
+        SmtpConfig cfg, IEnumerable<string> to, string subject, string body, string? replyTo = null, bool isHtml = false)
     {
         if (!cfg.IsConfigured) return (false, "SMTP ist nicht konfiguriert (Host und Absender-Adresse erforderlich).");
 
@@ -101,7 +108,15 @@ public class EmailService
             if (!string.IsNullOrWhiteSpace(replyTo))
                 try { msg.ReplyTo.Add(MailboxAddress.Parse(replyTo)); } catch { /* ignore bad reply-to */ }
             msg.Subject = subject;
-            msg.Body = new TextPart("plain") { Text = body };
+            // An HTML body goes out as multipart/alternative with a text version derived from the markup — the same shape the
+            // site itself sends (text part first: least preferred first). It used to be sent as plain text, tags and all.
+            msg.Body = isHtml
+                ? new Multipart("alternative")
+                {
+                    new TextPart("plain") { Text = MatCMS.Shared.MailTemplates.HtmlToText(body) },
+                    new TextPart("html") { Text = body },
+                }
+                : new TextPart("plain") { Text = body };
 
             // Pick the right TLS mode: port 465 = implicit SSL on connect; otherwise STARTTLS
             // (opportunistic when the SSL switch is off, so a plain server still works).

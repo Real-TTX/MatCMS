@@ -204,6 +204,9 @@ public static class SettingKeys
     public const string SmtpFromEmail = "smtp.fromEmail";
     public const string SmtpFromName = "smtp.fromName";
     public const string SmtpSsl = "smtp.ssl";
+    /// <summary>"1" = the sender NAME is the site's own name (SiteName), whatever smtp.fromName says — the address stays smtp.fromEmail.
+    /// Rolled out by a cloud profile with "Name der Website als Absender"; a site without a cloud sets it on its SMTP tab.</summary>
+    public const string SmtpFromSiteName = "smtp.fromSiteName";
 
     // Log system (Admin → Protokoll). Request logging is opt-in because it can grow fast; retention is
     // per category, in days (0 = keep, bounded only by the hard count cap). Read cached in the
@@ -261,7 +264,7 @@ public static class SettingKeys
     /// <summary>SMTP setting keys (managed on the Settings → SMTP tab).</summary>
     public static readonly string[] Smtp =
     [
-        SmtpHost, SmtpPort, SmtpUser, SmtpPassword, SmtpFromEmail, SmtpFromName, SmtpSsl
+        SmtpHost, SmtpPort, SmtpUser, SmtpPassword, SmtpFromEmail, SmtpFromName, SmtpSsl, SmtpFromSiteName
     ];
 
     /// <summary>Error-handling setting keys (managed on the Settings → Fehlerhandling tab).</summary>

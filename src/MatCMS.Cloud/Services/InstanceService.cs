@@ -347,7 +347,7 @@ public class InstanceService
             // would never report back, so an op offered to it would stand for ever. Offered on every beat
             // until reported; add-only ops are idempotent, so a re-offer after a lost report is harmless.
             ContentOps = instance.Status == InstanceStatus.Approved && beat.ProtocolVersion >= 15
-                ? await PendingContentOpsAsync(instance.Id, instance.Profile?.BackupBeforeAiChange ?? false, ct)
+                ? await PendingContentOpsAsync(instance.Id, instance.Profile is not null && (await ProfileInheritance.EffectiveAsync(_db, instance.Profile, ct)).BackupBeforeAiChange, ct)
                 : null,
 
             // Full-log request (Variante B). Only for an approved instance speaking the contract that

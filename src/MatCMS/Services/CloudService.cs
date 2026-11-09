@@ -720,6 +720,8 @@ public class CloudService
                 Body = body,
                 ReplyTo = replyTo,
                 IsHtml = isHtml,
+                // Only an offer: the cloud's profile decides whether its mails carry this site's name as the sender name.
+                SiteName = (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.SiteName, ct))?.Value,
             };
             using var res = await client.PostAsJsonAsync(
                 $"{settings.Url}/api/instances/{settings.InstanceId}/mail", payload, ct);

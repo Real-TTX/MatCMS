@@ -52,7 +52,7 @@ internal static class ForumAdmin
                 Ui.Stat(ctx.T("forum.admin.openReports"), S(open), tone: open > 0 ? UiTone.Warning : UiTone.Default, href: Base + "reports"));
 
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(ctx.T("forum.admin.dashboardSub"), null,
+            Ui.PageHead(null, null,
                 Ui.Button(ctx.T("forum.admin.viewForum"), ForumUrls.Home, UiButtonKind.Ghost, "ti-external-link") with { NewTab = true },
                 boards.Count == 0 ? Ui.Button(ctx.T("forum.admin.newBoard"), Base + "boards/new", icon: "ti-plus") : null),
             start,
@@ -142,10 +142,11 @@ internal static class ForumAdmin
             {
                 Help = categories.Count > 0 ? ctx.T("forum.admin.field.categoryHelpList", string.Join(", ", categories)) : ctx.T("forum.admin.field.categoryHelp")
             },
-            Ui.Select("read", ctx.T("forum.admin.field.read"), V("read", board?.ReadAccess ?? Access.All), AccessOptions(ctx, false)),
-            Ui.Select("write", ctx.T("forum.admin.field.write"), V("write", board?.WriteAccess ?? Access.Members), AccessOptions(ctx, true)),
-            Ui.Input("role", ctx.T("forum.admin.field.role"), V("role", board?.Role ?? "")) with { Help = ctx.T("forum.admin.field.roleHelp") },
-            Ui.Input("sort", ctx.T("forum.admin.field.sort"), V("sort", board is null ? "" : board.Sort.ToString(CultureInfo.InvariantCulture)), UiInputType.Number),
+            // the order is set with the arrows in the list; a posted "sort" is still read (older forms, scripts)
+            Ui.Grid(200,
+                Ui.Select("read", ctx.T("forum.admin.field.read"), V("read", board?.ReadAccess ?? Access.All), AccessOptions(ctx, false)),
+                Ui.Select("write", ctx.T("forum.admin.field.write"), V("write", board?.WriteAccess ?? Access.Members), AccessOptions(ctx, true)),
+                Ui.Input("role", ctx.T("forum.admin.field.role"), V("role", board?.Role ?? "")) with { Help = ctx.T("forum.admin.field.roleHelp") }),
             Ui.Checkbox("locked", ctx.T("forum.admin.field.locked"), f ? ctx.Request.F("locked") is "on" or "true" or "1" : board?.Locked == true) with { Help = ctx.T("forum.admin.field.lockedHelp") },
             Ui.FormActions(Ui.Submit(ctx.T("forum.save")), Ui.Button(ctx.T("forum.cancel"), Base + "boards", UiButtonKind.Ghost)));
 
@@ -154,7 +155,7 @@ internal static class ForumAdmin
             Ui.Card(ctx.T("forum.admin.figures"), Ui.KeyValue((ctx.T("forum.threads"), S(board.ThreadCount)), (ctx.T("forum.posts"), S(board.PostCount)),
                 (ctx.T("forum.admin.lastPost"), board.LastPostAt is null ? "–" : When(ctx, board.LastPostAt))),
                 Ui.Button(ctx.T("forum.admin.open"), ForumUrls.Board(board), UiButtonKind.Ghost, "ti-external-link") with { NewTab = true }),
-            Ui.Card(ctx.T("forum.admin.danger"), Ui.Muted(ctx.T("forum.admin.deleteBoardHelp")),
+            Ui.Card(ctx.T("forum.admin.danger"),
                 Ui.Action(ctx.T("forum.admin.deleteBoard"), "delete", board.Id.ToString(CultureInfo.InvariantCulture), UiButtonKind.Danger,
                     confirm: ctx.T("forum.admin.confirmDeleteBoard", board.Title, S(board.ThreadCount), S(board.PostCount))) with { WithLabel = true })
         };
@@ -190,8 +191,7 @@ internal static class ForumAdmin
             if (x.Sticky) status.Add(Ui.Badge(ctx.T("forum.sticky"), UiTone.Info));
             if (x.Closed) status.Add(Ui.Badge(ctx.T("forum.closed"), UiTone.Warning));
             return Ui.RowFor(x.Title + " " + x.AuthorName + " " + board.Title,
-                Ui.Link(x.Title, ForumUrls.Thread(x), newTab: true), board.Title, x.AuthorName, S(x.ReplyCount), When(ctx, x.LastPostAt),
-                Ui.Inline(status.ToArray()),
+                Ui.Inline(new UiNode?[] { Ui.Link(x.Title, ForumUrls.Thread(x), newTab: true) }.Concat(status).ToArray()), board.Title, x.AuthorName, S(x.ReplyCount), When(ctx, x.LastPostAt),
                 Ui.Inline(
                     Ui.Action(ctx.T(x.Sticky ? "forum.mod.unsticky" : "forum.mod.sticky"), "sticky", id, icon: x.Sticky ? "ti-pinned-off" : "ti-pin"),
                     Ui.Action(ctx.T(x.Closed ? "forum.mod.open" : "forum.mod.close"), "close", id, icon: x.Closed ? "ti-lock-open" : "ti-lock"),
@@ -203,10 +203,12 @@ internal static class ForumAdmin
 
         var table = Ui.Table(
             new[] { Ui.Column(ctx.T("forum.admin.col.thread")), Ui.Column(ctx.T("forum.admin.col.board")), Ui.Column(ctx.T("forum.admin.col.author")),
-                Ui.Column(ctx.T("forum.replies"), right: true), Ui.Column(ctx.T("forum.admin.lastPost")), Ui.Column(ctx.T("forum.admin.col.status")), Ui.Column("", actions: true) },
+                Ui.Column(ctx.T("forum.replies"), right: true), Ui.Column(ctx.T("forum.admin.lastPost")), Ui.Column("", actions: true) },
             rows, ctx.T("forum.admin.searchThreads"), pageSize: 50, emptyText: ctx.T("forum.noThreads")) with
         {
-            Filter = boards.Count > 1 ? Ui.ListFilter(ctx.T("forum.admin.allBoards"), boards.Select(b => ("b" + b.Id.ToString(CultureInfo.InvariantCulture), b.Title)).ToArray()) : null
+            // the first, empty option is "all boards" – without it the list opened on the first board and hid every other thread
+            Filter = boards.Count > 1 ? Ui.ListFilter(ctx.T("forum.admin.allBoards"), new[] { ("", ctx.T("forum.admin.allBoards")) }
+                .Concat(boards.Select(b => ("b" + b.Id.ToString(CultureInfo.InvariantCulture), b.Title))).ToArray()) : null
         };
         return PluginResult.Page(table, ctx.T("forum.admin.threads"));
     }
@@ -277,27 +279,31 @@ internal static class ForumAdmin
         var rows = new List<UiTableRow>();
         foreach (var p in await store.ProfilesAsync(ct))
         {
+            // A profile whose account is gone here (a restore from another site, an account deleted outside the forum) still wrote posts: it is
+            // listed under the name of its last post, so this list and the overview's "members with posts" count the same people.
             var account = await ctx.Members.FindAsync(p.MemberId, ct);
-            if (account is null) continue;
-            var name = account.DisplayName.Length > 0 ? account.DisplayName : account.Username;
+            var name = account is null
+                ? (await store.LatestPostsAsync(null, 1, p.MemberId, ct)).FirstOrDefault()?.AuthorName ?? ctx.T("forum.deletedMember")
+                : account.DisplayName.Length > 0 ? account.DisplayName : account.Username;
+            var email = account?.Email ?? "";
             var id = p.MemberId.ToString(CultureInfo.InvariantCulture);
             var status = new List<UiNode>();
-            if (account.Roles.Contains(modRole, StringComparer.OrdinalIgnoreCase)) status.Add(Ui.Badge(ctx.T("forum.moderator"), UiTone.Info));
+            if (account is null) status.Add(Ui.Badge(ctx.T("forum.admin.noAccount")));
+            else if (account.Roles.Contains(modRole, StringComparer.OrdinalIgnoreCase)) status.Add(Ui.Badge(ctx.T("forum.moderator"), UiTone.Info));
             if (p.Banned) status.Add(Ui.Badge(ctx.T("forum.admin.banned"), UiTone.Error));
-            if (!account.IsActive) status.Add(Ui.Badge(ctx.T("forum.admin.inactive"), UiTone.Warning));
-            rows.Add(Ui.RowFor(name + " " + account.Email,
-                Ui.Stack(Ui.Link(name, ForumUrls.Member(p.MemberId), newTab: true), Ui.Muted(account.Email)),
+            if (account is { IsActive: false }) status.Add(Ui.Badge(ctx.T("forum.admin.inactive"), UiTone.Warning));
+            rows.Add(Ui.RowFor(name + " " + email,
+                Ui.Stack(account is null ? Ui.Text(name) : Ui.Link(name, ForumUrls.Member(p.MemberId), newTab: true), email.Length > 0 ? Ui.Muted(email) : null),
                 S(p.PostCount), p.LastPostAt is null ? "–" : When(ctx, p.LastPostAt), Ui.Inline(status.ToArray()),
                 Ui.Inline(
                     p.Banned ? Ui.Action(ctx.T("forum.admin.unban"), "unban", id, icon: "ti-lock-open")
                              : Ui.Action(ctx.T("forum.admin.ban"), "ban", id, UiButtonKind.Danger, ctx.T("forum.admin.confirmBan", name), "ti-ban"),
                     p.Signature.Length > 0 ? Ui.Action(ctx.T("forum.admin.clearSignature"), "clearsig", id, icon: "ti-eraser") : null)));
         }
-        return PluginResult.Page(Ui.Stack(
-            Ui.Alert(ctx.T("forum.admin.modHint", modRole), UiTone.Info),
+        return PluginResult.Page(
             Ui.Table(new[] { Ui.Column(ctx.T("forum.admin.col.member")), Ui.Column(ctx.T("forum.posts"), right: true), Ui.Column(ctx.T("forum.admin.lastPost")),
                 Ui.Column(ctx.T("forum.admin.col.status")), Ui.Column("", actions: true) }, rows, ctx.T("forum.admin.searchMembers"), pageSize: 50,
-                emptyText: ctx.T("forum.admin.noMembers"))), ctx.T("forum.admin.members"));
+                emptyText: ctx.T("forum.admin.noMembers")), ctx.T("forum.admin.members"));
     }
 
     // ---- dashboard contributions ------------------------------------------------------------------------------------

@@ -45,10 +45,9 @@ internal static class ShopAdminCatalog
         var allCats = await store.CategoriesAsync(ct);
         var catNames = allCats.ToDictionary(c => c.Slug, c => ShopCategories.Label(allCats, c));
         var table = Ui.Table(
-            new[] { Ui.Column(ctx.T("shop.adm.product")), Ui.Column(ctx.T("shop.adm.kind")), Ui.Column(ctx.T("shop.price"), right: true), Ui.Column(ctx.T("shop.adm.stock"), right: true), Ui.Column(ctx.T("shop.adm.status")), Ui.Column("", actions: true) },
+            new[] { Ui.Column(ctx.T("shop.adm.product")), Ui.Column(ctx.T("shop.price"), right: true), Ui.Column(ctx.T("shop.adm.stock"), right: true) with { Phone = false }, Ui.Column(ctx.T("shop.adm.status")), Ui.Column("", actions: true) },
             products.Select(p => (Ui.RowFor($"{p.Title} {p.Slug} {p.Sku} {p.Category} {p.Tags}",
                 Ui.Html(ProductCell(ctx, p, catNames)),
-                p.IsDigital ? Ui.Badge(ctx.T("shop.digital"), UiTone.Info) : Ui.Badge(ctx.T("shop.physical"), UiTone.Default),
                 Ui.Html($"<strong>{System.Net.WebUtility.HtmlEncode(Money.Format(p.PriceCents, cfg.Currency, "de"))}</strong>" + (p.OnSale ? $"<div class=\"muted\"><s>{System.Net.WebUtility.HtmlEncode(Money.Format(p.CompareCents, cfg.Currency, "de"))}</s> −{p.SavePercent} %</div>" : "") + (variants.TryGetValue(p.Id, out var n) ? $"<div class=\"muted\">{System.Net.WebUtility.HtmlEncode(ctx.T("shop.adm.variantCount", n))}</div>" : "")),
                 p.TrackStock ? (p.Stock <= cfg.LowStock ? Ui.Badge(Intl(p.Stock), p.Stock <= 0 ? UiTone.Error : UiTone.Warning) : Ui.Text(Intl(p.Stock)) with { Inline = true }) : Ui.Text("∞") with { Inline = true, Muted = true },
                 p.Active ? Ui.Badge(ctx.T("shop.adm.active"), UiTone.Success) : Ui.Badge(ctx.T("shop.adm.inactive"), UiTone.Muted),
@@ -205,10 +204,10 @@ internal static class ShopAdminCatalog
         {
             Ui.Card(ctx.T("shop.adm.secStatus"),
                 Ui.Checkbox("active", ctx.T("shop.adm.activeLabel"), product.Active || id == 0),
-                Ui.Checkbox("featured", ctx.T("shop.adm.featured"), product.Featured) with { Help = ctx.T("shop.adm.featuredHelp") },
+                Ui.Checkbox("featured", ctx.T("shop.adm.featured"), product.Featured),
                 Ui.Select("kind", ctx.T("shop.adm.kind"), product.Kind, Ui.Option(ProductKind.Physical, ctx.T("shop.physical")), Ui.Option(ProductKind.Digital, ctx.T("shop.digital")))),
             Ui.Card(ctx.T("shop.adm.secPrice"),
-                Ui.Input("price", ctx.T("shop.adm.priceGross", cfg.Currency), Money.ForInput(product.PriceCents)) with { Required = true, Help = ctx.T("shop.adm.priceHelp") },
+                Ui.Input("price", ctx.T("shop.adm.priceGross", cfg.Currency), Money.ForInput(product.PriceCents)) with { Required = true },
                 Ui.Input("compare", ctx.T("shop.adm.compare", cfg.Currency), product.CompareCents > 0 ? Money.ForInput(product.CompareCents) : "") with { Help = ctx.T("shop.adm.compareHelp") },
                 Ui.Select("tax", ctx.T("shop.adm.taxPercent"), Money.Percent(product.TaxBp), ShopTaxChoices.ForProduct(ctx, cfg, product.TaxBp)) with { Help = ctx.T(cfg.SmallBusiness ? "shop.adm.taxIgnored" : "shop.adm.taxHelp") }),
             Ui.Card(ctx.T("shop.adm.secPlace"),
@@ -234,7 +233,7 @@ internal static class ShopAdminCatalog
         hidden.Add(Ui.Columns(main, side));
         hidden.Add(Ui.FormActions(Ui.Submit(ctx.T("action.save")), Ui.Button(ctx.T("action.cancel"), $"{Section}/products", UiButtonKind.Ghost)));
 
-        var nodes = new List<UiNode?> { Ui.PageHead(null, ctx.T(id == 0 ? "shop.adm.newProduct" : "shop.adm.editProduct"), Ui.Button(ctx.T("shop.adm.back"), $"{Section}/products", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true),
+        var nodes = new List<UiNode?> { Ui.PageHead(null, ctx.T(id == 0 ? "shop.adm.newProduct" : "shop.adm.editProduct"),
             id > 0 && product.Active ? Ui.Button(ctx.T("shop.adm.view"), "/shop/" + Uri.EscapeDataString(product.Slug), UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true } : null,
             id > 0 ? Ui.Action(ctx.T("shop.adm.duplicate"), "duplicate", null, UiButtonKind.Ghost, icon: "ti-copy") with { WithLabel = true } : null), Ui.Form(hidden.ToArray()) };
 
@@ -398,18 +397,18 @@ internal static class ShopAdminCatalog
         var total = ShopCategories.RollUp(cats, own);
         static string E(string? t) => System.Net.WebUtility.HtmlEncode(t ?? "");
         var table = Ui.Table(
-            new[] { Ui.Column(ctx.T("shop.adm.category")), Ui.Column(ctx.T("shop.adm.products"), right: true), Ui.Column(ctx.T("shop.adm.sort"), right: true), Ui.Column("", actions: true) },
+            new[] { Ui.Column(ctx.T("shop.adm.category")), Ui.Column(ctx.T("shop.adm.products"), right: true), Ui.Column(ctx.T("shop.adm.sort"), right: true) with { Phone = false }, Ui.Column("", actions: true) },
             ShopCategories.Flatten(cats).Select(t =>
             {
                 var c = t.Cat;
                 var img = ShopImages.Url(ctx, c.Image, ShopImages.Small);
                 var thumb = img.Length > 0 ? $"<span class=\"ui-thumb\" style=\"background-image:url('{E(img)}')\"></span>" : "<span class=\"ui-thumb empty\"><i class=\"ti ti-category\"></i></span>";
                 var desc = c.Description.Length > 90 ? c.Description[..90] + "…" : c.Description;
-                var cell = $"<div class=\"ui-media-cell\" style=\"padding-left:{t.Depth * 28}px\">{(t.Depth > 0 ? "<i class=\"ti ti-corner-down-right muted\" aria-hidden=\"true\"></i>" : "")}{thumb}<div><a href=\"{CategoryUrl(c.Id)}\"><strong>{E(c.Name)}</strong></a><div class=\"muted\">{E(c.Slug)}{(desc.Length > 0 ? " · " + E(desc) : "")}{(c.Tags.Length > 0 ? " · <i class=\"ti ti-tag\" aria-hidden=\"true\"></i> " + E(c.Tags) : "")}</div></div></div>";
+                var cell = $"<div class=\"ui-media-cell\" style=\"padding-left:{t.Depth * 28}px\">{(t.Depth > 0 ? "<i class=\"ti ti-corner-down-right muted\" aria-hidden=\"true\"></i>" : "")}{thumb}<div><a href=\"{CategoryUrl(c.Id)}\"><strong>{E(c.Name)}</strong></a><div class=\"muted\">{CategorySubline(desc, c.Tags)}</div></div></div>";
                 var n = own.GetValueOrDefault(c.Slug); var all = total.GetValueOrDefault(c.Slug);
                 return Ui.RowFor($"{c.Name} {c.Slug} {c.Description} {c.Tags}",
                     Ui.Html(cell),
-                    Ui.Text(all == n ? Intl(n) : $"{Intl(n)} ({Intl(all)})") with { Inline = true },
+                    Ui.Text(Intl(all)) with { Inline = true },
                     Ui.Text(Intl(c.Sort)) with { Inline = true, Muted = true },
                     Ui.Inline(
                         Ui.Button(ctx.T("action.edit"), CategoryUrl(c.Id), UiButtonKind.Ghost, small: true),
@@ -473,7 +472,7 @@ internal static class ShopAdminCatalog
         {
             Ui.Card(ctx.T("shop.adm.secCategory"),
                 Ui.Input("name", ctx.T("shop.adm.categoryName"), current.Name) with { Required = true },
-                Ui.TextArea("description", ctx.T("shop.adm.categoryDescription"), current.Description, 4) with { Help = ctx.T("shop.adm.categoryDescriptionHelp") },
+                Ui.TextArea("description", ctx.T("shop.adm.categoryDescription"), current.Description, 4),
                 Ui.Input("tags", ctx.T("shop.adm.categoryTags"), current.Tags) with { Help = ctx.T("shop.adm.categoryTagsHelp") },
                 Ui.Image("image", ctx.T("shop.adm.categoryImage"), current.Image)),
             Ui.Card(ctx.T("shop.adm.collection"),
@@ -486,14 +485,24 @@ internal static class ShopAdminCatalog
             Ui.Card(ctx.T("shop.adm.secPlace"),
                 Ui.Select("parent", ctx.T("shop.adm.parentCategory"), Intl(current.ParentId), parents),
                 Ui.Input("sort", ctx.T("shop.adm.sort"), Intl(current.Sort), UiInputType.Number) with { Min = "0" },
-                id == 0 ? Ui.Input("slug", ctx.T("shop.adm.slug"), "") with { Help = ctx.T("shop.adm.categorySlugHelp") } : Ui.KeyValue((ctx.T("shop.adm.slug"), current.Slug)))
+                id == 0 ? Ui.Input("slug", ctx.T("shop.adm.slug"), "") with { Help = ctx.T("shop.adm.categorySlugHelp") } : Ui.Input("slug", ctx.T("shop.adm.slug"), current.Slug) with { Disabled = true })
         };
         var title = ctx.T(id == 0 ? "shop.adm.newCategory" : "shop.adm.editCategory");
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, title, Ui.Button(ctx.T("shop.adm.back"), $"{Section}/categories", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true),
+            Ui.PageHead(null, title,
                 id > 0 ? Ui.Button(ctx.T("shop.adm.view"), ShopUrls.Category(current.Slug), UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true } : null),
             error is null ? null : Ui.Alert(error, UiTone.Error),
             Ui.Form(Ui.Hidden("action", "save"), Ui.Columns(main, side), Ui.FormActions(Ui.Submit(ctx.T("action.save")), Ui.Button(ctx.T("action.cancel"), $"{Section}/categories", UiButtonKind.Ghost)))), title);
+    }
+
+    /// <summary>The line under a category's name in the list: its text and its keywords (the slug is in the address of the edit page, not worth a place here).</summary>
+    private static string CategorySubline(string desc, string tags)
+    {
+        static string E(string? t) => System.Net.WebUtility.HtmlEncode(t ?? "");
+        var parts = new List<string>();
+        if (desc.Length > 0) parts.Add(E(desc));
+        if (tags.Length > 0) parts.Add("<i class=\"ti ti-tag\" aria-hidden=\"true\"></i> " + E(tags));
+        return string.Join(" · ", parts);
     }
 
     // ---- shipping ----------------------------------------------------------------------------------------
@@ -537,17 +546,17 @@ internal static class ShopAdminCatalog
         kids.Add(Ui.Heading(ctx.T("shop.adm.newRate"), 3));
         kids.Add(RateFields(ctx, "_new", new ShippingRate { Name = "" }, false));
         kids.Add(Ui.FormActions(Ui.Submit(ctx.T("action.save"))));
-        return PluginResult.Page(ShopConditions.Frame(ctx, "shipping", Ui.PageHead(ctx.T("shop.adm.shippingHelp"), ctx.T("shop.adm.shipping")), Ui.Card(Ui.Form(kids.ToArray()))), ctx.T("shop.adm.shipping"));
+        return PluginResult.Page(ShopConditions.Frame(ctx, "shipping", Ui.Form(kids.ToArray())), ctx.T("shop.adm.shipping"));
     }
 
     private static UiNode RateFields(IPluginContext ctx, string suffix, ShippingRate r, bool deletable) => Ui.Card(
         Ui.Grid(200,
             Ui.Input("name" + suffix, ctx.T("shop.adm.rateName"), r.Name),
-            Ui.Input("countries" + suffix, ctx.T("shop.adm.rateCountries"), r.Countries) with { Help = ctx.T("shop.adm.rateCountriesHelp") },
+            Ui.Input("countries" + suffix, ctx.T("shop.adm.rateCountries"), r.Countries) with { Help = deletable ? null : ctx.T("shop.adm.rateCountriesHelp") },
             Ui.Input("price" + suffix, ctx.T("shop.adm.ratePrice"), Money.ForInput(r.PriceCents)),
-            Ui.Input("free" + suffix, ctx.T("shop.adm.rateFree"), r.FreeFromCents > 0 ? Money.ForInput(r.FreeFromCents) : "") with { Help = ctx.T("shop.adm.rateFreeHelp") },
-            Ui.Input("weight" + suffix, ctx.T("shop.adm.rateWeight"), r.MaxWeightGrams > 0 ? Intl(r.MaxWeightGrams) : "", UiInputType.Number) with { Help = ctx.T("shop.adm.rateWeightHelp") }),
-        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), Ui.Checkbox("pickup" + suffix, ctx.T("shop.adm.ratePickup"), r.Pickup) with { Help = ctx.T("shop.adm.ratePickupHelp") }, deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
+            Ui.Input("free" + suffix, ctx.T("shop.adm.rateFree"), r.FreeFromCents > 0 ? Money.ForInput(r.FreeFromCents) : "") with { Help = deletable ? null : ctx.T("shop.adm.rateFreeHelp") },
+            Ui.Input("weight" + suffix, ctx.T("shop.adm.rateWeight"), r.MaxWeightGrams > 0 ? Intl(r.MaxWeightGrams) : "", UiInputType.Number) with { Help = deletable ? null : ctx.T("shop.adm.rateWeightHelp") }),
+        Ui.Inline(Ui.Checkbox("active" + suffix, ctx.T("shop.adm.activeLabel"), r.Active || r.Id == 0), Ui.Checkbox("pickup" + suffix, ctx.T("shop.adm.ratePickup"), r.Pickup) with { Help = deletable ? null : ctx.T("shop.adm.ratePickupHelp") }, deletable ? Ui.Checkbox("del" + suffix, ctx.T("shop.adm.removeRate")) : null));
 
     private static ShippingRate ReadRate(RequestData f, string suffix, ShippingRate current, out string? error)
     {

@@ -72,7 +72,7 @@ public static class VereinDashboard
         {
             var mine = replies.Where(r => r.EventId == e.Id).ToList();
             var asked = e.Ask ? VereinStore.Asked(all, e, board).Count() : 0;
-            return Ui.Row(Ui.Inline(Ui.Link(e.Title, R + "events/" + e.Id), e.Public ? null : Ui.Badge("intern")),
+            return Ui.Row(Ui.Inline(Ui.Link(e.Title, R + "events/" + e.Id), e.Public ? null : Ui.Badge("intern", UiTone.Info)),
                 V.When(e.Starts) + (e.Place.Length > 0 ? " · " + e.Place : ""),
                 e.Ask ? Ui.Badge(mine.Count(r => r.Answer == VereinStore.Yes) + " dabei · " + Math.Max(0, asked - mine.Count) + " offen", mine.Count < asked ? UiTone.Warning : UiTone.Success) : Ui.Muted("–"));
         }
@@ -80,28 +80,28 @@ public static class VereinDashboard
         var main = new List<UiNode?>
         {
             Ui.Card("Nächste Termine", events.Count == 0 ? Ui.Empty("Gerade steht nichts an.") : Ui.Table(new[] { Ui.Column("Termin"), Ui.Column("Wann · Wo"), Ui.Column("Teilnahme") }, events.Select(EventRow)),
-                Ui.Inline(Ui.Button("Alle Termine", R + "events", UiButtonKind.Ghost, small: true), Ui.Button("Neuer Termin", R + "events/new", UiButtonKind.Ghost, "ti-calendar-plus", small: true))),
+                Ui.Button("Alle Termine", R + "events", UiButtonKind.Ghost, small: true)),
             next is null ? null : Ui.Card("Nächste Sitzung", Ui.KeyValue(("Was", next.Title), ("Wann", V.When(next.Starts)), ("Wo", next.Place.Length > 0 ? next.Place : "–"),
                 ("Einladung", next.InvitedAt is null ? "noch nicht verschickt" : "verschickt am " + V.Stamp(next.InvitedAt))), Ui.Button("Öffnen", R + "meetings/" + next.Id, UiButtonKind.Ghost, small: true)),
         };
         var side = new List<UiNode?>
         {
             Ui.Card("Geburtstage (30 Tage)", birthdays.Count == 0 ? Ui.Muted("Keine – oder es fehlen Geburtsdaten.") :
-                Ui.Table(new[] { Ui.Column("Wer"), Ui.Column("Wann"), Ui.Column("wird", right: true) },
+                Ui.Table(new[] { Ui.Column("Wer"), Ui.Column("Wann"), Ui.Column("Alter", right: true) },
                     birthdays.Take(12).Select(b => Ui.Row(Ui.Link(b.P.Name, R + (b.P.Child ? "children/" : "members/") + b.P.Id), When(b.Day), b.Age.ToString(CultureInfo.InvariantCulture))))),
             jubilees.Count == 0 ? null : Ui.Card("Jubiläen " + V.Local(DateTime.UtcNow).Year,
-                Ui.Table(new[] { Ui.Column("Wer"), Ui.Column("Jahre", right: true), Ui.Column("seit") },
+                Ui.Table(new[] { Ui.Column("Wer"), Ui.Column("Jahre", right: true), Ui.Column("Seit") },
                     jubilees.Take(12).Select(j => Ui.Row(Ui.Link(j.P.Name, R + "members/" + j.P.Id), j.Years.ToString(CultureInfo.InvariantCulture), V.Date(j.Day))))),
             newest.Count == 0 ? null : Ui.Card("Zuletzt aufgenommen", Ui.Stack(newest.Select(p => (UiNode?)Ui.Inline(Ui.Link(p.Name, R + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null, Ui.Muted(V.Stamp(p.Created)[..10]))).ToArray())),
         };
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Mitglieder, Dokumente, Sitzungen und Termine auf einen Blick", VereinSettings.Club(ctx),
+            Ui.PageHead(null, VereinSettings.Club(ctx),
                 Ui.Button("Mitgliederbereich öffnen", VereinPublic.Base, UiButtonKind.Ghost, "ti-external-link", small: true)),
             Ui.Stats(
                 Ui.Stat("Mitglieder", people.Count.ToString(CultureInfo.InvariantCulture),
                     new[] { people.Count(p => p.Child) is var k and > 0 ? k + " Kinder" : null, people.Count(p => p.Passive) is var pa and > 0 ? pa + " passiv" : null }
                         .Where(x => x is not null).ToList() is { Count: > 0 } of ? "davon " + string.Join(", ", of) : null, href: R + "members"),
-                Ui.Stat("Ohne Zugang", people.Count(p => !p.Child && !p.HasAccount).ToString(CultureInfo.InvariantCulture), "nur geführt", href: R + "members?status=ohne-zugang"),
+                Ui.Stat("Ohne Zugang", people.Count(p => !p.Child && !p.HasAccount).ToString(CultureInfo.InvariantCulture), href: R + "members?status=ohne-zugang"),
                 Ui.Stat("Offene Bestätigungen", open.ToString(CultureInfo.InvariantCulture), tone: open > 0 ? UiTone.Warning : UiTone.Success, href: R + "docs"),
                 Ui.Stat("Uploads zur Freigabe", waiting.ToString(CultureInfo.InvariantCulture), tone: waiting > 0 ? UiTone.Warning : UiTone.Default, href: R + "uploads?status=offen")),
             Ui.Card("Schnell anlegen", Ui.Inline(
@@ -109,10 +109,8 @@ public static class VereinDashboard
                 Ui.Button("Kind", R + "children/new", UiButtonKind.Ghost, "ti-mood-kid"),
                 Ui.Button("Dokument", R + "docs/new", UiButtonKind.Ghost, "ti-file-plus"),
                 Ui.Button("Sitzung", R + "meetings/new", UiButtonKind.Ghost, "ti-users-group"),
-                Ui.Button("Termin", R + "events/new", UiButtonKind.Ghost, "ti-calendar-plus"),
-                Ui.Button("Termine exportieren", VereinExport.Url("instagram"), UiButtonKind.Ghost, "ti-file-export"))),
-            Ui.Columns(main, side),
-            Ui.Muted("Auf der Website: Der Mitgliederbereich liegt unter " + VereinPublic.Base + ". Öffentliche Termine zeigt der Block „Vereinstermine“; als Kalender: " + VereinIcal.PublicFeed + ".")
+                Ui.Button("Termin", R + "events/new", UiButtonKind.Ghost, "ti-calendar-plus"))),
+            Ui.Columns(main, side)
         ), "Verein");
     }
 

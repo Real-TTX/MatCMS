@@ -3,7 +3,16 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.11 — B7a: Verbund mit Zentrale (lesen)
+## Stand: 0.12 — UI-Durchgang
+
+- **0.12**: Erklär-Untertitel und Hinweisabsätze gestrichen (Übersicht, Listen, Kanäle, Meldungen, Reinigung, Verbund, Neue Buchung, Anfrageformular);
+  Einstellungen „Allgemein“ (Währung, „Neue Anfragen an“, Haltezeit, Angebot, Zahlungshinweis, Datenschutz) sind wieder erreichbar (eigene Gruppe);
+  Übersicht mit Anreisen/Abreisen heute und Kachel „Unbezahlt“, „Einrichten“ nur solange etwas fehlt; Buchung: nächste Schritte als Knöpfe oben
+  (Dialoge, Felder unverändert), PDF oben, Verlauf in Ortszeit statt „UTC“; Liste mit eigener Spalte „Zahlung“; Belegungsplan nennt den Monat;
+  Saisonpreise je Einheit als eine Feldzeile mit kurzen Labels (keine Karte je Einheit); „Neue Adressen erzeugen“ mit Text; Seitenleiste:
+  Einheiten, Saisons, Gebühren und Preis prüfen unter „Einrichtung“.
+
+## Stand davor: 0.11 — B7a: Verbund mit Zentrale (lesen)
 
 - **„Kundenverbund“ heißt „Verbund“**, die Rollen „für sich“, **Zentrale** (`lead`), **Haus im Verbund** (`member`) — Werte der Einstellung unverändert.
 - **Die Zentrale** (Buchungen → Verbund): Übersicht mit offenen Anfragen ALLER Häuser, Anreisen/Abreisen heute, Häuser im Verbund; Tab „Alle Buchungen“

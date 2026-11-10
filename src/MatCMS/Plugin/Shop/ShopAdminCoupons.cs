@@ -64,7 +64,7 @@ internal static class ShopAdminCoupons
                 coupons.GroupBy(c => StateOf(c).Key).Select(g => (g.Key, $"{ctx.T(g.Key)} ({g.Count()})"))).ToArray()),
             Below = new UiNode[] { Ui.Button(ctx.T("shop.adm.newCoupon"), CouponUrl(0)) }
         };
-        return PluginResult.Page(ShopConditions.Frame(ctx, "coupons", table), ctx.T("shop.adm.coupons"));
+        return PluginResult.Page(Ui.Stack(table), ctx.T("shop.adm.coupons"));
     }
 
     public static async Task<PluginResult> CouponAsync(IPluginContext ctx, CancellationToken ct)
@@ -108,11 +108,10 @@ internal static class ShopAdminCoupons
 
         var nodes = new List<UiNode?>
         {
-            Ui.PageHead(null, ctx.T(id == 0 ? "shop.adm.newCoupon" : "shop.adm.editCoupon"), Ui.Button(ctx.T("shop.adm.back"), $"{Section}/coupons", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true)),
             Ui.Card(Ui.Form(kids.ToArray()))
         };
         if (id > 0) nodes.Add(Ui.Muted(ctx.T("shop.adm.cpStats", coupon.Used, await store.OrdersWithCouponAsync(coupon.Code, ct))));
-        return PluginResult.Page(ShopConditions.Frame(ctx, "coupons", nodes.ToArray()), ctx.T(id == 0 ? "shop.adm.newCoupon" : "shop.adm.editCoupon"));
+        return PluginResult.Page(Ui.Stack(nodes.ToArray()), ctx.T(id == 0 ? "shop.adm.newCoupon" : "shop.adm.editCoupon"));
     }
 
     /// <summary>The coupon as the form describes it. Sets <paramref name="error"/> on the first thing wrong — the form comes back with what was typed.</summary>

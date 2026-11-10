@@ -764,18 +764,21 @@ internal sealed partial class ShopStore
         (await T("products").QueryAsync(DataQuery.Everything.Eq("active", true).Eq("track_stock", true).Where("stock", DataOp.Le, (long)threshold).OrderBy("stock"), ct)).Select(ProductOf).ToList();
 
     /// <summary>The ids of the best-selling products — pieces in paid, shipped or completed orders, most first. Read from the orders; empty while nothing has been sold.</summary>
-    public async Task<List<long>> TopSellerIdsAsync(int take, CancellationToken ct = default)
+    public async Task<List<long>> TopSellerIdsAsync(int take, CancellationToken ct = default) => (await TopSellersAsync(take, ct)).Select(t => t.Id).ToList();
+
+    /// <summary>The best sellers with the pieces sold (paid orders; only products that are still on sale).</summary>
+    public async Task<List<(long Id, long Qty)>> TopSellersAsync(int take, CancellationToken ct = default)
     {
         var paid = (await T("orders").QueryAsync(DataQuery.Everything.Where("status", DataOp.In, new List<string> { OrderStatus.Paid, OrderStatus.Shipped, OrderStatus.Completed }).OrderBy("created", descending: true).Page(0, 2000), ct))
             .Select(r => r.Id).ToList();
-        if (paid.Count == 0) return new List<long>();
+        if (paid.Count == 0) return new List<(long Id, long Qty)>();
         var sold = new Dictionary<long, long>();
         foreach (var r in await T("order_items").QueryAsync(DataQuery.Everything.Where("order_id", DataOp.In, paid), ct))
             if (r.Int("product_id") is > 0 and var pid) sold[pid] = sold.GetValueOrDefault(pid) + r.Int("qty");
         var ids = sold.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key).Select(kv => kv.Key).ToList();
         // Only products that can still be bought (a sold-out classic of last year must not hold a place).
         var live = (await ProductsByIdsAsync(ids, ct)).Where(p => p.Active).Select(p => p.Id).ToHashSet();
-        return ids.Where(live.Contains).Take(Math.Max(1, take)).ToList();
+        return ids.Where(live.Contains).Take(Math.Max(1, take)).Select(id => (id, sold[id])).ToList();
     }
 
     // ---- customers (derived from orders) -------------------------------------------------------------------

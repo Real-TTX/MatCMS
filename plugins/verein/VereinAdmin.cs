@@ -136,22 +136,27 @@ public static class VereinAdmin
             .Concat(filterFields.SelectMany(x => x.Values.Select((v, j) => p.Extra.TryGetValue(x.f.Label, out var pv) && string.Equals(pv.Trim(), v, StringComparison.OrdinalIgnoreCase) ? $"f{x.i}-{j}" : null)))
             .Where(t => t is not null));
 
+        // At most seven columns: eleven ran out of the card at 1440 px. The address goes under the name, only the first own field is a column (the
+        // others are searched and filtered, and stand on the person's page), the open confirmations join the status as a badge when there are any.
         var columns = new List<UiColumn> { Ui.Column("Name"), Ui.Column("Rollen") };
-        columns.AddRange(fields.Take(3).Select((f, i) => i == 0 ? Ui.Column(f.Label) : NotOnPhone(Ui.Column(f.Label))));
-        columns.AddRange(new[] { Ui.Column("Geboren"), NotOnPhone(Ui.Column("Mitglied seit")), Ui.Column("Kontakt / gehört zu"), NotOnPhone(Ui.Column("Offen", right: true)), Ui.Column("Status") });
+        columns.AddRange(fields.Take(1).Select(f => Ui.Column(f.Label)));
+        columns.AddRange(new[] { Ui.Column("Geboren"), NotOnPhone(Ui.Column("Mitglied seit")), Ui.Column("Telefon / gehört zu"), Ui.Column("Status") });
         var table = Ui.Table(columns, list.Select(p =>
             {
+                var mail = !p.Child && p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? p.Email : "";
                 var cells = new List<object?>
                 {
-                    Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null, p.Passive ? Ui.Badge("passiv") : null),
+                    Ui.Stack(Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge("Kind", UiTone.Info) : null, p.Passive ? Ui.Badge("passiv") : null),
+                        mail.Length > 0 ? Ui.Muted(mail) : null),
                     string.Join(", ", p.Roles)
                 };
-                cells.AddRange(fields.Take(3).Select(f => (object?)(p.Extra.TryGetValue(f.Label, out var v) ? v : "")));
+                cells.AddRange(fields.Take(1).Select(f => (object?)(p.Extra.TryGetValue(f.Label, out var v) ? v : "")));
                 cells.Add(p.Born.Length > 0 ? V.Date(p.Born) + (Age(p.Born) is int a ? " (" + a + ")" : "") : "");
                 cells.Add(p.Joined.Length > 0 ? V.Date(p.Joined) : "");
-                cells.Add(p.Child ? Guardians(p) : Contact(p));
-                cells.Add(p.Active ? OpenOf(p) : 0);
-                cells.Add(!p.Active ? Ui.Badge(InactiveLabel(p)) : p.Child ? Ui.Badge("Mitglied", UiTone.Success) : p.HasAccount ? Ui.Badge("Zugang", UiTone.Success) : Ui.Badge("ohne Zugang", UiTone.Warning));
+                cells.Add(p.Child ? Guardians(p) : p.Phone);
+                var open = p.Active ? OpenOf(p) : 0;
+                cells.Add(Ui.Inline(!p.Active ? Ui.Badge(InactiveLabel(p)) : p.Child ? Ui.Badge("Mitglied", UiTone.Success) : p.HasAccount ? Ui.Badge("Zugang", UiTone.Success) : Ui.Badge("ohne Zugang", UiTone.Warning),
+                    open > 0 ? Ui.Badge(open + " offen", UiTone.Warning) : null));
                 return Ui.RowFor(p.Name + " " + p.Email + " " + p.Phone + " " + string.Join(" ", p.Roles) + " " + string.Join(" ", p.Extra.Values) + " " + p.City + (p.Child ? " kind " + Guardians(p) : "") + (p.Passive ? " passiv" : ""), cells.ToArray()) with { Tags = Tags(p) };
             }), searchPlaceholder: "Name, Ort, Telefon, Nr. …", pageSize: 50,
             emptyText: people.Count == 0 ? "Noch keine Mitglieder. Lege das erste an." : "In dieser Ansicht ist niemand.") with
@@ -181,14 +186,6 @@ public static class VereinAdmin
 
     /// <summary>Why someone is a former member, as the board wrote it on the note's first line ("Ausgetreten", "Verstorben") — else "ehemalig".</summary>
     internal static string InactiveLabel(Person p) => p.Note.Split('\n')[0].Trim() is { Length: > 0 and <= 24 } first ? first : "ehemalig";
-
-    /// <summary>Phone and mail as two pieces that wrap as a whole (one string joined by " · " broke in the middle of the address); a parked address (xxx_…) is not shown.</summary>
-    private static UiNode Contact(Person p)
-    {
-        var phone = p.Phone.Length > 0 ? Ui.Text(p.Phone) : null;
-        var mail = p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? Ui.Muted(p.Email) : null;
-        return phone is null && mail is null ? Ui.Text("") : Ui.Inline(phone, mail);
-    }
 
     /// <summary>The membership type: active (takes part) or passive (supporting member). Not "aktiv" as in still a member — that is the "Ausgetreten" box.</summary>
     private static UiNode MembershipField(Person? p) =>
@@ -243,7 +240,7 @@ public static class VereinAdmin
             Ui.Heading("Gehört zu", 3),
             adults.Count == 0 ? Ui.Alert("Erst ein erwachsenes Mitglied anlegen – ein Kind gehört immer zu jemandem.", UiTone.Warning)
                 : Ui.Tags("guardians", "Eltern / Erziehungsberechtigte", string.Join(", ", currentGuardians), adults.Where(a => a.Active).Select(a => a.Name).OrderBy(n => n))
-                    with { Help = "Mindestens eine Person – sie bekommt die Nachrichten und antwortet für das Kind." },
+                    with { Help = "Bekommt die Nachrichten und antwortet für das Kind." },
             Ui.Heading("Im Verein", 3),
             MembershipField(c),
             RolesField(ctx, c?.Roles ?? new[] { roles[^1] }),
@@ -252,13 +249,13 @@ public static class VereinAdmin
             isNew ? null : FormerBox(c!),
             Ui.FormActions(Ui.Submit(isNew ? "Eintragen" : "Speichern"), Ui.Button("Zurück", Root + "members?status=kinder", UiButtonKind.Ghost)));
         if (isNew)
-            return Page(Ui.Stack(Ui.PageHead("Ein Kind hat keine eigene E-Mail und keinen Zugang – Dokumente und Nachrichten gehen an die Eltern", "Kind eintragen"), Ui.Card(form)), "Kind eintragen");
+            return Page(Ui.Card(form), "Kind eintragen");
         return Page(Ui.Stack(
-            Ui.PageHead("Kind · " + (c!.Born.Length > 0 && Age(c.Born) is int age ? age + " Jahre" : "ohne Geburtsdatum"), c.Name, Ui.Button("Zurück", Root + "members?status=kinder", UiButtonKind.Ghost, small: true)),
+            Ui.PageHead("Kind · " + (c!.Born.Length > 0 && Age(c.Born) is int age ? age + " Jahre" : "ohne Geburtsdatum"), c.Name),
             Ui.Columns(new UiNode?[] { Ui.Card(form) }, new UiNode?[]
             {
                 PhotoCard(c),
-                Ui.Card("Entfernen", Ui.Muted("Nimmt das Kind aus dem Verein (Bild und Rückmeldungen gehen mit)."), Act("Aus dem Verein entfernen", "remove", kind: UiButtonKind.Danger, confirm: "Wirklich entfernen?", icon: "ti-trash"))
+                Ui.Card("Entfernen", Act("Aus dem Verein entfernen", "remove", kind: UiButtonKind.Danger, confirm: c.Name + " aus dem Verein entfernen? Bild und Rückmeldungen gehen mit.", icon: "ti-trash"))
             })), c.Name);
     }
 
@@ -273,7 +270,7 @@ public static class VereinAdmin
 
     private static UiNode PhotoCard(Person p) => Ui.Card("Profilbild",
         p.Photo.Length > 0 ? Ui.Img(Root + "members/" + p.Id + "/photo?v=" + Path.GetFileNameWithoutExtension(p.Photo)[..8], p.Name, 120) : Ui.Muted("Noch kein Bild."),
-        Ui.Form(Ui.File("photo", "Bild hochladen (JPG, PNG oder WebP)", "image/jpeg,image/png,image/webp"),
+        Ui.Form(Ui.File("photo", "Bild (JPG, PNG, WebP)", "image/jpeg,image/png,image/webp"),
             Ui.FormActions(Ui.Submit("Hochladen", UiButtonKind.Ghost, "action", "photo"))) with { Upload = true },
         p.Photo.Length > 0 ? Act("Bild entfernen", "nophoto", kind: UiButtonKind.Ghost, icon: "ti-trash", confirm: "Profilbild entfernen?") : null);
 
@@ -400,21 +397,21 @@ public static class VereinAdmin
             Ui.Grid(240,
                 isNew ? Ui.Input("email", "E-Mail-Adresse", "", UiInputType.Email) with { Help = "Für einen Zugang: der Benutzername." }
                     : p!.HasAccount ? Ui.KeyValue(("E-Mail-Adresse (Benutzername)", p.Email))
-                    : Ui.Input("email", "E-Mail-Adresse", p.Email) with { Help = "Beginnt sie mit xxx_, ist sie gesperrt: an dieses Mitglied geht keine E-Mail." },
+                    : Ui.Input("email", "E-Mail-Adresse", p.Email) with { Help = "Mit xxx_ davor gesperrt: keine E-Mail an dieses Mitglied." },
                 Ui.Input("phone", "Telefon", p?.Phone ?? "", UiInputType.Tel)),
             Ui.Grid(200, Ui.Input("street", "Straße und Hausnummer", p?.Street ?? ""), Ui.Input("zip", "PLZ", p?.Zip ?? ""), Ui.Input("city", "Ort", p?.City ?? "")),
             Ui.Heading("Im Verein", 3),
             MembershipField(p),
             RolesField(ctx, p?.Roles ?? new[] { roles[^1] }),
             FieldInputs(ctx, p),
-            Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3) with { Help = isNew ? null : "Die erste Zeile erscheint bei ehemaligen Mitgliedern als Kennzeichen in der Liste (z. B. „Ausgetreten“, „Verstorben“)." },
+            Ui.TextArea("note", "Notiz (nur im Admin)", p?.Note ?? "", 3) with { Help = isNew ? null : "Erste Zeile = Kennzeichen ehemaliger Mitglieder (z. B. „Ausgetreten“)." },
             isNew ? Ui.Heading("Zugang zum Mitgliederbereich", 3) : null,
-            isNew ? Ui.Checkbox("access", "Konto anlegen (Anmeldung unter " + VereinPublic.Base + ")", true) with { Help = "Ohne Haken wird das Mitglied nur geführt – den Zugang kannst du später einrichten." } : null,
-            isNew ? Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Persönlich weitergeben – es wird nie per E-Mail verschickt." } : null,
+            isNew ? Ui.Checkbox("access", "Konto anlegen (Anmeldung unter " + VereinPublic.Base + ")", true) with { Help = "Ohne Haken nur geführt – Zugang später möglich." } : null,
+            isNew ? Ui.Input("initpw", "Startpasswort (freiwillig)", "", UiInputType.Text) with { Help = "Mind. 8 Zeichen, persönlich weitergeben – nie per E-Mail." } : null,
             isNew ? Ui.Checkbox("sendInvite", "Einladung per E-Mail schicken", true) : FormerBox(p!),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost)));
 
-        if (isNew) return Page(Ui.Stack(Ui.PageHead("Mit Zugang zum Mitgliederbereich oder nur geführt", "Neues Mitglied"), Ui.Card(form)), "Neues Mitglied");
+        if (isNew) return Page(Ui.Card(form), "Neues Mitglied");
 
         var answers = await store.AnswersOfMemberAsync(p!.MemberId, ct);
         var docs = (await store.DocsAsync(false, ct)).Concat(await store.DocsAsync(true, ct)).ToDictionary(d => d.Id);
@@ -425,32 +422,31 @@ public static class VereinAdmin
         {
             PhotoCard(p),
             siteAccount is null ? null : Ui.Card("Zwei-Faktor-Anmeldung",
-                twoFactorOn ? Ui.Badge("eingeschaltet", UiTone.Success) : Ui.Badge(VereinSettings.TwoFactorRequired(ctx, p.Roles.Any(r => VereinSettings.BoardList(ctx).Contains(r, StringComparer.OrdinalIgnoreCase))) ? "aus – Pflicht, wird beim nächsten Öffnen eingerichtet" : "aus", UiTone.Warning),
-                twoFactorOn ? Ui.Muted("Handy verloren? Dann hier ausschalten – das Mitglied meldet sich mit dem Passwort an und richtet sie im Profil neu ein.") : Ui.Muted("Einschalten kann sie nur das Mitglied selbst (Mein Profil)."),
+                twoFactorOn ? Ui.Badge("eingeschaltet", UiTone.Success) : Ui.Badge(VereinSettings.TwoFactorRequired(ctx, p.Roles.Any(r => VereinSettings.BoardList(ctx).Contains(r, StringComparer.OrdinalIgnoreCase))) ? "aus · Pflicht" : "aus", UiTone.Warning),
+                twoFactorOn ? Ui.Muted("Handy verloren? Hier ausschalten.") : Ui.Muted("Nur das Mitglied kann sie einschalten."),
                 twoFactorOn ? Act("Ausschalten", "reset2fa", kind: UiButtonKind.Danger, confirm: "Zwei-Faktor-Anmeldung von " + p.Name + " ausschalten?", icon: "ti-shield-off") : null),
             Ui.Card("Kinder", kids.Count == 0 ? Ui.Muted("Keine eingetragen.") : Ui.Stack(kids.Select(k => (UiNode?)Ui.Link(k.Name + (k.Born.Length > 0 ? " (" + V.Date(k.Born) + ")" : ""), Root + "children/" + k.Id)).ToArray()),
                 Ui.Button("Kind eintragen", Root + "children/new?eltern=" + p.Id, UiButtonKind.Ghost, "ti-mood-kid", small: true)),
             p.HasAccount ? Ui.Card("Zugang",
-                Ui.Muted("Die Einladung enthält einen Link: Passwort festlegen, danach ist das Mitglied direkt im Mitgliederbereich angemeldet. Hat es schon ein Passwort, kommt eine Erinnerung mit dem Link zur Anmeldung."),
                 Ui.Inline(Act("Einladung erneut senden", "invite", kind: UiButtonKind.Ghost, icon: "ti-mail")))
             : Ui.Card("Zugang einrichten", Ui.Form(
                 Ui.Muted(VereinMail.Parkable(p.Email)
-                    ? "Noch kein Zugang und keine freigegebene E-Mail-Adresse – an dieses Mitglied geht keine E-Mail. Zum Einrichten links die echte Adresse eintragen (ohne xxx_) und speichern."
-                    : "Legt ein Konto mit " + p.Email + " an. Erst damit kann sich das Mitglied anmelden und bekommt E-Mails des Vereins."),
-                Ui.Input("initpw", "Startpasswort (freiwillig, mindestens 8 Zeichen)", "", UiInputType.Text),
+                    ? "Gesperrte Adresse – keine E-Mail. Zum Einrichten links die echte Adresse (ohne xxx_) eintragen und speichern."
+                    : "Konto mit " + p.Email + " anlegen."),
+                Ui.Input("initpw", "Startpasswort (freiwillig)", "", UiInputType.Text) with { Help = "Mind. 8 Zeichen." },
                 Ui.Checkbox("sendInvite", "Einladung per E-Mail schicken", false),
                 Ui.FormActions(VereinMail.Parkable(p.Email) ? null : Ui.Submit("Zugang einrichten", UiButtonKind.Primary, "action", "access", confirm: "Konto für " + p.Email + " anlegen?")))),
             p.HasAccount ? Ui.Card("Passwort setzen", Ui.Form(
-                Ui.Input("newpw", "Neues Passwort (mindestens 8 Zeichen)", "", UiInputType.Text) with { Help = "Z. B. ein Startpasswort. Persönlich weitergeben – das Mitglied kann es danach im Profil ändern." },
+                Ui.Input("newpw", "Neues Passwort", "", UiInputType.Text) with { Help = "Mind. 8 Zeichen, persönlich weitergeben." },
                 Ui.FormActions(Ui.Submit("Passwort setzen", UiButtonKind.Ghost, "action", "setpw", confirm: "Passwort für dieses Mitglied neu setzen?")))) : null,
             Ui.Card("Bestätigungen", answers.Count == 0 ? Ui.Muted("Noch keine.") : Ui.Table(new[] { Ui.Column("Dokument"), Ui.Column("Antwort"), Ui.Column("Wann") },
                 answers.OrderByDescending(a => a.At).Select(a => Ui.Row(docs.TryGetValue(a.DocId, out var d) ? Ui.Link(d.Title, Root + "docs/" + d.Id) : "#" + a.DocId,
                     a.Status == VereinStore.Accepted ? Ui.Badge(a.Signature.Length > 0 ? "unterschrieben" : "bestätigt", UiTone.Success) : Ui.Badge("abgelehnt", UiTone.Error), V.Stamp(a.At))))),
-            Ui.Card("Entfernen", Ui.Form(Ui.Muted("Nimmt die Person aus dem Verein. Ihre bisherigen Antworten bleiben als Nachweis erhalten."),
+            Ui.Card("Entfernen", Ui.Form(
                 Ui.Checkbox("deleteAccount", "Auch das Konto der Website löschen (Uploads und Rückmeldungen werden dann gelöscht)"),
-                Ui.FormActions(Ui.Submit("Aus dem Verein entfernen", UiButtonKind.Danger, "action", "remove", confirm: "Wirklich entfernen?"))))
+                Ui.FormActions(Ui.Submit("Aus dem Verein entfernen", UiButtonKind.Danger, "action", "remove", confirm: p.Name + " aus dem Verein entfernen? Bisherige Antworten bleiben als Nachweis."))))
         };
-        return Page(Ui.Stack(Ui.PageHead(string.Join(", ", p.Roles), p.Name, Ui.Button("Zurück", Root + "members", UiButtonKind.Ghost, small: true)),
+        return Page(Ui.Stack(Ui.PageHead(string.Join(", ", p.Roles), p.Name),
             Ui.Columns(new UiNode?[] { Ui.Card(form) }, side)), p.Name);
     }
 
@@ -504,10 +500,9 @@ public static class VereinAdmin
             var target = VereinStore.Audience(people, d.Audience, board).Select(p => p.MemberId).ToHashSet();
             var done = answers.Count(a => a.DocId == d.Id && target.Contains(a.MemberId));
             return Ui.RowFor(d.Title, Ui.Link(d.Title, Root + "docs/" + d.Id), Kind(d.Kind), AudienceLabel(d.Audience), d.Due.Length > 0 ? V.Date(d.Due) : "–",
-                Ui.Badge(done + " / " + target.Count, done >= target.Count && target.Count > 0 ? UiTone.Success : UiTone.Warning), V.Stamp(d.Created));
+                target.Count == 0 ? (UiNode)Ui.Muted("–") : Ui.Badge(done + " / " + target.Count, done >= target.Count ? UiTone.Success : UiTone.Warning), V.Stamp(d.Created));
         });
         return Page(Ui.Stack(
-            Ui.PageHead("Zum Bestätigen, Unterschreiben oder Lesen – mit Nachweis, wer wann geantwortet hat", "Dokumente"),
             Ui.Tabs(Ui.Tab("Aktuell", Root + "docs", !archived), Ui.Tab("Archiv", Root + "docs?archiv=1", archived)),
             Ui.Table(new[] { Ui.Column("Titel"), NotOnPhone(Ui.Column("Art")), Ui.Column("Für"), Ui.Column("Frist"), Ui.Column("Beantwortet"), NotOnPhone(Ui.Column("Angelegt")) }, rows,
                 searchPlaceholder: "Dokumente durchsuchen …", emptyText: archived ? "Das Archiv ist leer." : "Noch keine Dokumente.")
@@ -571,16 +566,15 @@ public static class VereinAdmin
         {
             Ui.Card("Angaben", Ui.KeyValue(("Art", Kind(d.Kind)), ("Für", AudienceLabel(d.Audience)), ("Frist", d.Due.Length > 0 ? V.Date(d.Due) : "–"),
                 ("Angelegt", V.Stamp(d.Created) + (d.CreatedBy.Length > 0 ? " von " + d.CreatedBy : "")), ("Status", d.Archived ? "Archiv" : "aktiv"))),
-            Ui.Card("Aktionen", Ui.Stack(
-                d.Archived ? null : Act("Offene erinnern (" + (target.Count - done) + ")", "remind", kind: UiButtonKind.Primary, icon: "ti-mail", confirm: "Erinnerung an alle schicken, die noch nicht geantwortet haben?"),
+            Ui.Card("Aktionen", Ui.Inline(
+                d.Archived || target.Count == done ? null : Act("Offene erinnern (" + (target.Count - done) + ")", "remind", kind: UiButtonKind.Primary, icon: "ti-mail", confirm: "Erinnerung an alle schicken, die noch nicht geantwortet haben?"),
                 Ui.Button("PDF / Drucken", Root + "docs/" + d.Id + "/pdf", UiButtonKind.Ghost, "ti-printer", small: true),
                 Ui.Button("Nachweis als PDF", Root + "docs/" + d.Id + "/pdf?nachweis=1", UiButtonKind.Ghost, "ti-file-certificate", small: true),
                 Ui.Button("Liste als CSV", Root + "docs/" + d.Id + "/csv", UiButtonKind.Ghost, "ti-file-spreadsheet", small: true),
                 Act(d.Archived ? "Wieder aktivieren" : "Archivieren", "archive", icon: "ti-archive"),
                 answers.Count == 0 ? Act("Löschen", "delete", kind: UiButtonKind.Danger, confirm: "Dokument löschen?", icon: "ti-trash") : null))
         };
-        return Page(Ui.Stack(Ui.PageHead(Kind(d.Kind) + " · " + AudienceLabel(d.Audience), d.Title, Ui.Button("Zurück", Root + "docs", UiButtonKind.Ghost, small: true)),
-            Ui.Columns(main, side)), d.Title);
+        return Page(Ui.Columns(main, side), d.Title);   // kind and audience stand in "Angaben"
     }
 
     private static Dictionary<string, string> DocValues(IPluginContext ctx, Doc d) => new()
@@ -626,7 +620,7 @@ public static class VereinAdmin
         Template? tpl = long.TryParse(ctx.Request.Q("vorlage"), out var tid) ? await store.TemplateAsync(tid, ct) : null;
         var form = Ui.Form(
             Ui.Input("title", "Titel", tpl is null ? "" : V.Fill(tpl.Title, ctx)),
-            Ui.TextArea("body", "Text", tpl is null ? "" : V.Fill(tpl.Body, ctx), 14) with { Help = "Reiner Text; Leerzeilen trennen Absätze." },
+            Ui.TextArea("body", "Text", tpl is null ? "" : V.Fill(tpl.Body, ctx), 14) with { Help = "Leerzeile = neuer Absatz." },
             Ui.Grid(220,
                 Ui.Select("kind", "Was sollen die Mitglieder tun?", VereinStore.Confirm, Ui.Option(VereinStore.Confirm, "Bestätigen (Haken)"), Ui.Option(VereinStore.Sign, "Unterschreiben (Name eintippen)"), Ui.Option(VereinStore.Read, "Nur lesen")),
                 Ui.Select("audience", "Für wen?", VereinStore.AudienceAll, AudienceOptions(ctx)),
@@ -635,8 +629,8 @@ public static class VereinAdmin
             Ui.Checkbox("notify", "Alle Betroffenen per E-Mail benachrichtigen", true),
             Ui.FormActions(Ui.Submit("Dokument veröffentlichen"), Ui.Button("Abbrechen", Root + "docs", UiButtonKind.Ghost))) with { Upload = true };
         var side = Ui.Card("Vorlage verwenden", templates.Count == 0 ? Ui.Muted("Keine Vorlagen.") : Ui.Stack(templates.Select(t => (UiNode?)Ui.Button(t.Name, Root + "docs/new?vorlage=" + t.Id, t.Id == tpl?.Id ? UiButtonKind.Primary : UiButtonKind.Ghost, small: true)).ToArray()),
-            Ui.Muted("Vorlagen sind ein Ausgangspunkt – bitte vor dem Veröffentlichen prüfen und anpassen."), Ui.Link("Vorlagen bearbeiten", Root + "templates"));
-        return Page(Ui.Stack(Ui.PageHead("Erscheint sofort im Mitgliederbereich", "Neues Dokument"), Ui.Columns(new UiNode?[] { Ui.Card(form) }, new UiNode?[] { side })), "Neues Dokument");
+            Ui.Link("Vorlagen bearbeiten", Root + "templates"));
+        return Page(Ui.Columns(new UiNode?[] { Ui.Card(form) }, new UiNode?[] { side }), "Neues Dokument");
     }
 
     private static async Task<PluginResult> DocFileAsync(IPluginContext ctx, CancellationToken ct)
@@ -703,11 +697,11 @@ public static class VereinAdmin
         {
             var r = await store.RsvpsAsync(m.Id, ct);
             rows.Add(Ui.RowFor(m.Title + " " + m.Kind, Ui.Link(m.Title, Root + "meetings/" + m.Id), V.When(m.Starts), m.Kind, AudienceLabel(m.Audience),
-                r.Count(x => x.Answer == VereinStore.Yes) + " zu / " + r.Count(x => x.Answer == VereinStore.No) + " ab",
-                m.Status switch { VereinStore.Cancelled => Ui.Badge("abgesagt", UiTone.Error), VereinStore.Held => Ui.Badge("stattgefunden"), _ => Ui.Badge("geplant", UiTone.Info) },
+                r.Count == 0 ? (UiNode)Ui.Muted("–") : Ui.Badge(r.Count(x => x.Answer == VereinStore.Yes) + " zu · " + r.Count(x => x.Answer == VereinStore.No) + " ab", UiTone.Info),
+                m.Status switch { VereinStore.Cancelled => Ui.Badge("Abgesagt", UiTone.Error), VereinStore.Held => Ui.Badge("Stattgefunden"), _ => Ui.Badge("Geplant", UiTone.Info) },
                 m.MinutesStatus == VereinStore.Final ? Ui.Badge("veröffentlicht", UiTone.Success) : m.Minutes.Length > 0 ? Ui.Badge("Entwurf", UiTone.Warning) : Ui.Text("–")));
         }
-        return Page(Ui.Stack(Ui.PageHead("Einladen, Zu- und Absagen sehen, Protokoll schreiben", "Sitzungen"),
+        return Page(Ui.Stack(
             Ui.Table(new[] { Ui.Column("Sitzung"), Ui.Column("Wann"), NotOnPhone(Ui.Column("Art")), NotOnPhone(Ui.Column("Für")), Ui.Column("Rückmeldungen"), Ui.Column("Status"), Ui.Column("Protokoll") }, rows,
                 searchPlaceholder: "Sitzungen durchsuchen …", emptyText: "Noch keine Sitzungen.")
                 with { Below = new UiNode[] { Ui.Button("Neue Sitzung", Root + "meetings/new", icon: "ti-calendar-plus") } }), "Sitzungen");
@@ -784,11 +778,11 @@ public static class VereinAdmin
                 Ui.Input("place", "Ort", m?.Place ?? "")),
             Ui.Grid(220,
                 Ui.Select("audience", "Eingeladen", m?.Audience ?? VereinStore.AudienceBoard, AudienceOptions(ctx)),
-                Ui.Select("status", "Status", m?.Status ?? VereinStore.Planned, Ui.Option(VereinStore.Planned, "geplant"), Ui.Option(VereinStore.Held, "hat stattgefunden"), Ui.Option(VereinStore.Cancelled, "abgesagt"))),
+                Ui.Select("status", "Status", m?.Status ?? VereinStore.Planned, Ui.Option(VereinStore.Planned, "Geplant"), Ui.Option(VereinStore.Held, "Stattgefunden"), Ui.Option(VereinStore.Cancelled, "Abgesagt"))),
             Ui.TextArea("agenda", "Tagesordnung", m?.Agenda ?? (tpl is null ? "" : V.Fill(tpl.Body, ctx)), 10),
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "meetings", UiButtonKind.Ghost)));
         if (isNew)
-            return Page(Ui.Stack(Ui.PageHead("Danach: Einladung verschicken, Rückmeldungen sehen, Protokoll schreiben", "Neue Sitzung"),
+            return Page(Ui.Stack(
                 Ui.Columns(new UiNode?[] { Ui.Card(form) }, new UiNode?[] { Ui.Card("Tagesordnung aus Vorlage", agendaTpls.Count == 0 ? Ui.Muted("Keine Vorlagen.") :
                     Ui.Stack(agendaTpls.Select(t => (UiNode?)Ui.Button(t.Name, Root + "meetings/new?vorlage=" + t.Id, t.Id == tpl?.Id ? UiButtonKind.Primary : UiButtonKind.Ghost, small: true)).ToArray())) })), "Neue Sitzung");
 
@@ -804,9 +798,9 @@ public static class VereinAdmin
         {
             Ui.Card("Sitzung", form),
             Ui.Card("Protokoll", Ui.Form(
-                Ui.TextArea("minutes", "Protokoll", minutes, 18) with { Help = m.Minutes.Length == 0 ? "Aus der Protokoll-Vorlage vorausgefüllt – noch nicht gespeichert." : null },
+                Ui.TextArea("minutes", "Text", minutes, 18) with { Help = m.Minutes.Length == 0 ? "Aus der Protokoll-Vorlage vorausgefüllt – noch nicht gespeichert." : null },
                 Ui.Select("minutes_status", "Sichtbarkeit", m.MinutesStatus == VereinStore.Final ? VereinStore.Final : VereinStore.Draft,
-                    Ui.Option(VereinStore.Draft, "Entwurf (nur im Admin)"), Ui.Option(VereinStore.Final, "Veröffentlicht (für die Eingeladenen im Mitgliederbereich)")),
+                    Ui.Option(VereinStore.Draft, "Entwurf (nur im Admin)"), Ui.Option(VereinStore.Final, "Veröffentlicht (für die Eingeladenen)")),
                 m.MinutesStatus == VereinStore.Final ? null : Ui.Checkbox("notify", "Beim Veröffentlichen die Eingeladenen per E-Mail benachrichtigen", true),
                 Ui.FormActions(Ui.Submit("Protokoll speichern", name: "action", value: "minutes"))))
         };
@@ -823,7 +817,7 @@ public static class VereinAdmin
             }), emptyText: "Niemand eingeladen.")),
             Ui.Card("Löschen", Act("Sitzung löschen", "delete", kind: UiButtonKind.Danger, confirm: "Sitzung mit Rückmeldungen und Protokoll löschen?", icon: "ti-trash"))
         };
-        return Page(Ui.Stack(Ui.PageHead(V.When(m.Starts) + (m.Place.Length > 0 ? " · " + m.Place : ""), m.Title, Ui.Button("Zurück", Root + "meetings", UiButtonKind.Ghost, small: true)),
+        return Page(Ui.Stack(
             Ui.Columns(main, side)), m.Title);
     }
 
@@ -847,11 +841,10 @@ public static class VereinAdmin
         }
         var kinds = all.Select(e => e.Kind).Where(k => k.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
         return Page(Ui.Stack(
-            Ui.PageHead("Öffentliche Termine erscheinen im Block „Vereinstermine“ auf der Website, interne nur im Mitgliederbereich", "Termine"),
             Ui.Tabs(Ui.Tab("Kommende", Root + "events", !past), Ui.Tab("Vergangene", Root + "events?vergangen=1", past)),
             Ui.Table(new[] { Ui.Column("Termin"), Ui.Column("Wann"), NotOnPhone(Ui.Column("Art")), Ui.Column("Ort"), Ui.Column("Teilnahme"), NotOnPhone(Ui.Column("Sichtbar")) },
                 list.Select(e => Ui.RowFor(e.Title + " " + e.Kind + " " + e.Place, Ui.Link(e.Title, Root + "events/" + e.Id), V.When(e.Starts), e.Kind, e.Place, Participation(e),
-                    e.Draft ? Ui.Badge("Entwurf", UiTone.Warning) : e.Cancelled ? Ui.Badge("abgesagt", UiTone.Error) : e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern"))
+                    e.Draft ? Ui.Badge("Entwurf", UiTone.Warning) : e.Cancelled ? Ui.Badge("abgesagt", UiTone.Error) : e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern", UiTone.Info))
                     with { Tags = "k" + Math.Max(0, kinds.FindIndex(k => string.Equals(k, e.Kind, StringComparison.OrdinalIgnoreCase))) }),
                 searchPlaceholder: "Termine durchsuchen …", emptyText: past ? "Keine vergangenen Termine." : "Keine kommenden Termine.") with
             {
@@ -914,36 +907,35 @@ public static class VereinAdmin
         var main = new UiNode?[]
         {
             Ui.Card("Termin",
-                Ui.Input("title", "Titel", e?.Title ?? "") with { Help = "z. B. „Sommerfest“, „Saisoneröffnung“ oder „Umzug in …“" },
-                Ui.Grid(220, Ui.Input("kind", "Art", e?.Kind ?? "") with { Help = "z. B. Turnier, Fest, Ausflug, Umzug, Probe – danach lässt sich die Liste filtern" }, Ui.Input("place", "Ort", e?.Place ?? "")),
+                Ui.Input("title", "Titel", e?.Title ?? "") with { Placeholder = "z. B. Sommerfest" },
+                Ui.Grid(220, Ui.Input("kind", "Art", e?.Kind ?? "") with { Placeholder = "Turnier, Fest, Ausflug …" }, Ui.Input("place", "Ort", e?.Place ?? "")),
                 Ui.Grid(220, Ui.Input("starts", "Beginn", e?.Starts ?? "", UiInputType.DateTime), Ui.Input("ends", "Ende (freiwillig)", e?.Ends ?? "", UiInputType.DateTime)),
                 Ui.TextArea("description", "Beschreibung (kurz, öffentlich)", e?.Description ?? "", 3),
-                Ui.Input("link", "Link (freiwillig)", e?.Link ?? "") with { Help = "Eine Seite der Website (/…) oder eine https-Adresse, z. B. die Seite des Veranstalters." }),
+                Ui.Input("link", "Link (freiwillig)", e?.Link ?? "") with { Help = "Eine Seite der Website (/…) oder eine https-Adresse." }),
             Ui.Card("Planung (für Mitglieder)",
-                Ui.Muted("Nach und nach ergänzen – die Mitglieder sehen das im Mitgliederbereich beim Termin, auf der Website steht es nicht."),
                 Ui.RowEditor("plan", "Ablauf", new[] { Ui.RowColumn("time", "Uhrzeit", placeholder: "13:00", width: "110px"), Ui.RowColumn("what", "Was", placeholder: "Treffen, Aufstellung, Beginn, Empfang …") },
                     (e?.Steps ?? Array.Empty<(string, string)>()).Select((s, i) => Ui.RowValue(i.ToString(CultureInfo.InvariantCulture), s.Time, s.What)), "Programmpunkt"),
-                Ui.Input("meeting", "Treffpunkt / Aufstellung", e?.Meeting ?? "") with { Help = "z. B. „Aufstellung Bahnhofstraße, Startnummer 34“" },
+                Ui.Input("meeting", "Treffpunkt / Aufstellung", e?.Meeting ?? "") with { Placeholder = "z. B. Bahnhofstraße, Startnummer 34" },
                 Ui.TextArea("parking", "Parkmöglichkeiten / Anfahrt", e?.Parking ?? "", 3),
-                Ui.TextArea("notes", "Weitere Hinweise", e?.Notes ?? "", 3) with { Help = "z. B. was mitzubringen ist, Busabfahrt, Verpflegung, Ansprechpartner." })
+                Ui.TextArea("notes", "Weitere Hinweise", e?.Notes ?? "", 3) with { Placeholder = "Mitbringen, Busabfahrt, Verpflegung, Ansprechpartner …" }),
+            // the form is long: its save button belongs under it, not only in the side column
+            Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost))
         };
         var side = new UiNode?[]
         {
             Ui.Card("Status",
                 Ui.Select("status", "Stand", isNew || e!.Draft ? "draft" : "published", Ui.Option("draft", "Entwurf (nur im Admin)"), Ui.Option("published", "Veröffentlicht")),
                 Ui.Checkbox("public", "Öffentlich – auf der Website im Block „Vereinstermine“", e?.Public ?? true),
-                Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false),
-                Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "events", UiButtonKind.Ghost))),
+                Ui.Checkbox("cancelled", "Abgesagt (bleibt durchgestrichen stehen)", e?.Cancelled ?? false)),
             Ui.Card("Teilnahme abfragen",
                 Ui.Checkbox("ask", "Mitglieder sollen zu- oder absagen", e?.Ask ?? ctx.Settings.GetBool(VereinSettings.AskDefault)),
                 Ui.Checkbox("ask_required", "Rückmeldung ist Pflicht", e?.AskRequired ?? false),
-                Ui.Select("ask_audience", "Wer wird gefragt?", e is { AskAudience.Length: > 0 } ? e.AskAudience : VereinStore.AudienceAll, AudienceOptions(ctx)),
-                Ui.Input("ask_due", "Rückmeldung bis (freiwillig)", e?.AskDue ?? "", UiInputType.Date),
-                Ui.Muted("Bei „Alle“ werden auch die Kinder gefragt – für sie antworten ihre Eltern. Die Abfrage erscheint im Mitgliederbereich beim Termin und unter „Zu erledigen“."))
+                Ui.Select("ask_audience", "Wer wird gefragt?", e is { AskAudience.Length: > 0 } ? e.AskAudience : VereinStore.AudienceAll, AudienceOptions(ctx)) with { Help = "Für Kinder antworten die Eltern." },
+                Ui.Input("ask_due", "Rückmeldung bis (freiwillig)", e?.AskDue ?? "", UiInputType.Date))
         };
         var form = Ui.Form(Ui.Columns(main, side));
         var replyCard = e is { Ask: true } ? await RepliesCardAsync(ctx, store, e, ct) : null;
-        return Page(Ui.Stack(Ui.PageHead(isNew ? "Erst als Entwurf planen, dann veröffentlichen" : V.When(e!.Starts) + (e.Draft ? " · Entwurf" : ""), isNew ? "Neuer Termin" : e!.Title),
+        return Page(Ui.Stack(isNew ? null : Ui.PageHead(V.When(e!.Starts) + (e.Draft ? " · Entwurf" : ""), e.Title),
             form,
             replyCard,
             isNew || e!.Draft ? null : Ui.Card("Teilen", Ui.Button("Als Instagram-Bild", VereinExport.Url("instagram") + "&vorlage=plakat&event=" + e!.Id, UiButtonKind.Ghost, "ti-brand-instagram")),
@@ -1091,19 +1083,20 @@ public static class VereinAdmin
                 EventField(e, events.Values));
         }
         return Page(Ui.Stack(
-            Ui.PageHead("Was Mitglieder im Mitgliederbereich hochgeladen haben", "Bilder & Material",
+            Ui.PageHead(null, "Bilder & Material",
                 pendingCount > 0 ? Act("Alle " + pendingCount + " freigeben", new Dictionary<string, string> { ["action"] = "approveall" }, UiButtonKind.Primary, "Alle wartenden Uploads freigeben?", "ti-check") : null),
             Ui.Tabs(Ui.Tab("Alle", Root + "uploads", !pendingOnly), Ui.Tab("Warten auf Freigabe (" + pendingCount + ")", Root + "uploads?status=offen", pendingOnly)),
-            Ui.Table(new[] { Ui.Column(""), Ui.Column("Titel"), Ui.Column("Von"), NotOnPhone(Ui.Column("Aufgenommen")), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
+            Ui.Table(new[] { Ui.Column("Titel"), Ui.Column("Von"), NotOnPhone(Ui.Column("Aufgenommen")), Ui.Column("Termin"), Ui.Column("Status"), Ui.Column("", actions: true) },
                 list.Select(x => Ui.RowFor(x.Title + " " + x.FileName,
-                    V.IsImage(Path.GetExtension(x.File).ToLowerInvariant()) ? Ui.Img(Root + "uploads/" + x.Id, x.Title, 48) : Ui.Text(""),
-                    Ui.Link(Short(x.Title.Length > 0 ? x.Title : x.FileName), Root + "uploads/" + x.Id, newTab: true),
+                    // the picture stands in the title cell: an own column without a heading pushed "Titel" away from its values
+                    Ui.Inline(V.IsImage(Path.GetExtension(x.File).ToLowerInvariant()) ? Ui.Img(Root + "uploads/" + x.Id, x.Title, 48) : null,
+                        Ui.Link(Short(x.Title.Length > 0 ? x.Title : x.FileName), Root + "uploads/" + x.Id, newTab: true)),
                     people.TryGetValue(x.MemberId, out var n) ? n : "–", x.Taken.Length > 0 ? V.Date(x.Taken) : V.Stamp(x.Created),
                     EventCell(x),
                     !x.Approved ? Ui.Badge("wartet auf Freigabe", UiTone.Warning) : x.Shared ? Ui.Badge("alle Mitglieder", UiTone.Success) : Ui.Badge("privat"),
                     Ui.Inline(
                         x.Approved ? null : Act("Freigeben", new Dictionary<string, string> { ["action"] = "approve", ["id"] = Id(x) }, UiButtonKind.Primary, icon: "ti-check"),
-                        Act(x.Shared ? "Privat machen" : "Für alle sichtbar", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }, icon: x.Shared ? "ti-lock" : "ti-world"),
+                        Ui.Action(x.Shared ? "Privat machen" : "Für alle sichtbar", new Dictionary<string, string> { ["action"] = "share", ["id"] = Id(x) }, icon: x.Shared ? "ti-lock" : "ti-world"),
                         Act("Löschen", new Dictionary<string, string> { ["action"] = "delete", ["id"] = Id(x) }, UiButtonKind.Danger, "Datei löschen?", "ti-trash")))),
                 searchPlaceholder: "Dateien durchsuchen …", pageSize: 50, emptyText: pendingOnly ? "Nichts wartet auf Freigabe." : "Noch nichts hochgeladen.")), "Bilder & Material");
     }
@@ -1208,9 +1201,9 @@ public static class VereinAdmin
     private static async Task<PluginResult> TemplatesAsync(IPluginContext ctx, CancellationToken ct)
     {
         var list = await new VereinStore(ctx.Data).TemplatesAsync(ct: ct);
-        return Page(Ui.Stack(Ui.PageHead("Ausgangstexte für Dokumente, Tagesordnungen und Protokolle", "Vorlagen", Ui.Button("Neue Vorlage", Root + "templates/new", icon: "ti-plus")),
-            Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Für") }, list.Select(t => Ui.RowFor(t.Name, Ui.Link(t.Name, Root + "templates/" + t.Id), TplKind(t.Kind))), emptyText: "Keine Vorlagen."),
-            Ui.Muted("Platzhalter: {{verein}}, {{datum}}, {{jahr}} – im Protokoll außerdem {{titel}}, {{termin}}, {{ort}}, {{tagesordnung}}.")), "Vorlagen");
+        // the list in the admin's list shape: "Neue Vorlage" under the table; the placeholders are told where they are typed (the template's text field)
+        return Page(Ui.Table(new[] { Ui.Column("Name"), Ui.Column("Für") }, list.Select(t => Ui.RowFor(t.Name, Ui.Link(t.Name, Root + "templates/" + t.Id), TplKind(t.Kind))), emptyText: "Keine Vorlagen.")
+            with { Below = new UiNode[] { Ui.Button("Neue Vorlage", Root + "templates/new", icon: "ti-plus") } }, "Vorlagen");
     }
 
     private static async Task<PluginResult> TemplateAsync(IPluginContext ctx, CancellationToken ct)
@@ -1234,9 +1227,9 @@ public static class VereinAdmin
             Ui.Grid(220, Ui.Input("name", "Name der Vorlage", t?.Name ?? ""),
                 Ui.Select("kind", "Für", t?.Kind ?? VereinStore.TplDocument, Ui.Option(VereinStore.TplDocument, "Dokument"), Ui.Option(VereinStore.TplAgenda, "Tagesordnung / Sitzung"), Ui.Option(VereinStore.TplMinutes, "Protokoll"))),
             Ui.Input("title", "Titel (Dokument bzw. Sitzung)", t?.Title ?? ""),
-            Ui.TextArea("body", "Text", t?.Body ?? "", 18),
+            Ui.TextArea("body", "Text", t?.Body ?? "", 18) with { Help = "Platzhalter: {{verein}}, {{datum}}, {{jahr}}; im Protokoll {{titel}}, {{termin}}, {{ort}}, {{tagesordnung}}." },
             Ui.FormActions(Ui.Submit(isNew ? "Anlegen" : "Speichern"), Ui.Button("Zurück", Root + "templates", UiButtonKind.Ghost)));
-        return Page(Ui.Stack(Ui.PageHead("Platzhalter: {{verein}}, {{datum}}, {{jahr}}; im Protokoll {{titel}}, {{termin}}, {{ort}}, {{tagesordnung}}", isNew ? "Neue Vorlage" : t!.Name),
+        return Page(Ui.Stack(
             Ui.Card(form), isNew ? null : Ui.Card("Löschen", Act("Vorlage löschen", "delete", kind: UiButtonKind.Danger, confirm: "Vorlage löschen?", icon: "ti-trash"))), isNew ? "Neue Vorlage" : t!.Name);
     }
 }

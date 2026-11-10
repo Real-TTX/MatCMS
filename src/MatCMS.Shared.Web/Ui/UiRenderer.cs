@@ -96,7 +96,7 @@ public static class UiRenderer
                 case UiStack s: _sb.Append("<div class=\"ui-stack\">"); Children(s.Children); _sb.Append("</div>"); break;
                 case UiInline i: _sb.Append("<div class=\"ui-inline\">"); Children(i.Children); _sb.Append("</div>"); break;
                 case UiGrid g:
-                    _sb.Append("<div class=\"ui-grid\" style=\"grid-template-columns:repeat(auto-fill,minmax(")
+                    _sb.Append("<div class=\"ui-grid\" style=\"grid-template-columns:repeat(auto-fit,minmax(")
                         .Append(Math.Clamp(g.MinWidth, 80, 1200)).Append("px,1fr))\">");
                     Children(g.Children); _sb.Append("</div>"); break;
                 case UiSplit sp: Split(sp); break;
@@ -139,8 +139,12 @@ public static class UiRenderer
                 case UiHtml raw: _sb.Append(raw.Html); break;
                 case UiAlert a:
                 {
-                    var tone = a.Tone switch { UiTone.Success => "success", UiTone.Error => "error", UiTone.Warning => Admin ? "warning" : "info", _ => "info" };
-                    _sb.Append("<div class=\"alert alert-").Append(tone).Append("\">").Append(E(a.Text)).Append("</div>"); break;
+                    // a state is tint + icon + words (MatUi COLOR-04); Default/Muted are neutral, not the blue of "info" — "off" must not look like a notice
+                    var tone = a.Tone switch { UiTone.Success => "success", UiTone.Error => "error", UiTone.Warning => Admin ? "warning" : "info", UiTone.Info => "info", _ => Admin ? "neutral" : "info" };
+                    var icon = tone switch { "success" => "ti-circle-check", "error" => "ti-alert-octagon", "warning" => "ti-alert-triangle", "neutral" => "ti-circle-dashed", _ => "ti-info-circle" };
+                    _sb.Append("<div class=\"alert alert-").Append(tone).Append("\">");
+                    if (Admin) _sb.Append("<i class=\"ti ").Append(icon).Append(" alert-icon\" aria-hidden=\"true\"></i>");
+                    _sb.Append(E(a.Text)).Append("</div>"); break;
                 }
                 case UiBadge b:
                 {
@@ -191,15 +195,19 @@ public static class UiRenderer
 
         private void PageHead(UiPageHead h)
         {
+            // In the admin the topbar names the page (the h1 is hidden): without a subtitle the title block would only be an empty flex child that pushes
+            // the actions off the content edge, and a head with nothing to show left a 24 px hole in the stack.
+            var showTitle = Admin ? !string.IsNullOrWhiteSpace(h.Subtitle) : !string.IsNullOrWhiteSpace(h.Title) || !string.IsNullOrWhiteSpace(h.Subtitle);
+            if (!showTitle && h.Actions.Count == 0) return;
             _sb.Append("<div class=\"page-head\">");
-            if (!string.IsNullOrWhiteSpace(h.Title) || !string.IsNullOrWhiteSpace(h.Subtitle))
+            if (showTitle)
             {
                 _sb.Append("<div>");
                 if (!string.IsNullOrWhiteSpace(h.Title)) _sb.Append("<h1>").Append(E(h.Title)).Append("</h1>");
                 if (!string.IsNullOrWhiteSpace(h.Subtitle)) _sb.Append("<p class=\"muted\">").Append(E(h.Subtitle)).Append("</p>");
                 _sb.Append("</div>");
             }
-            if (h.Actions.Count > 0) { _sb.Append("<div class=\"list-toolbar\">"); Children(h.Actions); _sb.Append("</div>"); }
+            if (h.Actions.Count > 0) { _sb.Append("<div class=\"page-actions\">"); Children(h.Actions); _sb.Append("</div>"); }
             _sb.Append("</div>");
         }
 
@@ -332,9 +340,9 @@ public static class UiRenderer
             _sb.Append("</label>");
         }
 
-        private void FieldClose(UiField f)
+        private void FieldClose(UiField f, bool withHelp = true)
         {
-            if (!string.IsNullOrWhiteSpace(f.Help)) _sb.Append("<div class=\"").Append(Admin ? "help" : "field-help").Append("\">").Append(E(f.Help)).Append("</div>");
+            if (withHelp && !string.IsNullOrWhiteSpace(f.Help)) _sb.Append("<div class=\"").Append(Admin ? "help" : "field-help").Append("\">").Append(E(f.Help)).Append("</div>");
             _sb.Append("</div>");
         }
 
@@ -454,9 +462,11 @@ public static class UiRenderer
             _sb.Append(" value=\"").Append(E(f.Value)).Append("\" placeholder=\"").Append(S("ui.image.placeholder")).Append("\" data-ui-image-url />");
             if (!f.Disabled)
                 _sb.Append("<div style=\"margin-top:8px;\"><button type=\"button\" class=\"btn btn-ghost btn-sm\" data-ui-image-pick>").Append(S("ui.image.pick")).Append("</button></div>");
+            // the help belongs under the address and the button, as in the core's image fields — not under the preview
+            if (!string.IsNullOrWhiteSpace(f.Help)) _sb.Append("<div class=\"").Append(Admin ? "help" : "field-help").Append("\">").Append(E(f.Help)).Append("</div>");
             _sb.Append("</div></div>");
             if (!string.IsNullOrWhiteSpace(f.FocusName)) FocusPicker(f);
-            FieldClose(f);
+            FieldClose(f, withHelp: false);
         }
 
         /// <summary>A CSS position "x% y%" with both numbers 0–100, or "" — a value that goes into a style attribute is never anything else.</summary>
@@ -622,6 +632,8 @@ public static class UiRenderer
                     if (t.Filter is { } flt)
                     {
                         _sb.Append("<select class=\"list-search\" data-list-filter aria-label=\"").Append(E(flt.Label)).Append("\">");
+                        // a filter that cannot go back to "all" is a trap (the forum's list started on one board): the empty option comes by itself
+                        if (!flt.Options.Any(o => string.IsNullOrEmpty(o.Item1))) _sb.Append("<option value=\"\">").Append(E(flt.Label)).Append("</option>");
                         foreach (var (value, text) in flt.Options) _sb.Append("<option value=\"").Append(E(value)).Append('"').Append(!string.IsNullOrEmpty(flt.Selected) && flt.Selected == value ? " selected" : "").Append('>').Append(E(text)).Append("</option>");
                         _sb.Append("</select>");
                     }

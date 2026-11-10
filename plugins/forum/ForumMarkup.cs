@@ -53,9 +53,11 @@ internal static partial class ForumMarkup
             if (!closing && tag == "code")
             {
                 // Everything up to [/code] is shown as it is — BBCode inside a code block is the example, not markup.
+                // Without a [/code] the tag is text: someone writing ABOUT code blocks ("put code in [code] blocks") must not turn the rest of the post into one.
                 var end = src.IndexOf("[/code]", pos, StringComparison.OrdinalIgnoreCase);
-                var code = end < 0 ? src[pos..] : src[pos..end];
-                pos = end < 0 ? src.Length : end + "[/code]".Length;
+                if (end < 0) { Literal(stack, m.Value); continue; }
+                var code = src[pos..end];
+                pos = end + "[/code]".Length;
                 if (pos < src.Length && src[pos] == '\n') pos++;   // a block stands on its own line: the line break after it is not an empty line
                 Append(stack, "<pre class=\"forum-code\"><code>" + E(code.Trim('\n')) + "</code></pre>", m.Value + code + "[/code]");
                 continue;

@@ -31,9 +31,14 @@ internal static class PluginSettingsUi
     /// <summary>
     /// The settings with the group each belongs to. A declaration names a group on the first setting of it; the settings after it (without a name) belong to it until the next one is named.
     /// </summary>
+    /// <summary>The group of the settings declared before a plugin's first named group, once it has groups at all.</summary>
+    public const string GeneralGroup = "Allgemein";
+
     public static IReadOnlyList<(SettingSpec Spec, string? Group)> WithGroups(PluginRegistry.Slice slice)
     {
-        string? current = null;
+        // Settings before the first named group used to have none — and with groups, the settings page opens the first group and shows only
+        // groups: the booking plugin's notify address and currency could not be reached at all. They form a first group of their own.
+        string? current = slice.Settings.Any(x => !string.IsNullOrWhiteSpace(x.Group)) ? GeneralGroup : null;
         var list = new List<(SettingSpec, string?)>();
         foreach (var s in slice.Settings)
         {

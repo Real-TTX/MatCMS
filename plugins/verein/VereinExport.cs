@@ -23,7 +23,7 @@ public static class VereinExport
             _ => await PeriodBodyAsync(ctx, tab, ct)
         };
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Die Termine als Bild, zum Drucken, als Tabelle oder zum Abonnieren", "Termine exportieren",
+            Ui.PageHead(null, "Termine exportieren",
                 Ui.Button("Zurück zu den Terminen", VereinAdmin.Root + "events", UiButtonKind.Ghost, "ti-arrow-left", small: true)),
             Ui.Tabs(TabList.Select(t => Ui.Tab(t.Label, Url(t.Key), t.Key == tab)).ToArray()),
             body), "Termine exportieren");
@@ -82,14 +82,14 @@ public static class VereinExport
             : Ui.Button("CSV herunterladen (" + list.Count + " Termine)", VereinAdmin.Root + Path + "/csv?" + p.Query, icon: "ti-table-down");
         static string When(Event e) => V.Badge(e.Starts).Weekday + " " + V.Date(e.Day) + (e.Starts.Length >= 16 && e.Starts[11..16] != "00:00" ? ", " + e.Starts[11..16] : "");
         var preview = Ui.Table(new[] { Ui.Column("Wann"), Ui.Column("Termin"), Ui.Column("Art"), Ui.Column("Ort"), Ui.Column("Sichtbar") },
-            list.Select(e => Ui.Row(When(e), e.Title, e.Kind, e.Place, e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern"))),
+            list.Select(e => Ui.Row(When(e), e.Title, e.Kind, e.Place, e.Public ? Ui.Badge("öffentlich", UiTone.Success) : Ui.Badge("intern", UiTone.Info))),
             emptyText: "In diesem Zeitraum gibt es keine passenden Termine.");
         // the choice on top, what comes out below it in full width (a table of dates is too wide for a side column)
         return Ui.Stack(
             Ui.Card("Auswahl", form),
             Ui.Card(pdf ? "Terminplan als PDF" : "Termine als Tabelle", Ui.Stack(
-                Ui.Muted(pdf ? "Auf dem Briefkopf des Vereins (Einstellungen → Druckvorlage), zum Aushängen oder Verteilen. Abgesagte Termine und Entwürfe stehen nicht drin."
-                             : "Für Excel, Numbers oder LibreOffice: eine Zeile je Termin mit Datum, Uhrzeit, Art, Ort, Treffpunkt und Sichtbarkeit."),
+                Ui.Muted(pdf ? "Auf dem Briefkopf des Vereins, ohne Entwürfe und abgesagte Termine."
+                             : "Eine Zeile je Termin, für Excel, Numbers oder LibreOffice."),
                 go, preview)));
     }
 
@@ -136,7 +136,7 @@ public static class VereinExport
             new UiNode?[]
             {
                 Ui.Card("Öffentliche Termine abonnieren", Ui.Stack(
-                    Ui.Text("Diese Adresse in Google Kalender, Outlook oder auf dem Handy eintragen – neue und geänderte Termine kommen von selbst nach. Sie enthält nur die öffentlichen Termine."),
+                    Ui.Muted("Nur die öffentlichen Termine; Änderungen kommen von selbst nach."),
                     Ui.KeyValue(("Adresse", https)),
                     // webcal:// is no target the toolkit's buttons accept (local and http(s) only) — but it IS the one-click subscription, so it is drawn here, encoded
                     Ui.Html("<p><a class=\"btn\" href=\"" + V.H(webcal) + "\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> Im Kalender abonnieren</a> "
@@ -144,7 +144,7 @@ public static class VereinExport
             },
             new UiNode?[]
             {
-                Ui.Card("Eigener Kalender der Mitglieder", Ui.Text("Jedes Mitglied findet im Mitgliederbereich (Profil → Termine im eigenen Kalender) eine eigene geheime Adresse – mit den internen Terminen und seinen Sitzungen."))
+                Ui.Card("Eigener Kalender der Mitglieder", Ui.Muted("Jedes Mitglied hat im Profil eine eigene Adresse – mit internen Terminen und seinen Sitzungen."))
             });
     }
 }

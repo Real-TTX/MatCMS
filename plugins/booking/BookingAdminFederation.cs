@@ -15,9 +15,6 @@ public static class BookingAdminFederation
 
     private static string When(DateTime d) => d == DateTime.MinValue ? "noch nie" : BookingMail.Local(d);
 
-    private const string Privacy = "Gemeinsame Verarbeitung der Gästedaten aller Häuser – jede Datenschutzerklärung muss den Verbund nennen (Hinweis, keine Rechtsberatung). " +
-        "Meldedaten werden nie geteilt.";
-
     /// <summary>A booking as the central site lists it — its own or the mirror of another house's.</summary>
     private sealed record Entry(string House, string Number, string Guest, string Email, string Unit, DateOnly? Arrival, DateOnly? Departure, int Persons,
         long Total, string Currency, string Status, DateTime? Created, string Href, bool External, string Message);
@@ -79,15 +76,14 @@ public static class BookingAdminFederation
                         Ui.Stat("Zentrale", ctx.Settings.Get(BookingFederation.UrlKey) is { Length: > 0 } u ? u : "nicht eingetragen"),
                         Ui.Stat("Zuletzt abgeglichen", When(ok)),
                         Ui.Stat("Wartet", g + (g == 1 ? " Gast" : " Gäste") + ", " + s + (s == 1 ? " Buchung" : " Buchungen"))),
-                    Ui.Form(Ui.FormActions(Ui.Submit("Jetzt abgleichen", UiButtonKind.Primary, "action", "sync"), Ui.Submit("Verbindung prüfen", UiButtonKind.Ghost, "action", "probe"))))),
-                Ui.Muted(Privacy)), "Verbund");
+                    Ui.Form(Ui.FormActions(Ui.Submit("Jetzt abgleichen", UiButtonKind.Primary, "action", "sync"), Ui.Submit("Verbindung prüfen", UiButtonKind.Ghost, "action", "probe")))))), "Verbund");
         }
 
         if (role != BookingFederation.Lead)
             return PluginResult.Page(Ui.Stack(
-                Ui.PageHead(null, "Verbund", settings),
+                Ui.PageHead(null, "Verbund"),
                 Ui.Card("Diese Seite arbeitet für sich", Ui.Stack(
-                    Ui.Text("Mehrere Häuser eines Gastgebers können sich verbinden: eine Seite ist die Zentrale – mit den Anfragen, Buchungen und Gästen aller Häuser –, die anderen melden an sie."),
+                    Ui.Text("Mehrere Häuser verbinden: eine Seite wird Zentrale, die anderen melden an sie."),
                     Ui.Button("Rolle einstellen", R + "_settings?group=" + Uri.EscapeDataString(BookingFederation.Group), UiButtonKind.Primary, "ti-affiliate")))), "Verbund");
 
         // ---- the central site ----
@@ -115,12 +111,12 @@ public static class BookingAdminFederation
                 Ui.Stat("Häuser", B.Num(Math.Max(houses, seen.Count + 1)))),
             Ui.Card("Offene Anfragen aller Häuser", inbox),
             Ui.Grid(320, Today("Anreisen heute", arriving), Today("Abreisen heute", leaving)),
+            // how to connect a house is said only while none is connected
             Ui.Card("Häuser im Verbund", Ui.Stack(
                 Ui.Table(new[] { Ui.Column("Schlüssel"), Ui.Column("Zuletzt gemeldet") },
-                    seen.Select(x => Ui.Row(x.Site, x.At is { } at ? BookingMail.Local(at) : "–")), emptyText: "Noch kein Haus verbunden."),
-                Ui.Muted("Ein Haus verbinden: hier unter Admin → API-Schlüssel einen Schlüssel mit „Buchungen: Personendaten“ anlegen; im Haus Rolle „Haus im Verbund“, " +
-                    "Adresse " + ctx.Site.Origin + " und Schlüssel eintragen."))),
-            Ui.Muted(Privacy)), "Verbund");
+                    seen.Select(x => Ui.Row(x.Site, x.At is { } at ? BookingMail.Local(at) : "–")),
+                    emptyText: "Noch kein Haus verbunden. Ein Haus verbinden: hier unter Admin → API-Schlüssel einen Schlüssel mit „Buchungen: Personendaten“ anlegen; im Haus Rolle „Haus im Verbund“, " +
+                        "Adresse " + ctx.Site.Origin + " und Schlüssel eintragen.")))), "Verbund");
     }
 
     private static async Task<PluginResult> AllAsync(IPluginContext ctx, CancellationToken ct)

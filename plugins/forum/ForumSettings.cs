@@ -10,6 +10,14 @@ internal static class ForumSettings
 
     public const string DefaultModRole = "forum-moderator";
 
+    private static readonly string[] Zones =
+    [
+        "Europe/Berlin", "Europe/Vienna", "Europe/Zurich", "Europe/Amsterdam", "Europe/Brussels", "Europe/Luxembourg", "Europe/Paris", "Europe/Rome",
+        "Europe/Madrid", "Europe/Lisbon", "Europe/London", "Europe/Dublin", "Europe/Copenhagen", "Europe/Stockholm", "Europe/Oslo", "Europe/Helsinki",
+        "Europe/Warsaw", "Europe/Prague", "Europe/Budapest", "Europe/Zagreb", "Europe/Ljubljana", "Europe/Bratislava", "Europe/Bucharest", "Europe/Sofia",
+        "Europe/Athens", "Europe/Istanbul", "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Asia/Tokyo", "Australia/Sydney"
+    ];
+
     public static void Declare(ISettingsBuilder s)
     {
         s.Add(new SettingSpec(TitleKey, "forum.set.title") { Default = "Forum", Group = "forum.set.groupGeneral", Required = true });
@@ -25,7 +33,12 @@ internal static class ForumSettings
         s.Number(PostsPerPage, "forum.set.postsPerPage", 15, 5, 100);
         s.Add(new SettingSpec(Subscriptions, "forum.set.subscriptions", SettingKind.Bool) { Default = "true", Help = "forum.set.subscriptionsHelp", Group = "forum.set.groupMail" });
         s.Text(NotifyEmail, "forum.set.notify", "", "forum.set.notifyHelp");
-        s.Add(new SettingSpec(TimeZone, "forum.set.timeZone") { Default = "Europe/Berlin", Help = "forum.set.timeZoneHelp", Group = "forum.set.groupLook" });
+        // a choice instead of free text; the list is wide enough for every site the forum runs on (a value outside it would not be offered)
+        s.Add(new SettingSpec(TimeZone, "forum.set.timeZone", SettingKind.Choice)
+        {
+            Default = "Europe/Berlin", Group = "forum.set.groupLook",
+            Options = Zones.Select(z => new FieldOption(z, z.Replace('_', ' '))).ToArray()
+        });
         s.TextArea(CustomCss, "forum.set.css", "", "forum.set.cssHelp");
         s.Add(new SettingSpec(DiscussionBoard, "forum.set.discussionBoard") { Default = "", Help = "forum.set.discussionBoardHelp", Group = "forum.set.groupDiscussion" });
     }

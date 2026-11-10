@@ -89,14 +89,15 @@ public static class BookingAdminMore
                 sb.Append("</tr>");
             }
         }
-        sb.Append("</tbody></table></div><p class=\"bk-plan-legend\"><span class=\"request\">Anfrage</span><span class=\"offer\">Angebot</span><span class=\"confirmed\">bestätigt</span><span class=\"block\">gesperrt</span>")
-          .Append("<span>Ein Klick auf einen freien Tag legt eine Buchung ab diesem Tag an.</span></p>");
+        sb.Append("</tbody></table></div><p class=\"bk-plan-legend\"><span class=\"request\">Anfrage</span><span class=\"offer\">Angebot</span><span class=\"confirmed\">bestätigt</span><span class=\"block\">gesperrt</span></p>");
+        // the month goes into the page's title: the head's own title is hidden in the back office (the top bar names the page)
+        var title = "Belegungsplan " + B.Month(first);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Alle Einheiten über einen Monat – jede Spalte ist eine Nacht", "Belegungsplan " + B.Month(first),
+            Ui.PageHead(null, title,
                 Ui.Button("‹ " + B.MonthNames[first.AddMonths(-1).Month - 1], R + "plan?monat=" + Month(first.AddMonths(-1)), UiButtonKind.Ghost, small: true),
                 Ui.Button("Heute", R + "plan", UiButtonKind.Ghost, small: true),
                 Ui.Button(B.MonthNames[end.Month - 1] + " ›", R + "plan?monat=" + Month(end), UiButtonKind.Ghost, small: true)),
-            units.Count == 0 ? Ui.Empty("Noch keine buchbare Einheit.") : Ui.Html(sb.ToString())), "Belegungsplan");
+            units.Count == 0 ? Ui.Empty("Noch keine buchbare Einheit.") : Ui.Html(sb.ToString())), title);
     }
 
     /// <summary>The chart's look — admin variables only, so it follows light and dark.</summary>
@@ -121,6 +122,7 @@ public static class BookingAdminMore
 .bk-plan-legend span.request,.bk-plan-legend span.offer,.bk-plan-legend span.confirmed,.bk-plan-legend span.block{padding:2px 8px;border-radius:6px}
 .bk-plan-legend .request{background:var(--warn-bg);color:var(--warn-fg)}.bk-plan-legend .offer{background:var(--info-bg);color:var(--info-fg)}
 .bk-plan-legend .confirmed{background:var(--ok-bg);color:var(--ok-fg)}.bk-plan-legend .block{background:var(--surface-2);color:var(--text-2);border:1px dashed var(--border-strong)}
+@media (max-width:600px){.bk-plan .bk-plan-unit{width:110px;padding:0 8px}}
 """;
 
     // ---- guests -----------------------------------------------------------------------------------------------------
@@ -135,14 +137,17 @@ public static class BookingAdminMore
         var bookings = await BookingFlow.ListAsync(ctx.Data, null, ct);
         var cur = BookingPlugin.Currency(ctx);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Wer angefragt oder gebucht hat – wiedererkannt an der E-Mail-Adresse", "Gäste"),
-            Ui.Table(new[] { Ui.Column("Gast"), Ui.Column("E-Mail"), Ui.Column("Telefon"), Ui.Column("Aufenthalte", right: true), Ui.Column("Zuletzt"), Ui.Column("Umsatz", right: true) },
+            Ui.PageHead(null, "Gäste"),
+            // e-mail and phone share one column: the phone is often empty and had a column of its own
+            Ui.Table(new[] { Ui.Column("Gast"), Ui.Column("Kontakt"), Ui.Column("Aufenthalte", right: true), Ui.Column("Zuletzt"), Ui.Column("Umsatz", right: true) },
                 guests.Select(g =>
                 {
                     var mine = bookings.Where(b => b.GuestId == g.Id).ToList();
                     var stays = mine.Where(b => b.Status == BookingStatus.Confirmed).ToList();
-                    return Ui.RowFor(g.Name + " " + g.Email + " " + g.Phone, Ui.Link(g.Name.Length > 0 ? g.Name : g.Email, R + "guests/" + g.Id), g.Email, g.Phone,
-                        B.Num(stays.Count) + (mine.Count > stays.Count ? " (+" + (mine.Count - stays.Count) + " Anfr.)" : ""),
+                    var extra = mine.Count - stays.Count;
+                    return Ui.RowFor(g.Name + " " + g.Email + " " + g.Phone, Ui.Link(g.Name.Length > 0 ? g.Name : g.Email, R + "guests/" + g.Id),
+                        Ui.Stack(Ui.Text(g.Email), g.Phone.Length > 0 ? Ui.Muted(g.Phone) : null),
+                        B.Num(stays.Count) + (extra > 0 ? " (+" + extra + (extra == 1 ? " Anfrage)" : " Anfragen)") : ""),
                         mine.Count == 0 ? "–" : B.Date(mine.Max(b => b.Arrival)), B.Money(stays.Sum(b => b.Total), cur));
                 }),
                 searchPlaceholder: "Name, E-Mail oder Telefon …", emptyText: "Noch keine Gäste – sie kommen mit der ersten Anfrage.")), "Gäste");
@@ -184,7 +189,7 @@ public static class BookingAdminMore
         var units = (await new BookingStore(ctx.Data).UnitsAsync(ct)).ToDictionary(u => u.Id);
         var form = Ui.Form(
             Ui.Grid(200, Ui.Input("name", "Name", g.Name), Ui.Input("phone", "Telefon", g.Phone, UiInputType.Tel), Ui.Input("country", "Land", g.Country)),
-            Ui.TextArea("note", "Notiz (intern)", g.Note, 3) with { Help = "z. B. „Stammgast“, „kommt mit Hund“, „Allergie: Federn“" },
+            Ui.TextArea("note", "Notiz (intern)", g.Note, 3) with { Help = "z. B. Stammgast, Hund" },
             Ui.FormActions(Ui.Submit("Speichern"),
                 Ui.Submit("Daten löschen", UiButtonKind.Danger, "action", "erase", confirm: "Name, Kontakt und Nachrichten dieses Gastes löschen? Seine Aufenthalte bleiben anonym stehen, seine Links gehen nicht mehr.")));
         return PluginResult.Page(Ui.Stack(

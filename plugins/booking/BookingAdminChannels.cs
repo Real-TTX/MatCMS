@@ -75,7 +75,6 @@ public static class BookingAdminChannels
             var own = Url(ctx, await BookingIcal.UnitTokenAsync(ctx.Data, u.Id, ct));
             cards.Add(Ui.Card(u.Name, Ui.Stack(
                 Ui.KeyValue(("Kalender dieser Einheit", own)),
-                Ui.Muted("Alle belegten Nächte inklusive Puffertage, ohne Namen und Preise – z. B. für das Handy oder die Reinigung. Für ein Portal die eigene Adresse in der Tabelle nehmen."),
                 mine.Count == 0 ? Ui.Empty("Noch kein Portal verbunden.") : Ui.Table(
                     new[] { Ui.Column("Portal"), Ui.Column("Stand"), Ui.Column("Belegungen", right: true), Ui.Column("Adresse für das Portal"), Ui.Column("", actions: true) },
                     mine.Select(x => Ui.Row(
@@ -87,24 +86,22 @@ public static class BookingAdminChannels
                         Ui.Muted(Url(ctx, x.ExportToken)),
                         Ui.Inline(Ui.Action("Jetzt lesen", "run", B.Num(x.Id), icon: "ti-refresh"),
                             Ui.Action("Entfernen", "remove", B.Num(x.Id), confirm: "Kalender entfernen? Seine Belegungen werden hier wieder frei.", icon: "ti-trash"))))),
-                Ui.Action("Neue Adressen erzeugen", "renew", B.Num(u.Id), confirm: "Alle Kalender-Adressen dieser Einheit ändern? Die alten gehen danach nicht mehr – bei jedem Portal neu eintragen.", icon: "ti-key"))));
+                Ui.Action("Neue Adressen erzeugen", "renew", B.Num(u.Id), confirm: "Alle Kalender-Adressen dieser Einheit ändern? Die alten gehen danach nicht mehr – bei jedem Portal neu eintragen.", icon: "ti-key") with { WithLabel = true })));
         }
 
         var add = units.Count == 0 ? null : Ui.Card("Portal verbinden", Ui.Form(
-            Ui.Muted("1. Beim Portal die Export-Adresse des Kalenders kopieren (Airbnb: Kalender → Verfügbarkeit → Kalender verbinden; Booking.com: Tarife & Verfügbarkeit → Kalender synchronisieren). " +
-                     "2. Hier eintragen. 3. Die Adresse, die dann in der Tabelle steht, beim Portal als „Kalender importieren“ eintragen."),
             Ui.Grid(200,
                 Ui.Select("unit", "Einheit", B.Num(units[0].Id), units.Select(x => Ui.Option(B.Num(x.Id), x.Name)).ToArray()),
                 Ui.Select("portal", "Portal", Portals[0], Portals.Select(p => Ui.Option(p, p)).ToArray()),
                 Ui.Input("name", "Name (bei „Andere“)")),
-            Ui.Input("url", "Kalender-Adresse des Portals (https://…/….ics)", "", UiInputType.Url),
+            Ui.Input("url", "Kalender-Adresse des Portals (https://…/….ics)", "", UiInputType.Url)
+                with { Help = "Export-Adresse aus dem Portal (Airbnb: Kalender → Verfügbarkeit). Danach die Adresse aus der Tabelle dort als „Kalender importieren“ eintragen." },
             Ui.TextArea("ics", "… oder einmalig einen Kalender einfügen (Inhalt einer .ics-Datei)", "", 3),
             Ui.FormActions(Ui.Submit("Verbinden und lesen", icon: "ti-plug-connected"))));
 
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Belegungen mit Airbnb, Booking.com, Rentlio & Co. abgleichen – alle 15 Minuten, in beide Richtungen", "Kanäle"),
-            Ui.Alert("iCal überträgt nur belegte Nächte, keine Gäste und keine Preise. Die Portale lesen in ihrem eigenen Takt (Airbnb etwa stündlich, Booking.com auch seltener) – " +
-                     "zwischen zwei Abrufen ist eine Doppelbuchung möglich. Eine Überschneidung wird hier rot gemeldet und per Mail an „Neue Anfragen an“ geschickt.", UiTone.Info),
+            Ui.PageHead(null, "Kanäle"),
+            Ui.Alert("Zwischen zwei Abrufen eines Portals ist eine Doppelbuchung möglich – sie wird hier rot gemeldet.", UiTone.Info),
             Ui.Columns(cards, new UiNode?[] { add })), "Kanäle");
     }
 }

@@ -34,7 +34,7 @@ internal static class ShopStringsPackage
         ("shop.rep.byCountry", "Nach Land", "By country"), ("shop.rep.byPayment", "Nach Zahlart", "By payment method"),
         ("shop.slip", "Lieferschein", "Packing slip"),
         // ---- connection check ----
-        ("shop.chk.title", "Verbindung prüfen", "Check connection"), ("shop.chk.help", "Fragt Stripe bzw. PayPal mit den gespeicherten Zugangsdaten (nur lesend): wird der Schlüssel angenommen, stimmt der Modus, ist der Webhook eingerichtet? Es wird keine Bestellung angelegt und kein Geld bewegt.", "Asks Stripe or PayPal with the stored credentials (read-only): is the key accepted, does the mode match, is the webhook set up? No order is placed and no money moves."),
+        ("shop.chk.title", "Verbindung prüfen", "Check connection"),
         ("shop.chk.checkStripe", "Stripe prüfen", "Check Stripe"), ("shop.chk.checkPayPal", "PayPal prüfen", "Check PayPal"),
         ("shop.chk.urlStripe", "Stripe-Webhook-Adresse", "Stripe webhook address"), ("shop.chk.eventsStripe", "Stripe-Ereignisse", "Stripe events"), ("shop.chk.urlPayPal", "PayPal-Webhook-Adresse", "PayPal webhook address"), ("shop.chk.eventsPayPal", "PayPal-Ereignisse", "PayPal events"),
         ("shop.chk.listTitle", "Testlauf-Checkliste", "Test-run checklist"),

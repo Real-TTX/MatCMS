@@ -2052,11 +2052,12 @@ li.CodeMirror-hint-active { background: var(--accent); color: #fff; }
 
 /* A status light (Ui.Html): red = needs doing, amber = waiting, green = done, grey = closed. A row with a red light is marked, so what is unprocessed is seen from afar. */
 .ui-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); vertical-align: middle; }
-.ui-dot-err { background: #d64545; box-shadow: 0 0 0 3px color-mix(in srgb, #d64545 24%, transparent); }
-.ui-dot-warn { background: #e0a100; box-shadow: 0 0 0 3px color-mix(in srgb, #e0a100 24%, transparent); }
-.ui-dot-ok { background: #2f9e57; }
+.ui-dot-err { background: var(--err-fg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--err-fg) 24%, transparent); }
+.ui-dot-warn { background: var(--warn-fg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn-fg) 24%, transparent); }
+.ui-dot-ok { background: var(--ok-fg); }
 table.data tr:has(.ui-dot-err) td { background: var(--err-bg); }
-table.data tr:has(.ui-dot-err) td:first-child { box-shadow: inset 3px 0 0 #d64545; }
+/* the tint is the state — no coloured bar on one side (MatUi COLOR-04) */
+table.data tr:has(.ui-dot-warn) td { background: var(--warn-bg); }
 table.data tr:has(.ui-dot-err) td strong { color: var(--err-fg); }
 
 /* A plugin's table (Ui.Table) on a phone: every row is a card, every cell names its column (data-label). Sideways scrolling hid the very columns a list is read for — status, total, the buttons. */

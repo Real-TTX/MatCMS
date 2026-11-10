@@ -38,18 +38,18 @@ public static class BookingAdminCheckins
         var stays = await StaysAsync(ctx, from, to, ct);
         var q = "?von=" + B.Iso(from) + "&bis=" + B.Iso(to);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Die Anreisen eines Zeitraums mit dem Stand des Online-Check-ins – und die Liste für die Meldung", "Meldungen",
+            Ui.PageHead(null, "Meldungen",
                 Ui.Button("Alle als CSV", R + "checkins/csv" + q, UiButtonKind.Ghost, "ti-table-down", small: true)),
-            Ui.Card(Ui.Form(Ui.Inline(Ui.Input("von", "Anreise von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "bis", B.Iso(to), UiInputType.Date),
-                Ui.Submit("Anzeigen", UiButtonKind.Ghost, small: true))) with { Action = R + "checkins" }),
+            // the range filter sits right above its list, without a card of its own; the button has the fields' height
+            Ui.Form(Ui.Inline(Ui.Input("von", "Anreise von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "bis", B.Iso(to), UiInputType.Date),
+                Ui.Submit("Anzeigen", UiButtonKind.Ghost))) with { Action = R + "checkins" },
             Ui.Table(new[] { Ui.Column("Anreise"), Ui.Column("Unterkunft"), Ui.Column("Gast"), Ui.Column("Personen", right: true), Ui.Column("Check-in"), Ui.Column("", actions: true) },
                 stays.Select(s => Ui.Row(B.Weekday(s.B.Arrival) + " " + B.Date(s.B.Arrival), s.Unit, Ui.Link(s.B.Name, R + "bookings/" + s.B.Id),
                     B.Num(s.B.Adults + s.B.Children),
                     s.People.Count > 0 ? Ui.Badge("ausgefüllt (" + s.People.Count + ")", UiTone.Success) : Ui.Badge("offen", UiTone.Warning),
                     s.People.Count == 0 ? null : Ui.Inline(Ui.Button("CSV", R + "bookings/" + s.B.Id + "/travellers.csv", UiButtonKind.Ghost, "ti-table-down", small: true),
                         Ui.Button("Meldeschein", R + "bookings/" + s.B.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)))),
-                emptyText: "Keine Anreisen in diesem Zeitraum."),
-            Ui.Muted("Die Angaben werden nach der eingestellten Frist automatisch gelöscht (Einstellungen → Check-in und Gästemails).")), "Meldungen");
+                emptyText: "Keine Anreisen in diesem Zeitraum.")), "Meldungen");
     }
 
     private static PluginResult Csv(string text, string name) =>
@@ -91,7 +91,7 @@ public static class BookingAdminCheckins
         var profile = BookingCheckin.ProfileFor(ctx, house);
         var cols = BookingCheckin.Profiles[profile].All.Where(k => k is not ("first" or "last")).Take(4).ToList();
         return Ui.Card("Online-Check-in", Ui.Stack(
-            people.Count == 0 ? Ui.Badge("noch nicht ausgefüllt", UiTone.Warning) : Ui.Badge("ausgefüllt " + BookingMail.Local(row?.Timestamp("checkin_at")), UiTone.Success),
+            Ui.Inline(people.Count == 0 ? Ui.Badge("noch nicht ausgefüllt", UiTone.Warning) : Ui.Badge("ausgefüllt " + BookingMail.Local(row?.Timestamp("checkin_at")), UiTone.Success)),
             row?.Text("arrival_time") is { Length: > 0 } at ? Ui.Text("Ankunft: " + at) : null,
             row?.Text("travel") is { Length: > 0 } tr ? Ui.Text("Anreise mit: " + tr) : null,
             people.Count == 0 ? null : Ui.Table(new[] { Ui.Column("Name") }.Concat(cols.Select(c => Ui.Column(BookingCheckin.Label(c)))),

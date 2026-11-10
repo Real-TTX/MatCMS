@@ -46,7 +46,7 @@ public static class BookingFederation
                 new FieldOption(Lead, "Zentrale – Gästekartei und Anfragen aller Häuser"),
                 new FieldOption(Member, "Haus im Verbund – meldet an die Zentrale")
             },
-            Help = "Für mehrere Häuser eines Gastgebers. Gemeinsame Verarbeitung – jede Datenschutzerklärung muss den Verbund nennen."
+            Help = "Für mehrere Häuser eines Gastgebers. Gemeinsame Verarbeitung – jede Datenschutzerklärung muss den Verbund nennen (Hinweis, keine Rechtsberatung). Meldedaten werden nie geteilt."
         })
         .Add(new SettingSpec(UrlKey, "Adresse der Zentrale", SettingKind.Text) { Group = Group, Help = "Nur für ein Haus im Verbund, z. B. https://villa-nika.de" })
         .Add(new SettingSpec(KeyKey, "API-Schlüssel der Zentrale", SettingKind.Secret)

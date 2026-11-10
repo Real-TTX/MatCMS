@@ -314,7 +314,8 @@ internal static class BlogPublic
 
         if (posts.Count == 0)
         {
-            sb.Append("<p class=\"muted\">").Append(H(ctx.T("posts.noneFound"))).Append("</p>");
+            // in the heading's own centred box — left-aligned, it stood alone under the centred title
+            sb.Append("<div class=\"section__intro\"><p class=\"muted\">").Append(H(ctx.T("posts.noneFound"))).Append("</p></div>");
         }
         else if (isBlog)
         {

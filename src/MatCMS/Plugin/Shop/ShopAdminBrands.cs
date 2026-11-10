@@ -172,7 +172,7 @@ internal static class ShopAdminBrands
         };
         var title = ctx.T(id == 0 ? "shop.adm.newBrand" : "shop.adm.editBrand");
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, title, Ui.Button(ctx.T("shop.adm.back"), $"{Section}/brands", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true),
+            Ui.PageHead(null, title,
                 id > 0 ? Ui.Button(ctx.T("shop.adm.view"), ShopUrls.Brand(current.Slug), UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true } : null),
             error is null ? null : Ui.Alert(error, UiTone.Error),
             Ui.Form(Ui.Hidden("action", "save"), Ui.Columns(main, side), Ui.FormActions(Ui.Submit(ctx.T("action.save")), Ui.Button(ctx.T("action.cancel"), $"{Section}/brands", UiButtonKind.Ghost)))), title);

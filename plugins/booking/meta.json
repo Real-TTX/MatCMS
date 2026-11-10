@@ -1,6 +1,6 @@
 {
   "Key": "booking",
   "Name": "Buchungen",
-  "Version": "0.11",
+  "Version": "0.12",
   "Description": "Ferienhäuser, Villen und Apartments: Objekte mit buchbaren Einheiten (Apartment, Zimmer oder das ganze Haus), Saisons mit Rang, Preise je Nacht mit Mindestaufenthalt, Anreisetag, Wochenpreis und Personenaufschlag, Gebühren und Kurtaxe, Belegung ohne Doppelbuchung. Buchungsanfragen mit Zeitraum-Kalender (belegte Nächte gesperrt), Angebot und Bestätigung, Zahlungsplan, Gästekartei, iCal-Abgleich mit Airbnb/Booking.com/Rentlio, Online-Check-in, Gästemails, Reinigung, Verbund mehrerer Häuser mit Zentrale (Anfragen und Buchungen aller Häuser an einer Stelle). Natives Plugin (braucht „Native Plugins erlauben“)."
 }

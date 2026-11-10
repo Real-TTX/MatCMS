@@ -102,7 +102,6 @@ internal static class ShopAdminAttributes
                 id == 0 ? Ui.Input("slug", ctx.T("shop.adm.slug"), "") with { Help = ctx.T("shop.adm.attrSlugHelp") } : Ui.KeyValue((ctx.T("shop.adm.slug"), current.Slug)))
         };
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, title, Ui.Button(ctx.T("shop.adm.back"), $"{Section}/attributes", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true)),
             error is null ? null : Ui.Alert(error, UiTone.Error),
             Ui.Form(Ui.Hidden("action", "save"), Ui.Columns(main, side), Ui.FormActions(Ui.Submit(ctx.T("action.save")), Ui.Button(ctx.T("action.cancel"), $"{Section}/attributes", UiButtonKind.Ghost)))), title);
     }

@@ -257,7 +257,7 @@ public static class BookingCss
 .bk-form{display:grid;gap:18px;max-width:880px;margin:0 auto}.bk-form .form-field{margin:0}
 .bk-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
 .bk-row-stay{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
-@media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}}
+@media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}.bk-form button.bk-btn{width:100%}}
 .bk-form .bk-check{display:flex;gap:10px;align-items:flex-start;font-size:.95em}.bk-form .bk-check input{width:auto;margin-top:4px;accent-color:var(--bk-accent)}
 
 .bk-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}

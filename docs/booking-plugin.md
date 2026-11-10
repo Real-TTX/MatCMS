@@ -119,7 +119,7 @@ Buchungsnummern sind lückenlos (`NextNumberAsync`), z. B. `2027-0042`.
   bis zu mehreren Stunden). Zwischen zwei Abrufen ist eine Doppelbuchung möglich — die Vormerkung von Anfragen (§5.1) verkürzt das Fenster, schließt es
   nicht. Wer mehr will, nimmt einen Channel-Manager (Rentlio) als einzige Quelle; dessen API ist eine spätere Phase.
 
-## 8. Gäste und Kundenverbund
+## 8. Gäste und Verbund
 
 **Gäste** sind eine eigene Kartei (nicht die Mitgliederkonten der Seite — ein Gast braucht kein Passwort; seine Gastseite öffnet der geheime Link).
 Wiedererkannt wird ein Gast an der E-Mail-Adresse; zwei Einträge lassen sich zusammenführen. Profil: Stammdaten, Notizen („bringt Hund mit“), alle
@@ -144,6 +144,103 @@ Aufenthalte, Umsatz, Stammgast-Merker.
   GELUNGENEN Lauf geändert wurde (`updated` an Gast und Buchung, Marke `fed.pushed` in `meta`) — so geht nichts verloren, und doppelt Gesendetes ändert nichts.
   Die Seite holt nur Karten der Gäste, die sie selbst kennt. Ein Gast wird auf der Seite gelöscht, auf der man es tut (die Kartei behält ihn, bis man ihn dort löscht).
 - Das Muster (eine Seite führt, andere hängen per Schlüssel an) ist absichtlich allgemein — der Shop kann es später für gemeinsame Kunden übernehmen.
+
+### 8a. Verbund mit Zentrale (B7 — Entwurf, 10.11.2026)
+
+Matthias, 10.11.: *„Kundenverbund wird zu ‚Verbund'. Es sollen nicht nur Kunden, sondern auch Anfragen und Antworten über eine Oberfläche möglich
+sein, dass man quasi EIN DASHBOARD hat."* Entschieden: **in MatCMS, im Buchungs-Plugin** — kein eigenes Programm (Preise, Belegung, Ablauf, iCal,
+Check-in und Mails gibt es schon; ein zweites Programm müsste sie nachbauen oder die Seiten zu Anzeigen machen) und ohne Cloud.
+
+**Ziel:** Der Gastgeber arbeitet an EINER Stelle — Anfragen aller Häuser sehen und beantworten, Buchungen, Belegung, Gäste, Reinigung. Der Gast bucht
+weiter auf der Seite seines Hauses und bekommt Mails, Gastseite und Rechnung von diesem Haus.
+
+**Rollen** (die Werte der Einstellung bleiben `solo | lead | member`, nur die Namen ändern sich):
+
+| Rolle | Was sie tut |
+| --- | --- |
+| **für sich** | wie bisher |
+| **Zentrale** (`lead`) | führt die Gästekartei (B6) UND hat das Dashboard über alle Häuser. Kann selbst ein Haus sein (Villa Nika) oder eine Büro-Instanz ohne eigene Unterkünfte und ohne öffentliche Buchungsblöcke. |
+| **Haus im Verbund** (`member`) | nimmt Anfragen an wie bisher, meldet sie sofort der Zentrale und lässt sich von ihr steuern |
+
+**Grundsatz: eine Buchung lebt dort, wo sie gebucht wurde.** Die Zentrale hält nur einen **Spiegel** (Liste + Stand) und führt jede Handlung AUF dem
+Haus aus. So gibt es keine zweite Wahrheit, Nächte werden nur an einer Stelle vergeben (keine Doppelbuchung über den Verbund), und Absender, Gastlink,
+Nummernkreis und Rechnung bleiben die des Hauses.
+
+**Zwei Wege, zwei Schlüssel**
+
+| Richtung | Wozu | Schlüssel |
+| --- | --- | --- |
+| Haus → Zentrale | Gäste (B6), Buchungen und Anfragen melden | auf der Zentrale angelegt, Recht `booking:personal` (gibt es) |
+| Zentrale → Haus | Stand lesen, Handlungen ausführen | auf dem HAUS angelegt, neues Recht `booking:manage` (allein stehend wie `personal`: wer es hat, ändert Buchungen dieses Hauses) |
+
+Einrichten: Auf dem Haus „Verbund" → Rolle, Adresse der Zentrale, deren Schlüssel; dazu legt das Haus seinen `manage`-Schlüssel an und schickt ihn mit dem
+ersten Abgleich an die Zentrale (`PUT /api/v1/booking/houses/self`: Name, Adresse, Schlüssel — dort verschlüsselt gespeichert, nie angezeigt). Ein Schritt
+statt zwei Seiten hin und her. Die Zentrale listet die Häuser unter **Verbund → Häuser** (Name, Adresse, zuletzt gemeldet, erreichbar ja/nein,
+„Verbindung prüfen", „Haus entfernen" = Schlüssel vergessen). Später kann die Cloud beides auf Knopfdruck einrichten.
+
+**Spiegel (Haus → Zentrale)**
+
+- Je Buchung: Haus, Nummer, Einheit, Zeitraum, Personen, Status, Gast (Name, E-Mail, Telefon, Sprache), Nachricht der Anfrage, Rechnung (Zeilen + Summe),
+  Zahlungen (Soll/Ist), Fristen (`hold_until`, `offer_until`), letzte Änderung. NICHT: Meldedaten (`travellers`), Gastschlüssel.
+- **Neue Anfrage = sofort**: nach dem Commit einer Anfrage schickt das Haus sie direkt (`POST /api/v1/booking/mirror`), ohne auf den 10-Minuten-Job zu
+  warten; geht das nicht, holt der Job sie nach (dieselbe Warteschlange „seit dem letzten gelungenen Lauf" über `bookings.updated`). Doppelt Gesendetes
+  überschreibt nur denselben Stand (Schlüssel: Haus + Nummer).
+- Tabelle `remote_stays` wird zu `mirror` erweitert (neue Spalten; eine B6-Zeile ist ein Spiegel ohne Rechnung).
+- Je Haus außerdem: Unterkünfte (Name, Slug, Bild, Personen) und belegte Nächte der nächsten 18 Monate inkl. Sperren und Portal-Nächte
+  (`GET /api/v1/booking/occupancy`, beim Öffnen des Belegungsplans abgefragt, eine Minute zwischengespeichert; fällt das Haus aus, zeigt der Plan den
+  Spiegel und sagt „Stand von …").
+
+**Handlungen (Zentrale → Haus)**
+
+- `POST /api/v1/booking/bookings/{nummer}/actions` mit `{ action, args, expect, op }`: `offer` (Nachlass, Text, Frist), `confirm`, `decline` (Grund,
+  benachrichtigen), `cancel`, `pay`/`unpay`, `note`, `message` (s. u.). Neu anlegen (Telefonbuchung für ein Haus): `POST /api/v1/booking/bookings`.
+- **Ein Weg im Code:** die Handlungen der Buchungsseite im Admin werden zu `BookingActions` (eine Methode je Handlung), die Admin-Seite UND die API rufen
+  sie — die Zentrale kann nichts, was der Gastgeber im Haus nicht auch kann, und umgekehrt. Alles geht weiter durch `BookingFlow.MoveAsync`.
+- **`expect`** = der Status, den die Zentrale gesehen hat; hat sich die Buchung inzwischen geändert (jemand hat im Haus selbst geantwortet), antwortet das
+  Haus 409 mit dem neuen Stand — die Zentrale zeigt ihn, statt blind zu überschreiben.
+- **`op`** = Kennung der Handlung (UUID); das Haus merkt sie sich in der Historie, eine Wiederholung (Zeitüberschreitung, zweiter Klick) ändert nichts.
+- **Nur online:** ist das Haus nicht erreichbar, sind die Knöpfe für dieses Haus aus (mit Grund). Handlungen werden NICHT gesammelt und später gesendet —
+  ein Angebot, das Stunden später rausgeht, ist ein anderes Angebot.
+- Historie im Haus: „Verbund (Zentrale Büro): Angebot gesendet" — wer gehandelt hat, steht beim Haus, nicht nur in der Zentrale.
+
+**Antworten = Gespräch je Buchung (neu, auch ohne Verbund nützlich)**
+
+- Tabelle `messages` (Buchung, von host|guest, Text, Zeit, wer). Der Gastgeber schreibt im Admin der Buchung (oder in der Zentrale → `message`); der Gast
+  bekommt eine Mail vom Haus mit dem Text und dem Link zu seiner Gastseite.
+- Der Gast antwortet **auf seiner Gastseite** (Formular „Nachricht an den Gastgeber", Antiforgery, Grenze je Stunde) — keine Mail-Empfangstechnik nötig.
+  Seine Nachricht landet beim Haus, geht sofort in den Spiegel und erscheint im Posteingang der Zentrale als „neue Antwort".
+- Mails an Gäste bleiben bei den Schaltern des Hauses; auf den Demo-Seiten aus.
+
+**Oberfläche der Zentrale (Admin → Buchungen, eigenes Menü wie heute)**
+
+- **Übersicht** (Dashboard): neue Anfragen und Antworten (Zähler am Menüpunkt), heute An-/Abreise je Haus, fällige Zahlungen, Fristen, die bald
+  ablaufen, Doppelbuchungen aus iCal, Häuser, die nicht antworten.
+- **Posteingang**: Anfragen und Gast-Antworten ALLER Häuser in einer Liste (Haus als Spalte und Filter, Tabs offen / beantwortet / alle); ein Klick öffnet
+  die Buchung mit Rechnung, Gespräch und den Knöpfen des Hauses.
+- **Buchungen** und **Belegungsplan** über alle Häuser (Plan: Häuser untereinander, Einheiten als Zeilen — wie der heutige Plan, nur länger).
+- **Gäste** (die Kartei aus B6, jetzt mit den Buchungen aller Häuser) und **Reinigung** (die Listen aller Häuser zusammen, Haus als Spalte).
+- Eigene Unterkünfte der Zentrale (wenn sie ein Haus ist) erscheinen überall wie ein weiteres Haus („dieses Haus").
+- Mitteilungen: die Zentrale hat EINE Adresse für neue Anfragen aller Häuser; jedes Haus kann seine eigene Mitteilung abschalten.
+
+**Datenschutz und Sicherheit**
+
+- Die Zentrale hält personenbezogene Daten aller Anfragen — gemeinsame Verarbeitung wie B6; der Hinweis im Admin nennt jetzt auch Anfragen und Nachrichten.
+- `manage`-Schlüssel nur verschlüsselt auf der Zentrale, nie im Backup (wie alle Schlüssel); ein Haus kann ihn jederzeit widerrufen → die Zentrale zeigt es
+  sofort als „nicht verbunden".
+- Ausgehende Aufrufe der Zentrale wie bisher nur https an öffentliche Adressen, geprüft im Verbindungsaufbau.
+- Löschen bleibt pro Seite; löscht das Haus eine Buchung oder einen Gast, verschwindet der Spiegel beim nächsten Abgleich.
+
+**Teile**
+
+| Teil | Inhalt | Ergebnis |
+| --- | --- | --- |
+| **B7a** | Umbenennung „Verbund", Rollen Zentrale/Haus, Häuser-Liste, Spiegel (sofort + Job), Übersicht + Posteingang + Buchungen über alle Häuser, nur lesen | Matthias sieht Nika und Sogi an einer Stelle |
+| **B7b** | `booking:manage`, `BookingActions` (ein Weg für Admin und API), Handlungen aus der Zentrale mit `expect`/`op`, Telefonbuchung für ein Haus, Belegungsplan über alle | Antworten ohne zweiten Login |
+| **B7c** | Gespräch je Buchung: Nachrichten im Admin und auf der Gastseite, Mails, „neue Antwort" im Posteingang; Reinigung über alle Häuser | Anfragen UND Antworten an einer Stelle |
+
+Tests: drei ganze Seiten in einem Test (Büro + zwei Häuser, wie `FederationSites`): Anfrage auf Haus B erscheint sofort in der Zentrale; Angebot aus der
+Zentrale geht als Mail des Hauses B; gleichzeitige Antwort im Haus → 409 mit neuem Stand; Wiederholung mit gleicher `op` ändert nichts; Haus aus →
+Knöpfe aus, Anfrage auf dem Haus geht trotzdem; widerrufener Schlüssel; kein Meldedatum in der Zentrale.
 
 ## 9. On- und Offboarding
 
@@ -208,6 +305,7 @@ kein Konto nötig), Checkliste je Einheit, „erledigt“ mit Zeit. Druck als PD
 | **B4** | iCal Ein- und Ausgang, Konflikte | Airbnb/Booking.com abgeglichen |
 | **B5** | Online-Check-in, Mails vor/nach dem Aufenthalt, Reinigung | On-/Offboarding |
 | **B6** | Kundenverbund | Nika + Sogi teilen Gäste |
+| **B7** | Verbund mit Zentrale (§ 8a): ein Dashboard für Anfragen, Antworten, Buchungen, Belegung und Gäste aller Häuser — Teile B7a–c | ein Dashboard für Nika + Sogi |
 | später | Online-Zahlung (Stripe/PayPal), Rentlio-API, Gutscheine, Bewertungen auf der Seite | |
 
 Jede Phase mit Tests (`tests/MatCMS.Plugins.Tests/Booking*Tests.cs`, ganze App in memory wie Verein/Forum; Doppelbuchung unter Last wie die Shop-Race-Tests)
@@ -219,3 +317,5 @@ und einer Prüfung an einer lokalen Kopie von Villa Nika (eigener Container, eig
 2. **Stornobedingungen**: eine Staffel je Seite, oder je Saison verschieden (Hauptsaison strenger)?
 3. **Sprachen der Gästetexte**: de/en/hr/it genug, oder weitere (nl, pl, cs …)?
 4. **Was Villa Nika/Sogi heute nutzen**: welche Portale und ob ein Channel-Manager (Rentlio) schon im Spiel ist — das entscheidet, ob iCal reicht.
+5. **Zentrale für Nika + Sogi**: Villa Nika selbst, oder eine eigene Büro-Instanz ohne Website (kein Haus bevorzugt; die Zentrale bleibt erreichbar, wenn eine Seite umgebaut wird)?
+6. **Wer antwortet**: nur ein Konto, oder mehrere Personen mit Rechten je Haus (dann braucht B7 Rollen im Plugin)?

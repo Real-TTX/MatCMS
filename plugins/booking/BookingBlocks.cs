@@ -186,7 +186,7 @@ public static class BookingBlocks
           .Append("<label class=\"bk-hp\" aria-hidden=\"true\">Website<input name=\"website\" tabindex=\"-1\" autocomplete=\"off\"></label>")
           .Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"consent\" value=\"1\" required> <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Anfrage gespeichert werden (<a href=\"")
           .Append(B.H(privacy)).Append("\">Datenschutz</a>).</span></label>")
-          .Append("<p><button class=\"bk-btn\" type=\"submit\">Unverbindlich anfragen</button></p>")
+          .Append("<p><button class=\"btn bk-btn\" type=\"submit\">Unverbindlich anfragen</button></p>")
           .Append("<p class=\"bk-muted\">Die Anfrage ist noch keine Buchung: wir merken den Zeitraum vor und melden uns mit einer Bestätigung.</p></form>");
         // data for the script: which house each unit belongs to (the optional fees of the chosen unit's house show)
         sb.Append("<script type=\"application/json\" class=\"bk-units-json\">{")
@@ -315,7 +315,7 @@ var form=document.getElementById('anfrage');if(form)form.scrollIntoView({behavio
               .Append(u.Bedrooms > 0 ? " · " + u.Bedrooms + (u.Bedrooms == 1 ? " Schlafzimmer" : " Schlafzimmer") : "").Append("</p>");
             if (u.Description.Length > 0) sb.Append("<p>").Append(B.H(u.Description.Length > 220 ? u.Description[..220].TrimEnd() + " …" : u.Description)).Append("</p>");
             if (from > 0) sb.Append("<p class=\"bk-from\">ab ").Append(B.H(B.Money(from, cur))).Append(" / Nacht</p>");
-            sb.Append("<a class=\"bk-btn\" href=\"").Append(B.H(href)).Append("\">").Append(B.H(button)).Append("</a></div></article>");
+            sb.Append("<a class=\"btn bk-btn\" href=\"").Append(B.H(href)).Append("\">").Append(B.H(button)).Append("</a></div></article>");
         }
         sb.Append("</div></div></section>");
         return PluginResult.Fragment(sb.ToString());

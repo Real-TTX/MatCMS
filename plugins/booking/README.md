@@ -3,7 +3,11 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.7 — Zeitraum-Picker statt großer Kalender
+## Stand: 0.8 — Zeitraum-Picker statt großer Kalender, Knöpfe der Seite
+
+- **0.8: Knöpfe sind die Knöpfe der Seite** (`class="btn bk-btn"`; `btn-outline` für den zweiten): Schrift, Großschreibung und Ecken kommen vom Template, das
+  eigene Aussehen `.bk-btn:not(.btn)` gilt nur noch, wo ein Template keine `.btn` hat. Die Unterkunfts-Karten sind eine Spalte (nicht mehr ein Grid, das die
+  Zeilen streckte — der Knopf wuchs mit dem Text): Preis und Knopf stehen unten, über alle Karten auf einer Linie.
 
 - **Das Anfrageformular hat EIN Feld „Anreise – Abreise“**: der Zeitraum-Picker der Website (`mat-datepicker.js`, derselbe wie im Formular-Builder),
   der über `GET /buchung/belegung?einheit=&von=&bis=` (höchstens 400 Tage, nur Nächte, nie Gäste) lernt, was belegt ist: belegte Nächte durchgestrichen,

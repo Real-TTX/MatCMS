@@ -73,7 +73,7 @@ public static partial class BookingPublic
     private static async Task<PluginResult> RequestAsync(IPluginContext ctx, CancellationToken ct)
     {
         var f = ctx.Request;
-        string Back(string message) => "<h1>Anfrage nicht gesendet</h1><p class=\"bk-alert\">" + B.H(message) + "</p><p><a class=\"bk-btn bk-btn-ghost\" href=\""
+        string Back(string message) => "<h1>Anfrage nicht gesendet</h1><p class=\"bk-alert\">" + B.H(message) + "</p><p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\""
             + B.H(SafeBack(f.Header("Referer"), ctx)) + "\">Zurück zum Formular</a></p>";
         // a bot fills every field it sees — this one is hidden from people
         if (f.F("website").Length > 0) return Shell("Danke", "<h1>Danke!</h1><p>Ihre Anfrage ist eingegangen.</p>");
@@ -167,7 +167,7 @@ public static partial class BookingPublic
 
         if (b.Status == BookingStatus.Offer && b.OfferUntil >= DateTime.UtcNow)
             sb.Append("<form method=\"post\" class=\"bk-accept\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"accept\">")
-              .Append("<p>Mit dem Klick buchen Sie verbindlich zu den genannten Bedingungen.</p><button class=\"bk-btn\" type=\"submit\">Verbindlich buchen</button></form>");
+              .Append("<p>Mit dem Klick buchen Sie verbindlich zu den genannten Bedingungen.</p><button class=\"btn bk-btn\" type=\"submit\">Verbindlich buchen</button></form>");
         if (b.Status == BookingStatus.Confirmed)
         {
             var plan = await BookingPayments.PlanAsync(ctx, b, ct);
@@ -179,7 +179,7 @@ public static partial class BookingPublic
             sb.Append("<dt>Bezahlt</dt><dd>").Append(B.H(B.Money(plan.Paid, cur))).Append("</dd><dt>Noch offen</dt><dd><strong>").Append(B.H(B.Money(plan.Open, cur))).Append("</strong></dd></dl>");
             if (ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
                 sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">Verwendungszweck: ").Append(B.H(b.Number)).Append("</p>");
-            sb.Append("<p><a class=\"bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">Buchungsbestätigung (PDF)</a></p></div>");
+            sb.Append("<p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">Buchungsbestätigung (PDF)</a></p></div>");
 
             if (b.Departure >= B.Today)
             {
@@ -189,7 +189,7 @@ public static partial class BookingPublic
                 if (ctx.Request.Q("checkin") == "1") sb.Append("<p class=\"bk-status bk-status-confirmed\">Danke! Ihr Check-in ist bei uns angekommen.</p>");
                 sb.Append(done ? "<p>Erledigt" + (row!.Text("arrival_time") is { Length: > 0 } at ? " – Ankunft " + B.H(at) : "") + ".</p>" : "<p>Bitte vor der Anreise die Angaben aller Personen eintragen.</p>");
                 if (b.Arrival >= B.Today)
-                    sb.Append("<p><a class=\"bk-btn").Append(done ? " bk-btn-ghost" : "").Append("\" href=\"").Append(B.H(self + "/checkin")).Append("\">")
+                    sb.Append("<p><a class=\"btn bk-btn").Append(done ? " btn-outline bk-btn-ghost" : "").Append("\" href=\"").Append(B.H(self + "/checkin")).Append("\">")
                       .Append(done ? "Angaben ändern" : "Jetzt einchecken").Append("</a></p>");
                 sb.Append("</div>");
 
@@ -248,8 +248,9 @@ public static class BookingCss
 .bk-status-declined,.bk-status-expired,.bk-status-cancelled{background:color-mix(in srgb,#9ca3af 18%,transparent)}
 .bk-status-confirmed{background:color-mix(in srgb,#16a34a 14%,transparent)}
 .bk-alert{padding:12px 16px;border-radius:10px;background:color-mix(in srgb,#dc2626 12%,transparent)}
-.bk-btn{display:inline-block;border:0;border-radius:999px;padding:12px 22px;background:var(--bk-accent);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
-.bk-btn-ghost{background:transparent;color:var(--bk-accent);border:1px solid var(--bk-accent)}
+.bk-btn{cursor:pointer;text-align:center}button.bk-btn{font-family:inherit}
+.bk-btn:not(.btn){display:inline-block;border:0;border-radius:999px;padding:12px 22px;background:var(--bk-accent);color:#fff;font:inherit;font-weight:600;text-decoration:none}
+.bk-btn-ghost:not(.btn){background:transparent;color:var(--bk-accent);border:1px solid var(--bk-accent)}
 .bk-btn[disabled]{opacity:.5;cursor:not-allowed}
 .bk-muted{color:var(--bk-muted);font-size:.9em}.bk-pre{white-space:pre-line}
 .bk-accept{margin:18px 0}
@@ -258,7 +259,7 @@ public static class BookingCss
 .bk-row-stay{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
 @media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}}
 .bk-form .bk-check{display:flex;gap:10px;align-items:flex-start;font-size:.95em}.bk-form .bk-check input{width:auto;margin-top:4px;accent-color:var(--bk-accent)}
-.bk-form .bk-btn{padding:14px 28px}
+
 .bk-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 .bk-price{border:1px solid var(--bk-line);border-radius:12px;padding:14px 16px}.bk-price:empty{display:none}
 .bk-price .bk-total{font-size:1.3em;font-weight:700}.bk-price .bk-no{color:#b91c1c}
@@ -281,7 +282,7 @@ public static class BookingCss
 .bk-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px}
 .bk-unit{border:1px solid var(--bk-line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;background:var(--bk-bg)}
 .bk-unit img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
-.bk-unit-body{padding:14px 16px;display:grid;gap:6px;flex:1}.bk-unit h3{margin:0;font-size:1.15em}
-.bk-unit .bk-from{font-weight:700}.bk-unit .bk-btn{justify-self:start;margin-top:6px}
+.bk-unit-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}.bk-unit h3{margin:0;font-size:1.15em}.bk-unit-body p{margin:0}
+.bk-unit .bk-from{font-weight:700;margin-top:auto;padding-top:6px}.bk-unit .bk-btn{align-self:flex-start;flex:0 0 auto;margin-top:auto}.bk-unit .bk-from+.bk-btn{margin-top:4px}
 """;
 }

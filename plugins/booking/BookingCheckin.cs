@@ -190,7 +190,7 @@ public static class BookingCheckin
         foreach (var a in ArrivalTimes) sb.Append("<option").Append(a == arrivalTime ? " selected" : "").Append(" value=\"").Append(B.H(a)).Append("\">").Append(a.Length == 0 ? "noch unklar" : B.H(a)).Append("</option>");
         sb.Append("</select></label><label>Anreise mit (z. B. Auto mit Kennzeichen, Fähre, Flug)<input name=\"travel\" maxlength=\"200\" value=\"").Append(B.H(travel)).Append("\"></label></div>");
         sb.Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"remember\" value=\"1\"> <span>Für meinen nächsten Aufenthalt merken (sonst werden die Angaben nach der gesetzlichen Frist gelöscht).</span></label>");
-        sb.Append("<p><button class=\"bk-btn\" type=\"submit\">Check-in absenden</button></p></form>");
+        sb.Append("<p><button class=\"btn bk-btn\" type=\"submit\">Check-in absenden</button></p></form>");
         return sb.ToString();
     }
 

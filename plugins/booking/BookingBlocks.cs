@@ -131,8 +131,9 @@ public static class BookingBlocks
           .Append("<input type=\"hidden\" name=\"").Append(name).Append("\" value=\"").Append(B.H(value)).Append("\" data-dp-input></div></div>");
     }
 
-    // ?v= so a browser that kept the older picker (no availability) fetches this one
-    private const string PickerAssets = "<link rel=\"stylesheet\" href=\"/css/mat-datepicker.css?v=busy1\"><script src=\"/js/mat-datepicker.js?v=busy1\" defer></script>";
+    // ?v= so a browser that kept an older picker fetches this one. busy1 was handed out while the hosts still served the OLD file — browsers kept
+    // that under busy1; bump it whenever the picker changes again (the host does not give a plugin a content hash for a static file)
+    private const string PickerAssets = "<link rel=\"stylesheet\" href=\"/css/mat-datepicker.css?v=busy2\"><script src=\"/js/mat-datepicker.js?v=busy2\" defer></script>";
 
     // ---- the request form ---------------------------------------------------------------------------------------
 

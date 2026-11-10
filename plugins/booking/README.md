@@ -3,8 +3,9 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.9 — Zeitraum-Picker statt großer Kalender, Knöpfe der Seite
+## Stand: 0.10 — Zeitraum-Picker statt großer Kalender, Knöpfe der Seite
 
+- **0.10**: Picker-Dateien unter `?v=busy2` — unter busy1 hatten Browser die ALTE Datei behalten, weil 0.7 vor dem Image-Update ausgeliefert wurde.
 - **0.9**: „Unterkünfte“ legt vier Karten in eine Reihe (Spalten ab 230 px, auto-fit) — mit 260 px stand die vierte allein in der zweiten Zeile.
 
 - **0.8: Knöpfe sind die Knöpfe der Seite** (`class="btn bk-btn"`; `btn-outline` für den zweiten): Schrift, Großschreibung und Ecken kommen vom Template, das

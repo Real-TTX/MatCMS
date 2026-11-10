@@ -37,12 +37,14 @@ public sealed class BookingPlugin : IPlugin
         BookingCheckin.Declare(b.Settings);
         BookingGuestMails.Declare(b.Settings);
         BookingCleaning.Declare(b.Settings);
+        BookingFederation.Declare(b.Settings);
         foreach (var spec in BookingMail.Specs.Concat(BookingGuestMails.Specs)) b.MailTemplate(spec);
         BookingAdmin.Configure(b);
         BookingPublic.Configure(b);
         BookingBlocks.Configure(b);
         BookingIcal.Configure(b);
         BookingCleaning.Configure(b);
+        BookingFederation.Configure(b);
         b.Job("guest-mails", JobSchedule.EveryInterval(TimeSpan.FromHours(1)), BookingGuestMails.RunAsync);
         b.Job("checkin-purge", JobSchedule.EveryInterval(TimeSpan.FromHours(24)), async (ctx, ct) => await BookingCheckin.PurgeAsync(ctx, ct));
 

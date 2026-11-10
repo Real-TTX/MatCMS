@@ -165,7 +165,7 @@ public static class BookingAdminMore
                 {
                     await ctx.Data.Table(BookingStore.TBookings).UpdateAsync(b.Id, new Dictionary<string, object?>
                     {
-                        ["name"] = "(gelöscht)", ["email"] = "", ["phone"] = "", ["message"] = "", ["guest_id"] = 0
+                        ["name"] = "(gelöscht)", ["email"] = "", ["phone"] = "", ["message"] = "", ["guest_id"] = 0, ["updated"] = DateTime.UtcNow
                     }, ct);
                     await ctx.Data.Table(BookingStore.TKeys).DeleteWhereAsync(DataQuery.Everything.Eq("booking_id", b.Id), ct);
                     await BookingFlow.NoteAsync(ctx.Data, b.Id, "Daten des Gastes gelöscht (Name, Kontakt, Nachricht); die Buchung bleibt für die Buchhaltung.", ct);
@@ -173,11 +173,11 @@ public static class BookingAdminMore
                 await ctx.Data.Table(BookingStore.TGuests).DeleteAsync(g.Id, ct);
                 return PluginResult.Redirect(R + "guests", "Gast gelöscht, " + bookings.Count + " Aufenthalt(e) anonymisiert.");
             }
-            await ctx.Data.Table(BookingStore.TGuests).UpdateAsync(g.Id, new Dictionary<string, object?>
+            await ctx.Data.Table(BookingStore.TGuests).UpdateAsync(g.Id, BookingFederation.StampLocal(row, new Dictionary<string, object?>
             {
                 ["name"] = B.Clip(ctx.Request.F("name"), 120), ["phone"] = B.Clip(ctx.Request.F("phone"), 60), ["country"] = B.Clip(ctx.Request.F("country"), 60),
                 ["note"] = B.Clip(ctx.Request.F("note"), 4000), ["updated"] = DateTime.UtcNow
-            }, ct);
+            }, DateTime.UtcNow), ct);
             return PluginResult.Redirect(self, "Gespeichert.");
         }
         var cur = BookingPlugin.Currency(ctx);
@@ -195,6 +195,6 @@ public static class BookingAdminMore
                     bookings.Select(b => Ui.Row(Ui.Link(b.Number, R + "bookings/" + b.Id), units.TryGetValue(b.UnitId, out var u) ? u.Name : "–",
                         B.Date(b.Arrival) + " – " + B.Date(b.Departure), B.Money(b.Total, cur), Ui.Badge(BookingStatus.Label(b.Status), BookingStatus.Tone(b.Status)))),
                     emptyText: "Keine Aufenthalte."))
-            }, new UiNode?[] { Ui.Card("Gast", form) })), g.Name.Length > 0 ? g.Name : g.Email);
+            }, new UiNode?[] { Ui.Card("Gast", form), await BookingAdminFederation.GuestCardAsync(ctx, g.Email, ct) })), g.Name.Length > 0 ? g.Name : g.Email);
     }
 }

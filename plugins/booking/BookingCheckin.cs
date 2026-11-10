@@ -65,7 +65,7 @@ public static class BookingCheckin
 
     // ---- data -------------------------------------------------------------------------------------------------------
 
-    private static readonly string[] Columns = Fields.Select(f => f.Key).ToArray();
+    public static readonly string[] Columns = Fields.Select(f => f.Key).ToArray();
 
     public static async Task<List<Traveller>> TravellersAsync(IPluginData data, long bookingId, CancellationToken ct = default) =>
         (await data.Table(BookingStore.TTravellers).QueryAsync(DataQuery.Everything.Eq("booking_id", bookingId).OrderBy("idx"), ct))
@@ -101,7 +101,9 @@ public static class BookingCheckin
                         keep.Add(o);
                     }
                 }
-                await tx.Table(BookingStore.TGuests).UpdateAsync(b.GuestId, new Dictionary<string, object?> { ["checkin"] = keep?.ToJsonString() ?? "" }, ct);
+                var card = await tx.Table(BookingStore.TGuests).GetAsync(b.GuestId, ct);
+                if (card is not null)
+                    await tx.Table(BookingStore.TGuests).UpdateAsync(b.GuestId, BookingFederation.StampLocal(card, new Dictionary<string, object?> { ["checkin"] = keep?.ToJsonString() ?? "", ["updated"] = DateTime.UtcNow }, DateTime.UtcNow), ct);
             }
         }, ct);
         await BookingFlow.NoteAsync(data, b.Id, "Online-Check-in ausgefüllt (" + people.Count + (people.Count == 1 ? " Person" : " Personen") + ")" + (remember ? ", für den nächsten Aufenthalt gemerkt" : ""), ct);

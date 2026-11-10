@@ -1,6 +1,6 @@
 # Buchungs-Plugin — Entwurf
 
-Stand: 10.11.2026 — **B1–B5 gebaut** (`plugins/booking` 0.4: … B3 Belegungsplan, Zahlungen, PDF, Gästekartei; B4 iCal-Abgleich in beide Richtungen mit Konflikt-Meldung; B5 Online-Check-in (Felder je Land), Meldungen/CSV/PDF, Löschfrist, Gästemails vor/nach dem Aufenthalt, Reinigungsliste mit Teamkalender; Tests `BookingTests`, `BookingFlowTests`, `BookingB3Tests`, `BookingIcalTests`, `BookingB5Tests`). B6 offen. Demo: `matcms-demo-villa` (Villa Mirta). Abweichung vom Entwurf: das iCal-Fenster reicht drei Jahre voraus (Airbnb exportiert so weit).
+Stand: 10.11.2026 — **B1–B6 gebaut** (`plugins/booking` 0.6: … B3 Belegungsplan, Zahlungen, PDF, Gästekartei; B4 iCal-Abgleich in beide Richtungen mit Konflikt-Meldung; B5 Online-Check-in (Felder je Land), Meldungen/CSV/PDF, Löschfrist, Gästemails vor/nach dem Aufenthalt, Reinigungsliste mit Teamkalender; B6 Kundenverbund (§8: Kartei-API, Abgleich mit Warteschlange, Zeitstempel je Feld); Tests `BookingTests`, `BookingFlowTests`, `BookingB3Tests`, `BookingIcalTests`, `BookingB5Tests`, `BookingFederationTests`). Demo: `matcms-demo-villa` (Villa Mirta). Abweichung vom Entwurf: das iCal-Fenster reicht drei Jahre voraus (Airbnb exportiert so weit).
 Apartments“): Belegungskalender, Buchungsanfragen, Saisonpreise, Gäste, Abgleich mit Booking.com/Airbnb/Rentlio, Check-in und Übergabe.
 Erste Seiten: **Villa Nika** und **Villa Sogi** (gemeinsame Gäste). Ergänzt `docs/plugin-system-v2.md`; wie beim Shop gilt: was das
 Plugin braucht und die API nicht kann, kommt **in die API**, nicht am Plugin vorbei.
@@ -139,6 +139,9 @@ Aufenthalte, Umsatz, Stammgast-Merker.
 - **Meldedaten reisen nicht mit** (Ausweisnummern gehören zu einem Aufenthalt in einem Haus) — außer der Gast setzt beim Check-in den Haken
   „für meinen nächsten Aufenthalt merken“; dann liegen sie in seinem Gästeeintrag und sind beim nächsten Check-in vorausgefüllt.
 - Datenschutz: der Verbund ist eine gemeinsame Verarbeitung zweier Häuser — die Datenschutzerklärung beider Seiten muss es sagen (Hinweis im Admin, kein Rechtsrat).
+- **Gebaut (B6)**: Abgleich der anhängenden Seite per Job alle 10 Minuten; die „Warteschlange“ ist keine eigene Tabelle, sondern alles, was seit dem letzten
+  GELUNGENEN Lauf geändert wurde (`updated` an Gast und Buchung, Marke `fed.pushed` in `meta`) — so geht nichts verloren, und doppelt Gesendetes ändert nichts.
+  Die Seite holt nur Karten der Gäste, die sie selbst kennt. Ein Gast wird auf der Seite gelöscht, auf der man es tut (die Kartei behält ihn, bis man ihn dort löscht).
 - Das Muster (eine Seite führt, andere hängen per Schlüssel an) ist absichtlich allgemein — der Shop kann es später für gemeinsame Kunden übernehmen.
 
 ## 9. On- und Offboarding

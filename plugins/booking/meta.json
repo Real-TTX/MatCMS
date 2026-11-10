@@ -1,6 +1,6 @@
 {
   "Key": "booking",
   "Name": "Buchungen",
-  "Version": "0.5",
-  "Description": "FerienhÃ¤user, Villen und Apartments: Objekte mit buchbaren Einheiten (Apartment, Zimmer oder das ganze Haus), Saisons mit Rang (Neben-, Hauptsaison, Weihnachten, Silvester), Preise je Nacht mit Mindestaufenthalt, Anreisetag, Wochenpreis und Personenaufschlag, GebÃ¼hren und Kurtaxe, Belegung ohne Doppelbuchung. Weitere Phasen: Buchungsanfragen, GÃ¤stekartei, iCal-Abgleich mit Airbnb/Booking.com/Rentlio, Online-Check-in, Reinigung. Natives Plugin (braucht â€žNative Plugins erlaubenâ€œ)."
+  "Version": "0.6",
+  "Description": "FerienhÃ¤user, Villen und Apartments: Objekte mit buchbaren Einheiten (Apartment, Zimmer oder das ganze Haus), Saisons mit Rang (Neben-, Hauptsaison, Weihnachten, Silvester), Preise je Nacht mit Mindestaufenthalt, Anreisetag, Wochenpreis und Personenaufschlag, GebÃ¼hren und Kurtaxe, Belegung ohne Doppelbuchung. Weitere Phasen: Buchungsanfragen, GÃ¤stekartei, iCal-Abgleich mit Airbnb/Booking.com/Rentlio, Online-Check-in, Reinigung, Kundenverbund mehrerer Seiten. Natives Plugin (braucht â€žNative Plugins erlaubenâ€œ)."
 }

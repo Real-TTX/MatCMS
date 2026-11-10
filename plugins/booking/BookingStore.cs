@@ -19,7 +19,7 @@ public sealed class UnavailableException(string message) : Exception(message);
 public sealed class BookingStore(IPluginData data)
 {
     public const string TProperties = "properties", TUnits = "units", TSeasons = "seasons", TRates = "rates", TFees = "fees", TNights = "nights",
-        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments", TFeeds = "feeds", TTravellers = "travellers", TTasks = "tasks";
+        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments", TFeeds = "feeds", TTravellers = "travellers", TTasks = "tasks", TRemoteStays = "remote_stays";
 
     public static void Declare(IDataBuilder b)
     {
@@ -52,7 +52,11 @@ public sealed class BookingStore(IPluginData data)
             .Timestamp("hold_until").Timestamp("offer_until").Timestamp("confirmed_at").Timestamp("reminded_deposit").Timestamp("reminded_rest").Timestamp("checkin_at").Text("arrival_time").Text("travel").Text("mails").Timestamp("created").Timestamp("updated").Json("history")
             .Index("unit_id").Index("status").Index("arrival").Index("guest_id"));
         b.Table(TGuests, t => t.Text("name").Text("email", required: true).Text("phone").Text("country").Text("locale").Text("note")
-            .Json("checkin").Timestamp("created").Timestamp("updated").UniqueIndex("email"));
+            .Json("checkin").Json("stamps").Timestamp("created").Timestamp("updated").UniqueIndex("email").Index("updated"));
+        // the leading site of a federation (BookingFederation): the stays the attached sites reported, as summaries — no registration data
+        b.Table(TRemoteStays, t => t.Text("site", required: true).Text("site_name").Text("ref", required: true).Text("email").Text("name").Text("number")
+            .Text("property").Text("unit").Text("arrival").Text("departure").Text("status").Int("total", def: "0").Text("currency").Timestamp("updated")
+            .UniqueIndex("site", "ref").Index("email"));
         // the people of a stay with what the authorities want to know (the fields depend on the country of the house — BookingCheckin.Profiles);
         // deleted by a job after the retention period, the booking stays
         b.Table(TTravellers, t => t.Int("booking_id", required: true).Int("idx", def: "0").Text("first").Text("last").Text("gender").Text("born").Text("birthplace")

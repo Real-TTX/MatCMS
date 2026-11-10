@@ -3,7 +3,25 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: Phase B5 (0.5)
+## Stand: Phase B6 (0.6) — alle Phasen des Entwurfs gebaut
+
+### Kundenverbund (B6)
+
+Mehrere Seiten mit denselben Gästen (Villa Nika + Villa Sogi) teilen eine Gästekartei — ohne Cloud. Einstellungen → Kundenverbund, Rolle:
+
+- **für sich** (Standard): eigene Kartei.
+- **führt die Kartei**: bietet ihre Gäste über die Plugin-API an — `GET /api/v1/booking/guests?email=…` (ein Gast mit seinen Aufenthalten auf allen Seiten),
+  `GET …/guests?since=…&page=` (geänderte), `PUT …/guests` (anlegen/abgleichen, Antwort = der Gast, wie er jetzt dasteht), `POST …/stays` (Aufenthalte einer
+  anhängenden Seite als Zusammenfassung). Zugang: ein Site-API-Schlüssel mit dem Recht `booking:personal` (Admin → API-Schlüssel); eine Seite, die nicht führt,
+  antwortet 409. Unter Buchungen → Kundenverbund stehen die Seiten, die schon gemeldet haben (nach dem Namen ihres Schlüssels).
+- **hängt an**: Adresse + Schlüssel der führenden Seite. Ein Job (alle 10 Minuten, oder „Jetzt abgleichen“) schickt jede seit dem letzten gelungenen Lauf
+  geänderte Gästekarte und jeden geänderten Aufenthalt (Haus, Einheit, Zeitraum, Status, Betrag — keine Meldedaten) und übernimmt, was die Kartei zu den Gästen
+  dieser Seite weiß. Die Seite hält eine **Kopie** ihrer Gäste: eine Anfrage geht auch, wenn die führende Seite nicht erreichbar ist; was nicht durchging,
+  wartet (die Marke rückt erst nach einem gelungenen Lauf vor). „Verbindung prüfen“ sagt, was fehlt (Schlüssel, Recht, Adresse).
+- **Je Feld gewinnt die spätere Änderung** (`guests.stamps`: Name, Telefon, Land, Sprache, Notiz, gemerkter Check-in je mit Zeitstempel); Karten von vor dem
+  Verbund (ohne Stempel) füllen nur leere Felder. Meldedaten reisen nur, wenn der Gast sie beim Check-in „merken“ ließ — und dann nur die bekannten Spalten.
+- Abrufe nur über https an öffentliche Adressen (dieselbe Prüfung wie beim iCal-Abruf). Die Gästekarte zeigt „Auf anderen Seiten“ (führend: die gemeldeten
+  Aufenthalte; anhängend: live aus der Kartei). Löschen eines Gastes gilt für die Seite, auf der es geschieht. Datenschutz-Hinweis im Admin (gemeinsame Verarbeitung).
 
 ### Check-in, Gästemails, Reinigung (B5)
 
@@ -122,7 +140,8 @@ Nachlass und Annahme über den Link (ohne Token abgewiesen), Ablehnen/Stornieren
 Nächte, eingefügter Kalender sperrt + meldet Überschneidung + neue Fassung ersetzt die alte, nachsichtiges Lesen, Abweisung von http/localhost/127.0.0.1/10.x/::1/169.254.169.254,
 neue Adressen machen die alten ungültig. `BookingB5Tests`: Check-in mit eVisitor-Feldern (Fehler je Person, CSV, PDF, „merken“ füllt den nächsten vor),
 Zugang erst ab dem Vortag, jede Gästemail einmal und nur in ihrem Fenster, Reinigungsliste aus Buchungen + Airbnb samt Teamkalender, Löschfrist.
+`BookingFederationTests` (zwei ganze Seiten in einem Test): Gäste und Aufenthalte wandern, spätere Änderung gewinnt je Feld, führende Seite weg = Buchung geht, Abgleich später, API nur mit Personendaten-Recht und nur auf der führenden Seite, gemerkter Check-in nur mit bekannten Spalten.
 
 ## Nächste Phasen
 
-B6 Kundenverbund (gemeinsame Gäste mehrerer Seiten).
+Online-Zahlung (Stripe/PayPal), Rentlio-API, Gutscheine, Bewertungen auf der Seite; die Verbindung im Verbund per Cloud einrichten (Schlüssel auf Knopfdruck).

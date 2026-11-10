@@ -169,8 +169,10 @@ public static class BookingFlow
         email = B.Clip(email, 200).ToLowerInvariant();
         var row = await t.FindAsync(DataQuery.Everything.Eq("email", email), ct);
         var values = new Dictionary<string, object?> { ["name"] = B.Clip(name, 120), ["phone"] = B.Clip(phone, 60), ["locale"] = B.Clip(locale, 8), ["updated"] = DateTime.UtcNow };
-        if (row is not null) { await t.UpdateAsync(row.Id, values, ct); return row.Id; }
+        // each shared field gets its own time stamp when it changes — the federation's later-change-wins (BookingFederation)
+        if (row is not null) { await t.UpdateAsync(row.Id, BookingFederation.StampLocal(row, values, DateTime.UtcNow), ct); return row.Id; }
         values["email"] = email; values["created"] = DateTime.UtcNow;
+        BookingFederation.StampLocal(null, values, DateTime.UtcNow);
         try { return await t.InsertAsync(values, ct); }
         catch { return (await t.FindAsync(DataQuery.Everything.Eq("email", email), ct))?.Id ?? 0; }      // a parallel request made it first
     }

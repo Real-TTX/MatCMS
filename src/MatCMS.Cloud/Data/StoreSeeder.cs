@@ -8,33 +8,49 @@ namespace MatCMS.Cloud.Data;
 
 /// <summary>
 /// Fills the catalogue with a starter set: blocks, themes and one plugin.
-/// <para>Every entry is added only when its identity is missing, and nothing is ever updated — an
-/// operator who changed a catalogue entry must not find it reset on the next start. That is also why
-/// this is separate from the rest of the seeding: it is CONTENT, and content the operator owns the
-/// moment they touch it.</para>
+/// <para>Every entry is offered ONCE and nothing is ever updated — an operator who changed a catalogue entry must not
+/// find it reset on the next start, and one who DELETED it must not find it back. That is also why this is separate
+/// from the rest of the seeding: it is CONTENT, and content the operator owns the moment they touch it.</para>
+/// <para>"Once" is remembered per entry in the cloud setting <see cref="Services.SettingKeys.StoreSeeded"/>
+/// (<c>component:{type}</c>, <c>template:{name}</c>, <c>plugin:{key}</c>, one per line). It used to be "add when missing",
+/// which put a deleted entry back on every start — the test plugin "Wartungsfenster" returned with each cloud update.
+/// An entry is marked whether it was added now or already there, so a later version can add a NEW starter entry
+/// and it reaches existing clouds once, while the old ones stay as the operator left them. The first start with this
+/// rule still adds what is missing (there is no record of what was deleted before it).</para>
 /// </summary>
 public static class StoreSeeder
 {
     public static async Task SeedAsync(AppDbContext db)
     {
+        var row = await db.CloudSettings.FirstOrDefaultAsync(s => s.Key == Services.SettingKeys.StoreSeeded);
+        var seeded = new HashSet<string>((row?.Value ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            StringComparer.Ordinal);
+        var before = seeded.Count;
+
         foreach (var c in Components())
         {
-            if (await db.StoreComponents.AnyAsync(x => x.Type == c.Type)) continue;
-            db.StoreComponents.Add(c);
+            if (!seeded.Add("component:" + c.Type)) continue;
+            if (!await db.StoreComponents.AnyAsync(x => x.Type == c.Type)) db.StoreComponents.Add(c);
         }
 
         foreach (var t in Templates())
         {
-            if (await db.StoreTemplates.AnyAsync(x => x.Name == t.Name)) continue;
-            db.StoreTemplates.Add(t);
+            if (!seeded.Add("template:" + t.Name)) continue;
+            if (!await db.StoreTemplates.AnyAsync(x => x.Name == t.Name)) db.StoreTemplates.Add(t);
         }
 
         foreach (var p in Plugins())
         {
-            if (await db.StorePlugins.AnyAsync(x => x.Key == p.Key)) continue;
-            db.StorePlugins.Add(p);
+            if (!seeded.Add("plugin:" + p.Key)) continue;
+            if (!await db.StorePlugins.AnyAsync(x => x.Key == p.Key)) db.StorePlugins.Add(p);
         }
 
+        if (seeded.Count != before)
+        {
+            var value = string.Join("\n", seeded.OrderBy(x => x, StringComparer.Ordinal));
+            if (row is null) db.CloudSettings.Add(new CloudSetting { Key = Services.SettingKeys.StoreSeeded, Value = value });
+            else row.Value = value;
+        }
         await db.SaveChangesAsync();
     }
 

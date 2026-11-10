@@ -496,6 +496,11 @@ its layout, CSS or script) and a component its Tabler icon, so a showcase can dr
 plugin (1.2) validates every one of those values before it puts them into a style attribute, and never links the picture address for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
 catalogue, bounded memory cache), so a visitor's browser talks to the website alone.
 
+**The store's starter set is offered ONCE per entry** (`Data/StoreSeeder.cs`, remembered in the CloudSetting `store.seeded`: `component:{type}`,
+`template:{name}`, `plugin:{key}`, one per line; not in the configuration backup). It used to be "add when missing", which put every deleted
+starter entry back on the next start — the test plugin "Wartungsfenster" returned with each cloud update. A new starter entry in a later version
+still reaches existing clouds once; what an operator changed or deleted stays that way (`StoreSeederTests`).
+
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
 rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the
 profile's own items and the ones it takes from the store, with a *Global* / *eigenes* badge in the

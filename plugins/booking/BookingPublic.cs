@@ -80,7 +80,9 @@ public static partial class BookingPublic
         var store = new BookingStore(ctx.Data);
         var unit = await store.UnitBySlugAsync(B.Slug(f.F("einheit")), ct);
         if (unit is null || !unit.Active) return Shell("Anfrage", Back("Bitte eine Unterkunft wählen."));
-        if (B.Day(f.F("anreise")) is not { } arrival || B.Day(f.F("abreise")) is not { } departure) return Shell("Anfrage", Back("Bitte An- und Abreise angeben."));
+        // the date picker posts one field "zeitraum" (YYYY-MM-DD..YYYY-MM-DD); without script the form has the two plain date fields
+        var (rawFrom, rawTo) = f.F("zeitraum").Split("..") is [var zf, var zt] ? (zf, zt) : (f.F("anreise"), f.F("abreise"));
+        if (B.Day(rawFrom) is not { } arrival || B.Day(rawTo) is not { } departure) return Shell("Anfrage", Back("Bitte An- und Abreise angeben."));
         if (arrival < B.Today) return Shell("Anfrage", Back("Die Anreise liegt in der Vergangenheit."));
         var name = B.Clip(f.F("name"), 120);
         var email = B.Clip(f.F("email"), 200);
@@ -251,13 +253,21 @@ public static class BookingCss
 .bk-btn[disabled]{opacity:.5;cursor:not-allowed}
 .bk-muted{color:var(--bk-muted);font-size:.9em}.bk-pre{white-space:pre-line}
 .bk-accept{margin:18px 0}
-.bk-form{display:grid;gap:14px}.bk-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.bk-form label{display:grid;gap:4px;font-size:.92em}.bk-form input,.bk-form select,.bk-form textarea{font:inherit;padding:10px 12px;border:1px solid var(--bk-line);border-radius:8px;background:var(--bk-bg);color:inherit;width:100%;box-sizing:border-box}
-.bk-form .bk-check{display:flex;gap:8px;align-items:flex-start}.bk-form .bk-check input{width:auto;margin-top:3px}
+.bk-form{display:grid;gap:18px;max-width:880px;margin:0 auto}.bk-form .form-field{margin:0}
+.bk-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.bk-row-stay{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
+@media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}}
+.bk-form .bk-check{display:flex;gap:10px;align-items:flex-start;font-size:.95em}.bk-form .bk-check input{width:auto;margin-top:4px;accent-color:var(--bk-accent)}
+.bk-form .bk-btn{padding:14px 28px}
 .bk-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}
 .bk-price{border:1px solid var(--bk-line);border-radius:12px;padding:14px 16px}.bk-price:empty{display:none}
 .bk-price .bk-total{font-size:1.3em;font-weight:700}.bk-price .bk-no{color:#b91c1c}
 .bk-cal{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px}
+.bk-cal-wrap{position:relative;max-width:760px;margin:0 auto}.bk-cal.bk-cal-paged{grid-template-columns:1fr 1fr;gap:28px}.bk-month[hidden]{display:none}
+@media(max-width:640px){.bk-cal.bk-cal-paged{grid-template-columns:1fr}}
+.bk-cal-nav{position:absolute;inset:-4px 0 auto 0;display:flex;justify-content:space-between;pointer-events:none}
+.bk-cal-nav button{pointer-events:auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--bk-line);background:var(--bk-bg);color:inherit;font-size:20px;line-height:1;cursor:pointer}
+.bk-cal-nav button:disabled{opacity:.3;cursor:default}
 .bk-month h3{margin:0 0 8px;font-size:1em;text-align:center}
 .bk-month table{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
 .bk-month th{font-size:.75em;color:var(--bk-muted);font-weight:500}
@@ -266,7 +276,7 @@ public static class BookingCss
 .bk-month td.bk-past{background:transparent;color:var(--bk-muted);opacity:.5}
 .bk-month td.bk-empty{background:transparent}
 .bk-month td.bk-free{cursor:pointer}.bk-month td.bk-sel{background:var(--bk-accent);color:#fff}
-.bk-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.85em;color:var(--bk-muted);margin-top:10px}
+.bk-legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;font-size:.85em;color:var(--bk-muted);margin-top:14px}
 .bk-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .bk-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px}
 .bk-unit{border:1px solid var(--bk-line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;background:var(--bk-bg)}

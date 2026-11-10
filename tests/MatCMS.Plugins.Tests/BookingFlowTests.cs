@@ -196,5 +196,41 @@ public sealed class BookingFlowTests(BookingApp app) : IClassFixture<BookingApp>
         Assert.Contains("<option value=\"apartment-garten\" selected>", html);                    // ?einheit= preselects the unit
         Assert.Contains("name=\"extra_", html);                                                   // the optional pet fee
         Assert.DoesNotContain("Anna Gast", html);                                                 // a calendar shows nights, never guests
+        Assert.Contains("data-dp-busy-url=\"/buchung/belegung?einheit=apartment-garten\"", html); // the form's date field is the site's picker, asking this unit
+        Assert.Contains("name=\"zeitraum\"", html);
+        Assert.Contains("/js/mat-datepicker.js", html);
+    }
+
+    [Fact]
+    public async Task The_date_picker_learns_the_taken_nights_the_least_stay_and_the_arrival_days()
+    {
+        await app.AdminAsync();
+        string Day(int d) => DateTime.UtcNow.Date.AddDays(d).ToString("yyyy-MM-dd");
+        // the picker posts ONE field "zeitraum" — the request takes it as well as the two plain date fields
+        var form = Request("apartment-garten", "", "");
+        form.Remove("anreise"); form.Remove("abreise");
+        form["zeitraum"] = Day(40) + ".." + Day(43);
+        var res = await AskAsync(form);
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+
+        JsonNode Busy(string unit, string from, string to) =>
+            JsonNode.Parse(app.App.Browser().GetStringAsync($"/buchung/belegung?einheit={unit}&von={from}&bis={to}").GetAwaiter().GetResult())!;
+        var garden = Busy("apartment-garten", Day(38), Day(46));
+        var taken = garden["taken"]!.AsArray().Select(x => x!.GetValue<string>()).ToList();
+        Assert.Equal(new[] { Day(40), Day(41), Day(42) }, taken);                     // the nights, not the departure day: someone may arrive on it
+        Assert.Contains(Day(40), Busy("ganze-villa", Day(38), Day(46))["taken"]!.AsArray().Select(x => x!.GetValue<string>()));   // the house contains the apartment
+        Assert.DoesNotContain(Day(40), Busy("apartment-meerblick", Day(38), Day(46))["taken"]!.AsArray().Select(x => x!.GetValue<string>()));
+
+        // the rules of the ARRIVAL night's season: Hauptsaison 2030 for Meerblick = at least 7 nights, arrival on Saturdays only
+        var high = Busy("apartment-meerblick", "2030-07-01", "2030-07-15");
+        Assert.Equal(1, high["minNights"]!.GetValue<int>());
+        Assert.Equal(7, high["min"]!["2030-07-06"]!.GetValue<int>());
+        var noStart = high["noStart"]!.AsArray().Select(x => x!.GetValue<string>()).ToList();
+        Assert.Contains("2030-07-01", noStart);                                             // a Monday
+        Assert.DoesNotContain("2030-07-06", noStart);                                       // a Saturday
+        Assert.Empty(Busy("apartment-meerblick", "2030-07-01", "2030-07-15")["taken"]!.AsArray());
+
+        Assert.Equal(HttpStatusCode.NotFound, (await app.App.Browser().GetAsync("/buchung/belegung?einheit=gibt-es-nicht")).StatusCode);
+        Assert.DoesNotContain("Anna", await app.App.Browser().GetStringAsync($"/buchung/belegung?einheit=apartment-garten&von={Day(38)}&bis={Day(46)}"));
     }
 }

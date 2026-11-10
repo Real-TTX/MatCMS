@@ -3,7 +3,18 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: Phase B6 (0.6) — alle Phasen des Entwurfs gebaut
+## Stand: 0.7 — Zeitraum-Picker statt großer Kalender
+
+- **Das Anfrageformular hat EIN Feld „Anreise – Abreise“**: der Zeitraum-Picker der Website (`mat-datepicker.js`, derselbe wie im Formular-Builder),
+  der über `GET /buchung/belegung?einheit=&von=&bis=` (höchstens 400 Tage, nur Nächte, nie Gäste) lernt, was belegt ist: belegte Nächte durchgestrichen,
+  kein Zeitraum über eine belegte Nacht, die Abreise am Wechseltag möglich, Mindestaufenthalt und Anreisetage aus der Saison der ANREISE-Nacht
+  (wie `Pricing.Calculate`), Pufferstage der Einheit eingerechnet. Das Formular postet `zeitraum=a..b`; ohne Script zwei normale Datumsfelder
+  (`<noscript>`), die Anfrage nimmt beides. Felder im Aussehen des Kontaktformulars (`.form-field` aus site.css).
+- **„Belegungskalender“ kompakt**: zwei Monate nebeneinander (Handy: einer), Pfeile blättern durch bis zu 12.
+- Die Picker-Dateien bindet der Block selbst ein (`/css|js/mat-datepicker.*?v=busy1`). Auf einem älteren Host ohne Belegung im Picker wählt der
+  Gast trotzdem, der Preis darunter sagt „belegt“.
+
+## Stand davor: Phase B6 (0.6) — alle Phasen des Entwurfs gebaut
 
 ### Kundenverbund (B6)
 

@@ -203,7 +203,10 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   from maintenance mode (an ERP sync must keep running). Keys are **not in backups** (a restored copy elsewhere must not accept the live site's ERP).
   The shop's ERP endpoints: `Plugin/Shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
 - **Holiday homes** (`plugins/booking`, native, key `booking`; design `docs/booking-plugin.md`, built in phases B1–B6 — all done, 0.6): houses, units (a "whole house" unit
-  CONTAINS others), seasons with a rank (the higher wins on overlap), rates per unit and season, fees and tourist tax, `GET /buchung/preis`. Money in whole cents,
+  CONTAINS others), seasons with a rank (the higher wins on overlap), rates per unit and season, fees and tourist tax, `GET /buchung/preis`. The request form's dates are ONE field: the site's own date picker (`src/MatCMS/wwwroot/js/mat-datepicker.js`, the form builder's "Anreise–Abreise") with
+  `data-dp-busy-url` → `/buchung/belegung` (taken nights widened by the buffer days, the change-over day allowed as departure, least stay and arrival days of the
+  ARRIVAL night's season) — general picker attributes (`data-dp-min/-max/-min-nights/-busy-url`), not a booking widget; MatUi's daterange picker cannot mark taken
+  days yet, and the public site never loads MatUi anyway. Money in whole cents,
   the server prices (`Pricing.Calculate`, pure). **Availability is a table of nights** with a unique (`unit_id`, `night`) — a stay writes rows for itself and the
   units it CONTAINS, never for the units that contain it (an apartment written onto the house would make the neighbour apartment look taken).
   Every change of a booking's state goes through `BookingFlow.MoveAsync` (`BookingStatus.CanMove` is the only list of moves; freeing nights happens in the same

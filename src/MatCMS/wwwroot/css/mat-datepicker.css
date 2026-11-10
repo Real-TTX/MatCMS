@@ -160,6 +160,25 @@ textarea.mat-input { min-height: 120px; resize: vertical; }
 /* When start and end are the same day, keep the full pill shape. */
 .mat-dp-day.mat-dp-range-start.mat-dp-range-end { border-radius: 8px; }
 
+/* Availability (data-dp-busy-url): a taken night is struck and tinted; a day that cannot be picked now is dimmed;
+   the change-over day (taken, but someone leaves before the next guest arrives) can still be the end. */
+.mat-dp-day:disabled { cursor: default; }
+.mat-dp-day.mat-dp-off { color: color-mix(in srgb, currentColor 35%, transparent); }
+.mat-dp-day.mat-dp-taken {
+    background: color-mix(in srgb, #dc2626 10%, transparent);
+    color: color-mix(in srgb, currentColor 45%, transparent);
+    text-decoration: line-through;
+}
+.mat-dp-day.mat-dp-taken.mat-dp-checkout { text-decoration: none; color: inherit; background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, #dc2626 12%, transparent) 50%); }
+.mat-dp-day.mat-dp-in-range { color: inherit; }   /* inside the range being chosen: never dimmed */
+.mat-dp-day.mat-dp-nostart { color: color-mix(in srgb, currentColor 45%, transparent); }
+.mat-dp-day.mat-dp-taken.mat-dp-selected, .mat-dp-day.mat-dp-checkout.mat-dp-selected { background: var(--accent, #2563eb); color: #fff; text-decoration: none; }
+.mat-dp-info { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 14px; border-top: 1px solid #ececec; font-size: 13px; color: #666; }
+.mat-dp-key { display: inline-flex; align-items: center; gap: 6px; }
+.mat-dp-key-taken { width: 14px; height: 14px; border-radius: 4px; background: color-mix(in srgb, #dc2626 14%, transparent); }
+.mat-dp-loading { color: #999; }
+.mat-dp-nav:disabled { opacity: .3; cursor: default; }
+
 /* Flexible-date options (booking-style): "Genaue Zeitangabe" + ± N days chips. */
 .mat-dp-flex { padding: 10px 14px 12px; border-top: 1px solid #ececec; }
 .mat-dp-flex-title { font-size: 12px; color: #888; margin-bottom: 8px; }

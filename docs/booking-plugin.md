@@ -95,8 +95,9 @@ Buchungsnummern sind lückenlos (`NextNumberAsync`), z. B. `2027-0042`.
 
 ## 6. Website (öffentlich)
 
-- **Blöcke**: „Belegungskalender“ (eine Einheit oder alle, 1–12 Monate, Saisonfarben, freie/belegte/An-/Abreisetage halb), „Buchungsanfrage“ (Formular mit
-  Live-Preis, vorbelegbar mit einer Einheit), „Unterkünfte“ (Karten aller Einheiten mit „ab … € / Nacht“), „Preise“ (Tabelle Saisons × Einheiten).
+- **Blöcke**: „Belegungskalender“ (eine Einheit, zwei Monate zum Blättern), „Buchungsanfrage“ (Formular mit
+  Live-Preis, vorbelegbar mit einer Einheit; der Zeitraum ist EIN Feld — der Zeitraum-Picker der Website mit `data-dp-busy-url` auf
+  `/buchung/belegung`: belegte Nächte gesperrt, Wechseltag als Abreise, Mindestaufenthalt/Anreisetage der Anreise-Saison, 0.7), „Unterkünfte“ (Karten aller Einheiten mit „ab … € / Nacht“), „Preise“ (Tabelle Saisons × Einheiten).
 - **Seiten** als Block-Seiten (`PageRole`, wie der Shop): Einheit (`/unterkunft/{slug}`), Anfrage, Gastseite. Ohne angelegte Seite zeichnet das Plugin
   ein Template-Teil (`booking-unit.html` …) — theme-bar über die Variablen der Seite (`--accent` …), keine festen Farben.
 - **Sprachen**: Gäste kommen von überall — Texte des Plugins in de/en/hr/it (`Strings`), Inhalte (Einheitentexte) über die Sprachen der Seite;

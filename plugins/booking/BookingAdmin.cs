@@ -30,7 +30,7 @@ public static class BookingAdmin
             .Link("Kanäle", "channels", "ti-arrows-exchange")
             .Link("Meldungen", "checkins", "ti-id", also: new[] { "checkins/" })
             .Link("Reinigung", "cleaning", "ti-wash-machine", also: new[] { "cleaning/" })
-            .Link("Kundenverbund", "federation", "ti-affiliate")
+            .Link("Verbund", "federation", "ti-affiliate", also: new[] { "federation/" })
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })

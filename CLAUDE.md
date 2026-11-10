@@ -216,7 +216,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   that way for any new outgoing fetch; a feed's blocks are replaced in one transaction and never overwrite a night taken here (conflict note instead).
   Guest mails (`BookingGuestMails`) go at most once per booking: the key is written to `bookings.mails` BEFORE sending. The way in (code, Wi-Fi) is never shown or
   mailed before the day before arrival. Registration data (`travellers`) is deleted after the retention period; it reaches the guest card only when the guest ticks "merken".
-  The guest-card federation (`BookingFederation`, B6): one site LEADS (its guests behind `/api/v1/booking/guests` + `stays`, right `booking:personal`,
+  The federation ("Verbund", `BookingFederation`, B6 + B7a): one site is the CENTRAL site (role `lead`; B7a: its Verbund page lists the open requests and bookings of ALL houses from the mirror `remote_stays`, a house's booking opens in that house's own admin; a house pushes at once after every booking-changing POST through `BookingFederation.Pushing`, the job is the fallback) and LEADS (its guests behind `/api/v1/booking/guests` + `stays`, right `booking:personal`,
   any other role answers 409), others ATTACH with its address + key and keep a COPY. Every shared guest field has its own time stamp (`guests.stamps`) — a
   local write must go through `BookingFederation.StampLocal` or its change loses against an older one. The queue is "changed since the last SUCCESSFUL run"
   (`updated` on guests/bookings, watermark `fed.pushed`), so a merge taken FROM the leader must not touch `updated` on the attached site. Only stay summaries

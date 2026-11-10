@@ -145,7 +145,7 @@ Aufenthalte, Umsatz, Stammgast-Merker.
   Die Seite holt nur Karten der Gäste, die sie selbst kennt. Ein Gast wird auf der Seite gelöscht, auf der man es tut (die Kartei behält ihn, bis man ihn dort löscht).
 - Das Muster (eine Seite führt, andere hängen per Schlüssel an) ist absichtlich allgemein — der Shop kann es später für gemeinsame Kunden übernehmen.
 
-### 8a. Verbund mit Zentrale (B7 — Entwurf, 10.11.2026)
+### 8a. Verbund mit Zentrale (B7 — Entwurf 10.11.2026; B7a gebaut, 0.11)
 
 Matthias, 10.11.: *„Kundenverbund wird zu ‚Verbund'. Es sollen nicht nur Kunden, sondern auch Anfragen und Antworten über eine Oberfläche möglich
 sein, dass man quasi EIN DASHBOARD hat."* Entschieden: **in MatCMS, im Buchungs-Plugin** — kein eigenes Programm (Preise, Belegung, Ablauf, iCal,

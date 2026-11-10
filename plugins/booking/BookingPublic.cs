@@ -15,8 +15,8 @@ public static partial class BookingPublic
     public static void Configure(IPluginBuilder b)
     {
         // an anonymous form with nothing to forge: no token (a block cannot carry one), rate-limited by the host (20 a minute per address, like a contact form) and with a honeypot
-        b.Route(RequestPath, RequestAsync, new PublicRouteOptions { Methods = PluginMethod.Post });
-        b.Route(BookingFlow.GuestPath + "{key}", GuestAsync, new PublicRouteOptions { Antiforgery = true });
+        b.Route(RequestPath, BookingFederation.Pushing(RequestAsync), new PublicRouteOptions { Methods = PluginMethod.Post });   // a request reaches the central inbox at once
+        b.Route(BookingFlow.GuestPath + "{key}", BookingFederation.Pushing(GuestAsync), new PublicRouteOptions { Antiforgery = true });
         b.Route(BookingFlow.GuestPath + "{key}/pdf", GuestPdfAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
         b.Route(BookingFlow.GuestPath + "{key}/checkin", CheckinAsync, new PublicRouteOptions { Antiforgery = true });
     }

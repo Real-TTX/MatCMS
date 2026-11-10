@@ -13,8 +13,8 @@ public static class BookingAdminBookings
 
     public static IAdminSection Register(IAdminSection s) => s
         .Page("bookings", null, ListAsync)
-        .Page("bookings/new", null, NewAsync)
-        .Page("bookings/{id}", null, DetailAsync)
+        .Page("bookings/new", null, BookingFederation.Pushing(NewAsync))
+        .Page("bookings/{id}", null, BookingFederation.Pushing(DetailAsync))
         .Page("bookings/{id}/pdf", null, PdfAsync);
 
     private static async Task<PluginResult> PdfAsync(IPluginContext ctx, CancellationToken ct)

@@ -56,6 +56,8 @@ public sealed class BookingStore(IPluginData data)
         // the leading site of a federation (BookingFederation): the stays the attached sites reported, as summaries — no registration data
         b.Table(TRemoteStays, t => t.Text("site", required: true).Text("site_name").Text("ref", required: true).Text("email").Text("name").Text("number")
             .Text("property").Text("unit").Text("arrival").Text("departure").Text("status").Int("total", def: "0").Text("currency").Timestamp("updated")
+            // B7a: what the central site's inbox shows of a request on another house (never the people of a stay)
+            .Text("phone").Int("adults", def: "0").Int("children", def: "0").Text("message").Text("hold_until").Text("offer_until").Text("created").Text("origin")
             .UniqueIndex("site", "ref").Index("email"));
         // the people of a stay with what the authorities want to know (the fields depend on the country of the house — BookingCheckin.Profiles);
         // deleted by a job after the retention period, the booking stays

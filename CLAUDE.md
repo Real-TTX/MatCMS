@@ -202,7 +202,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   The handler never sees the key — only its name (`RequestData.ApiCaller`), which goes into history as `api:{name}`. Antiforgery off, the route is exempt
   from maintenance mode (an ERP sync must keep running). Keys are **not in backups** (a restored copy elsewhere must not accept the live site's ERP).
   The shop's ERP endpoints: `Plugin/Shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
-- **Holiday homes** (`plugins/booking`, native, key `booking`; design `docs/booking-plugin.md`, built in phases B1–B6 — B1–B4 done): houses, units (a "whole house" unit
+- **Holiday homes** (`plugins/booking`, native, key `booking`; design `docs/booking-plugin.md`, built in phases B1–B6 — B1–B5 done): houses, units (a "whole house" unit
   CONTAINS others), seasons with a rank (the higher wins on overlap), rates per unit and season, fees and tourist tax, `GET /buchung/preis`. Money in whole cents,
   the server prices (`Pricing.Calculate`, pure). **Availability is a table of nights** with a unique (`unit_id`, `night`) — a stay writes rows for itself and the
   units it CONTAINS, never for the units that contain it (an apartment written onto the house would make the neighbour apartment look taken).
@@ -211,6 +211,8 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   runs with invariant globalization, where "de-DE" silently formats English. iCal (`BookingIcal`): a portal's own export token leaves out the nights that portal sent;
   feeds are fetched ONLY over https to PUBLIC addresses, checked on the resolved IP inside `SocketsHttpHandler.ConnectCallback` (not before — DNS can change) — keep it
   that way for any new outgoing fetch; a feed's blocks are replaced in one transaction and never overwrite a night taken here (conflict note instead).
+  Guest mails (`BookingGuestMails`) go at most once per booking: the key is written to `bookings.mails` BEFORE sending. The way in (code, Wi-Fi) is never shown or
+  mailed before the day before arrival. Registration data (`travellers`) is deleted after the retention period; it reaches the guest card only when the guest ticks "merken".
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every

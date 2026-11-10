@@ -3,7 +3,28 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: Phase B4 (0.4)
+## Stand: Phase B5 (0.5)
+
+### Check-in, Gästemails, Reinigung (B5)
+
+- **Online-Check-in** `/buchung/gast/{schlüssel}/checkin` (bestätigte Buchung, bis zur Anreise änderbar): je Person die Felder des Landes — Kroatien/eVisitor
+  (Geschlecht, Wohnland/-ort, Ausweis), Deutschland/Österreich/Meldeschein (Adresse des Hauptgastes), Italien/Alloggiati (Geburtsort, Ausweis), sonst „einfach“;
+  Einstellung „Meldedaten“ (nach Land oder fest). Dazu Ankunftszeit und Anreise (Auto/Kennzeichen …). „Für meinen nächsten Aufenthalt merken“ legt die Angaben
+  — und NUR dann — in die Gästekarte (`guests.checkin`), der nächste Check-in ist vorausgefüllt.
+- **Admin**: Karte „Online-Check-in“ an der Buchung (Personen, Ankunft, CSV, Meldeschein-PDF, gesendete Gästemails), Seite **Meldungen** (Anreisen eines Zeitraums mit
+  Check-in-Stand, alle als CSV für die Meldung). Formelschutz in jeder CSV.
+- **Löschfrist**: täglicher Job löscht die Personen-Angaben N Monate nach der Abreise (Einstellung, Standard 12) — die Buchung bleibt, im Verlauf steht es.
+- **Gästeseite**: Karte „Online-Check-in“ (Knopf/erledigt) und „Ihre Anreise“: Anfahrt und Hausregeln immer, **Zugang (Code/Schlüsselbox) und WLAN erst ab dem Tag vor der Anreise**.
+- **Gästemails** (Job stündlich, je Buchung jede höchstens EINMAL — die Schlüssel in `bookings.mails` werden VOR dem Senden geschrieben; einzeln abschaltbar;
+  eine abgeschaltete gilt als erledigt, Einschalten schickt nichts Altes nach): Check-in-Link N Tage vorher (mit Anfahrt, Hausregeln), Zugang + WLAN am Tag davor,
+  Abreise-Hinweise am Abreisetag ab 7 Uhr, Danke (mit Bewertungslink, wenn eingestellt) 2–14 Tage danach. `BookingGuestMails.Due` ist die reine Regel.
+- **Reinigung**: die Wechselliste ergibt sich aus den belegten Nächten — eine Buchung ODER Portal-Reservierung, die an einem Tag endet, ist eine Reinigung
+  (Eigennutzung/Renovierung nicht; die „ganze Villa“ wird als ihre Apartments gereinigt). Mit nächster Anreise (Personen, Extras), „Wechsel bis 15:00“ bei
+  Anreise am selben Tag, Zuständige (Einstellung, ein Name je Zeile), Erledigt, PDF mit den Checklisten der Einheiten, geheimer Kalender fürs Team
+  (`/buchung/reinigung/{token}.ics`, ohne Gästenamen).
+- Neu an Objekt/Einheit: Anfahrt, Hausregeln, Hinweise zur Abreise; Zugang, WLAN, Reinigungs-Checkliste.
+
+## Stand davor: Phase B4 (0.4)
 
 ### Kalender-Abgleich mit den Portalen (B4)
 
@@ -99,8 +120,9 @@ Nachlass und Annahme über den Link (ohne Token abgewiesen), Ablehnen/Stornieren
 `BookingB3Tests`: Anzahlung aufgerundet + Rest, Zahlungen → angezahlt/bezahlt, kurzfristig = alles sofort, Erinnerung genau einmal, PDF für Admin und Gast
 (nicht vor der Bestätigung), Gästekartei und Löschen, Belegungsplan. `BookingIcalTests`: Ausgang ohne Gastdaten, Portal-Adresse ohne seine eigenen
 Nächte, eingefügter Kalender sperrt + meldet Überschneidung + neue Fassung ersetzt die alte, nachsichtiges Lesen, Abweisung von http/localhost/127.0.0.1/10.x/::1/169.254.169.254,
-neue Adressen machen die alten ungültig.
+neue Adressen machen die alten ungültig. `BookingB5Tests`: Check-in mit eVisitor-Feldern (Fehler je Person, CSV, PDF, „merken“ füllt den nächsten vor),
+Zugang erst ab dem Vortag, jede Gästemail einmal und nur in ihrem Fenster, Reinigungsliste aus Buchungen + Airbnb samt Teamkalender, Löschfrist.
 
 ## Nächste Phasen
 
-B5 Online-Check-in, Mails, Reinigung · B6 Kundenverbund.
+B6 Kundenverbund (gemeinsame Gäste mehrerer Seiten).

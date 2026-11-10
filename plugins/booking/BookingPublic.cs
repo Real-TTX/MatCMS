@@ -18,6 +18,46 @@ public static partial class BookingPublic
         b.Route(RequestPath, RequestAsync, new PublicRouteOptions { Methods = PluginMethod.Post });
         b.Route(BookingFlow.GuestPath + "{key}", GuestAsync, new PublicRouteOptions { Antiforgery = true });
         b.Route(BookingFlow.GuestPath + "{key}/pdf", GuestPdfAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
+        b.Route(BookingFlow.GuestPath + "{key}/checkin", CheckinAsync, new PublicRouteOptions { Antiforgery = true });
+    }
+
+    /// <summary>The online check-in behind the guest's link: only for a confirmed stay that has not ended; may be corrected until the day of arrival.</summary>
+    private static async Task<PluginResult> CheckinAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var key = ctx.Request.R("key");
+        var b = await BookingFlow.ByKeyAsync(ctx.Data, key, ct);
+        if (b is null) return PluginResult.NotFound();
+        var back = BookingFlow.GuestPath + key;
+        if (b.Status != BookingStatus.Confirmed || b.Departure < B.Today) return PluginResult.Redirect(back);
+        var store = new BookingStore(ctx.Data);
+        var unit = await store.UnitAsync(b.UnitId, ct);
+        var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);
+        var profile = BookingCheckin.ProfileFor(ctx, house);
+        var count = Math.Max(1, b.Adults + b.Children);
+        var row = await ctx.Data.Table(BookingStore.TBookings).GetAsync(b.Id, ct);
+        string? problem = null;
+        if (ctx.Request.IsPost && ctx.Request.Action == "checkin")
+        {
+            if (b.Arrival < B.Today) return PluginResult.Redirect(back);                       // after arrival the host has the list; no more changes
+            var (people, err) = BookingCheckin.Read(ctx.Request, profile, count);
+            if (err is null)
+            {
+                await BookingCheckin.SaveAsync(ctx.Data, b, people, BookingCheckin.ArrivalTimes.Contains(ctx.Request.F("arrival_time")) ? ctx.Request.F("arrival_time") : "",
+                    ctx.Request.F("travel"), B.Checked(ctx.Request.F("remember")), ct);
+                return PluginResult.Redirect(back + "?checkin=1");
+            }
+            problem = err;
+        }
+        var prefill = await BookingCheckin.TravellersAsync(ctx.Data, b.Id, ct);
+        if (prefill.Count == 0) prefill = await BookingCheckin.RememberedAsync(ctx.Data, b.GuestId, ct);
+        if (problem is not null) prefill = Enumerable.Range(0, count).Select(i => new Traveller(i,
+            BookingCheckin.FieldsOf(profile, i).ToDictionary(k => k, k => ctx.Request.F("t" + i + "_" + k)))).ToList();
+        var body = "<p class=\"bk-kicker\">" + B.H(house?.Name ?? ctx.Site.Name) + " · Nr. " + B.H(b.Number) + "</p><h1>Online-Check-in</h1>"
+            + "<p>" + B.H(unit?.Name ?? "") + ", " + B.Date(b.Arrival) + " – " + B.Date(b.Departure) + ". Bitte für jede Person ausfüllen – wir sind gesetzlich verpflichtet, "
+            + "unsere Gäste zu melden. Die Angaben gehen nur an uns und werden nach der gesetzlichen Frist gelöscht.</p>"
+            + BookingCheckin.Form(profile, count, prefill, row?.Text("arrival_time") ?? "", row?.Text("travel") ?? "", ctx.Antiforgery, problem)
+            + "<p><a href=\"" + B.H(back) + "\">Zurück zur Buchung</a></p>";
+        return Shell("Online-Check-in", body);
     }
 
     private static readonly KeyValuePair<string, string>[] NoIndex = { new("robots", "noindex, nofollow") };
@@ -138,6 +178,34 @@ public static partial class BookingPublic
             if (ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
                 sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">Verwendungszweck: ").Append(B.H(b.Number)).Append("</p>");
             sb.Append("<p><a class=\"bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">Buchungsbestätigung (PDF)</a></p></div>");
+
+            if (b.Departure >= B.Today)
+            {
+                var row = await ctx.Data.Table(BookingStore.TBookings).GetAsync(b.Id, ct);
+                var done = row?.Timestamp("checkin_at") is not null;
+                sb.Append("<div class=\"bk-card\"><h2>Online-Check-in</h2>");
+                if (ctx.Request.Q("checkin") == "1") sb.Append("<p class=\"bk-status bk-status-confirmed\">Danke! Ihr Check-in ist bei uns angekommen.</p>");
+                sb.Append(done ? "<p>Erledigt" + (row!.Text("arrival_time") is { Length: > 0 } at ? " – Ankunft " + B.H(at) : "") + ".</p>" : "<p>Bitte vor der Anreise die Angaben aller Personen eintragen.</p>");
+                if (b.Arrival >= B.Today)
+                    sb.Append("<p><a class=\"bk-btn").Append(done ? " bk-btn-ghost" : "").Append("\" href=\"").Append(B.H(self + "/checkin")).Append("\">")
+                      .Append(done ? "Angaben ändern" : "Jetzt einchecken").Append("</a></p>");
+                sb.Append("</div>");
+
+                // how to get there and in: directions and rules always; the way in (code, key box) and the Wi-Fi only from the day before arrival
+                var near = B.Today >= b.Arrival.AddDays(-1);
+                var parts = new List<(string, string)>();
+                if (house?.Directions is { Length: > 0 } dir) parts.Add(("Anfahrt", dir));
+                if (near && unit?.AccessInfo is { Length: > 0 } acc) parts.Add(("Zugang", acc));
+                if (near && unit?.Wifi is { Length: > 0 } wifi) parts.Add(("WLAN", wifi));
+                if (house?.HouseRules is { Length: > 0 } rules) parts.Add(("Hausregeln", rules));
+                if (parts.Count > 0 || unit?.AccessInfo is { Length: > 0 } || unit?.Wifi is { Length: > 0 })
+                {
+                    sb.Append("<div class=\"bk-card\"><h2>Ihre Anreise</h2>");
+                    foreach (var (h, text) in parts) sb.Append("<h3>").Append(B.H(h)).Append("</h3><p class=\"bk-pre\">").Append(B.H(text)).Append("</p>");
+                    if (!near && unit?.AccessInfo is { Length: > 0 }) sb.Append("<p class=\"bk-muted\">Den Zugang (Schlüssel/Code) und das WLAN finden Sie hier ab dem Tag vor Ihrer Anreise.</p>");
+                    sb.Append("</div>");
+                }
+            }
         }
         sb.Append("<p class=\"bk-muted\">Diese Seite ist nur über den Link in Ihrer E-Mail erreichbar. Fragen? Antworten Sie einfach auf unsere E-Mail.</p>");
         return Shell(title, sb.ToString());

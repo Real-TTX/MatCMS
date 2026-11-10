@@ -25,6 +25,9 @@ public sealed class BookingApp : IDisposable
 
     public async Task<HttpClient> AdminAsync()
     {
+        // the host's limit on anonymous plugin POSTs is per process and address — every test server here is ONE address, and the booking
+        // test classes together send more than 20 a minute (the other site tests reset it the same way)
+        PluginPostLimiter.Reset();
         await _gate.WaitAsync();
         try
         {

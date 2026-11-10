@@ -259,8 +259,9 @@ public static class BookingAdminBookings
                     Ui.FormActions(Ui.Submit("Zahlung eintragen", UiButtonKind.Ghost, "action", "pay", icon: "ti-cash"))),
                 Ui.Button("Buchungsbestätigung (PDF)", self + "/pdf", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)));
         }
+        var checkin = await BookingAdminCheckins.CardAsync(ctx, b, ct);
         var history = Ui.Card("Verlauf", Ui.Table(new[] { Ui.Column("Wann"), Ui.Column("Was") },
             b.History.AsEnumerable().Reverse().Select(h => Ui.Row(BookingMail.Local(h.At), h.Text)), emptyText: "–"));
-        return PluginResult.Page(Ui.Stack(head, Ui.Columns(new UiNode?[] { facts, guest, history }, new UiNode?[] { payments }.Concat(steps))), "Buchung " + b.Number);
+        return PluginResult.Page(Ui.Stack(head, Ui.Columns(new UiNode?[] { facts, checkin, guest, history }, new UiNode?[] { payments }.Concat(steps))), "Buchung " + b.Number);
     }
 }

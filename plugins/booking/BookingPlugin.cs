@@ -34,11 +34,17 @@ public sealed class BookingPlugin : IPlugin
             .Text(PrivacyKey, "Datenschutzerklärung", "/datenschutz", "Die Seite, auf die das Anfrageformular verweist.");
         BookingPayments.Declare(b.Settings);
         BookingPrint.Declare(b.Settings);
-        foreach (var spec in BookingMail.Specs) b.MailTemplate(spec);
+        BookingCheckin.Declare(b.Settings);
+        BookingGuestMails.Declare(b.Settings);
+        BookingCleaning.Declare(b.Settings);
+        foreach (var spec in BookingMail.Specs.Concat(BookingGuestMails.Specs)) b.MailTemplate(spec);
         BookingAdmin.Configure(b);
         BookingPublic.Configure(b);
         BookingBlocks.Configure(b);
         BookingIcal.Configure(b);
+        BookingCleaning.Configure(b);
+        b.Job("guest-mails", JobSchedule.EveryInterval(TimeSpan.FromHours(1)), BookingGuestMails.RunAsync);
+        b.Job("checkin-purge", JobSchedule.EveryInterval(TimeSpan.FromHours(24)), async (ctx, ct) => await BookingCheckin.PurgeAsync(ctx, ct));
 
         // what nobody answered in time runs out and frees the calendar; the guest is told
         b.Job("expire", JobSchedule.EveryInterval(TimeSpan.FromMinutes(15)), async (ctx, ct) =>

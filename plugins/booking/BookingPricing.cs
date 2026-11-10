@@ -1,14 +1,16 @@
 namespace MatCMS.Plugin.Booking;
 
 /// <summary>A house (villa, holiday home). A site usually has one; it may have several.</summary>
-public sealed record Property(long Id, string Name, string Slug, string Address, string Country, string CheckIn, string CheckOut, string Description, int Sort);
+public sealed record Property(long Id, string Name, string Slug, string Address, string Country, string CheckIn, string CheckOut, string Description, int Sort,
+    string Directions = "", string HouseRules = "", string CheckoutInfo = "");
 
 /// <summary>
 /// What is booked: an apartment, a room or the whole house. <see cref="Contains"/> lists the units a "whole house" consists of — booking it occupies
 /// them, booking one of them occupies the house. Prices outside every season: <see cref="BasePrice"/> (cents per night) and <see cref="BaseMinNights"/>.
 /// </summary>
 public sealed record Unit(long Id, long PropertyId, string Name, string Slug, string Description, string Image, int Bedrooms, int GuestsStd, int GuestsMax,
-    IReadOnlyList<long> Contains, int BufferDays, long BasePrice, int BaseMinNights, long ExtraPerson, int Sort, bool Active);
+    IReadOnlyList<long> Contains, int BufferDays, long BasePrice, int BaseMinNights, long ExtraPerson, int Sort, bool Active,
+    string AccessInfo = "", string Wifi = "", string Checklist = "");
 
 /// <summary>A named period of a house, from and to INCLUSIVE (nights). Overlaps are allowed: the higher rank wins (Silvester inside the low season).</summary>
 public sealed record Season(long Id, long PropertyId, string Name, DateOnly From, DateOnly To, int Rank, string Color)

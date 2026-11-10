@@ -19,16 +19,16 @@ public sealed class UnavailableException(string message) : Exception(message);
 public sealed class BookingStore(IPluginData data)
 {
     public const string TProperties = "properties", TUnits = "units", TSeasons = "seasons", TRates = "rates", TFees = "fees", TNights = "nights",
-        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments", TFeeds = "feeds";
+        TBlocks = "blocks", TBookings = "bookings", TMeta = "meta", TGuests = "guests", TSequences = "sequences", TKeys = "keys", TPayments = "payments", TFeeds = "feeds", TTravellers = "travellers", TTasks = "tasks";
 
     public static void Declare(IDataBuilder b)
     {
         b.Table(TProperties, t => t.Text("name", required: true).Text("slug", required: true).Text("address").Text("country").Text("check_in").Text("check_out")
-            .Text("description").Int("sort", def: "0").UniqueIndex("slug"));
+            .Text("description").Int("sort", def: "0").Text("directions").Text("house_rules").Text("checkout_info").UniqueIndex("slug"));
         b.Table(TUnits, t => t.Int("property_id", required: true).Text("name", required: true).Text("slug", required: true).Text("description").Text("image")
             .Int("bedrooms", def: "0").Int("guests_std", def: "2").Int("guests_max", def: "2").Text("contains").Int("buffer_days", def: "0")
             .Int("base_price", def: "0").Int("base_min_nights", def: "1").Int("extra_person", def: "0").Int("sort", def: "0").Bool("active", def: "1")
-            .Text("ical_token").UniqueIndex("slug").Index("property_id"));
+            .Text("ical_token").Text("access_info").Text("wifi").Text("checklist").UniqueIndex("slug").Index("property_id"));
         b.Table(TSeasons, t => t.Int("property_id", required: true).Text("name", required: true).Text("from_day", required: true).Text("to_day", required: true)
             .Int("rank", def: "1").Text("color").Index("property_id"));
         b.Table(TRates, t => t.Int("unit_id", required: true).Int("season_id", required: true).Int("price", def: "0").Int("min_nights", def: "1")
@@ -49,10 +49,16 @@ public sealed class BookingStore(IPluginData data)
         b.Table(TBookings, t => t.Text("number").Int("unit_id", required: true).Int("guest_id", def: "0").Text("arrival", required: true).Text("departure", required: true)
             .Int("adults", def: "1").Int("children", def: "0").Text("extras").Text("status", required: true).Text("source").Json("quote").Int("total", def: "0")
             .Text("name").Text("email").Text("phone").Text("message").Text("host_note").Text("locale")
-            .Timestamp("hold_until").Timestamp("offer_until").Timestamp("confirmed_at").Timestamp("reminded_deposit").Timestamp("reminded_rest").Timestamp("created").Timestamp("updated").Json("history")
+            .Timestamp("hold_until").Timestamp("offer_until").Timestamp("confirmed_at").Timestamp("reminded_deposit").Timestamp("reminded_rest").Timestamp("checkin_at").Text("arrival_time").Text("travel").Text("mails").Timestamp("created").Timestamp("updated").Json("history")
             .Index("unit_id").Index("status").Index("arrival").Index("guest_id"));
         b.Table(TGuests, t => t.Text("name").Text("email", required: true).Text("phone").Text("country").Text("locale").Text("note")
-            .Timestamp("created").Timestamp("updated").UniqueIndex("email"));
+            .Json("checkin").Timestamp("created").Timestamp("updated").UniqueIndex("email"));
+        // the people of a stay with what the authorities want to know (the fields depend on the country of the house — BookingCheckin.Profiles);
+        // deleted by a job after the retention period, the booking stays
+        b.Table(TTravellers, t => t.Int("booking_id", required: true).Int("idx", def: "0").Text("first").Text("last").Text("gender").Text("born").Text("birthplace")
+            .Text("nationality").Text("doc_type").Text("doc_no").Text("street").Text("zip").Text("city").Text("res_country").Timestamp("created").Index("booking_id"));
+        // the cleaning of a unit on a day: who does it, whether it is done — the list itself is derived from the bookings (BookingCleaning)
+        b.Table(TTasks, t => t.Int("unit_id", required: true).Text("day", required: true).Text("assignee").Timestamp("done_at").Text("note").UniqueIndex("unit_id", "day"));
         // the guest's secret links, as hashes. Each mail may carry a fresh one (only a hash is kept, so an old one cannot be sent again); all stay valid
         b.Table(TKeys, t => t.Int("booking_id", required: true).Text("hash", required: true).Timestamp("created").UniqueIndex("hash").Index("booking_id"));
         b.Table(TPayments, t => t.Int("booking_id", required: true).Int("amount", required: true).Text("day", required: true).Text("method").Text("note")
@@ -71,10 +77,11 @@ public sealed class BookingStore(IPluginData data)
         csv.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => int.TryParse(x, NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : 0).Where(v => v is >= 1 and <= 7).Distinct().OrderBy(v => v).ToList();
     private static int I(DataRow r, string c) => (int)Math.Clamp(r.Int(c), int.MinValue, int.MaxValue);
 
-    private static Property P(DataRow r) => new(r.Id, r.Text("name"), r.Text("slug"), r.Text("address"), r.Text("country"), r.Text("check_in"), r.Text("check_out"), r.Text("description"), I(r, "sort"));
+    private static Property P(DataRow r) => new(r.Id, r.Text("name"), r.Text("slug"), r.Text("address"), r.Text("country"), r.Text("check_in"), r.Text("check_out"), r.Text("description"), I(r, "sort"),
+        r.Text("directions"), r.Text("house_rules"), r.Text("checkout_info"));
     private static Unit U(DataRow r) => new(r.Id, r.Int("property_id"), r.Text("name"), r.Text("slug"), r.Text("description"), r.Text("image"), I(r, "bedrooms"),
         Math.Max(1, I(r, "guests_std")), Math.Max(1, I(r, "guests_max")), Ids(r.Text("contains")), Math.Max(0, I(r, "buffer_days")), r.Int("base_price"),
-        Math.Max(1, I(r, "base_min_nights")), r.Int("extra_person"), I(r, "sort"), r.Bool("active"));
+        Math.Max(1, I(r, "base_min_nights")), r.Int("extra_person"), I(r, "sort"), r.Bool("active"), r.Text("access_info"), r.Text("wifi"), r.Text("checklist"));
     private static Season? S(DataRow r) => B.Day(r.Text("from_day")) is { } f && B.Day(r.Text("to_day")) is { } t
         ? new Season(r.Id, r.Int("property_id"), r.Text("name"), f, t, I(r, "rank"), r.Text("color")) : null;
     private static Rate R(DataRow r) => new(r.Id, r.Int("unit_id"), r.Int("season_id"), r.Int("price"), Math.Max(1, I(r, "min_nights")), Days(r.Text("arrival_days")), r.Int("week_price"), r.Int("extra_person"));

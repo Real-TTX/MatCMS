@@ -28,6 +28,8 @@ public static class BookingAdmin
             .Link("Belegungsplan", "plan", "ti-layout-kanban")
             .Link("Gäste", "guests", "ti-address-book", also: new[] { "guests/" })
             .Link("Kanäle", "channels", "ti-arrows-exchange")
+            .Link("Meldungen", "checkins", "ti-id", also: new[] { "checkins/" })
+            .Link("Reinigung", "cleaning", "ti-wash-machine", also: new[] { "cleaning/" })
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })
@@ -38,6 +40,8 @@ public static class BookingAdmin
         BookingAdminBookings.Register(section);
         BookingAdminMore.Register(section);
         BookingAdminChannels.Register(section);
+        BookingAdminCheckins.Register(section);
+        BookingCleaning.Register(section);
     }
 
     private static long Id(IPluginContext ctx) => long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? id : 0;
@@ -125,7 +129,8 @@ public static class BookingAdmin
                 ["name"] = name, ["slug"] = await store.FreeSlugAsync(BookingStore.TProperties, p?.Slug ?? name, p?.Id ?? 0, ct),
                 ["address"] = B.Clip(ctx.Request.F("address"), 300), ["country"] = B.Clip(ctx.Request.F("country"), 2).ToUpperInvariant(),
                 ["check_in"] = B.Clip(ctx.Request.F("check_in"), 5), ["check_out"] = B.Clip(ctx.Request.F("check_out"), 5),
-                ["description"] = B.Clip(ctx.Request.F("description"), 4000), ["sort"] = Int(ctx.Request.F("sort"), 0, -999, 999)
+                ["description"] = B.Clip(ctx.Request.F("description"), 4000), ["sort"] = Int(ctx.Request.F("sort"), 0, -999, 999),
+                ["directions"] = B.Clip(ctx.Request.F("directions"), 4000), ["house_rules"] = B.Clip(ctx.Request.F("house_rules"), 4000), ["checkout_info"] = B.Clip(ctx.Request.F("checkout_info"), 2000)
             };
             var id = p?.Id ?? 0;
             if (p is null) id = await store.Properties.InsertAsync(values, ct); else await store.Properties.UpdateAsync(p.Id, values, ct);
@@ -138,7 +143,11 @@ public static class BookingAdmin
                 Ui.Select("country", "Land", p?.Country ?? "HR", Countries.Select(c => Ui.Option(c.Code, c.Name)).ToArray()),
                 Ui.Input("check_in", "Check-in ab", p?.CheckIn ?? "15:00"), Ui.Input("check_out", "Check-out bis", p?.CheckOut ?? "10:00"),
                 Ui.Input("sort", "Reihenfolge", B.Num(p?.Sort ?? 0), UiInputType.Number)),
-            Ui.TextArea("description", "Beschreibung (intern, für die Gästemails später)", p?.Description ?? "", 4),
+            Ui.TextArea("description", "Beschreibung (intern)", p?.Description ?? "", 3),
+            Ui.Heading("Für die Gäste", 3),
+            Ui.TextArea("directions", "Anfahrt", p?.Directions ?? "", 4) with { Help = "Steht in der Mail mit dem Check-in-Link (einige Tage vor Anreise) und auf der Seite des Gastes." },
+            Ui.TextArea("house_rules", "Hausregeln", p?.HouseRules ?? "", 4),
+            Ui.TextArea("checkout_info", "Hinweise zur Abreise", p?.CheckoutInfo ?? "", 3) with { Help = "Schlüssel, Müll, Geschirr … – Mail am Morgen des Abreisetags." },
             Ui.FormActions(Ui.Submit("Speichern"), p is null ? null : Ui.Submit("Löschen", UiButtonKind.Danger, "action", "delete", confirm: "Objekt mit Saisons und Gebühren löschen?")));
         return PluginResult.Page(Ui.Stack(Ui.PageHead(null, p?.Name ?? "Neues Objekt", Ui.Button("Alle Objekte", Root + "properties", UiButtonKind.Ghost, "ti-arrow-left", small: true)),
             Ui.Card(form)), p?.Name ?? "Neues Objekt");
@@ -215,7 +224,8 @@ public static class BookingAdmin
                 ["contains"] = string.Join(",", contains), ["buffer_days"] = Int(ctx.Request.F("buffer_days"), 0, 0, 14),
                 ["base_price"] = Math.Max(0, B.ParseMoney(ctx.Request.F("base_price")) ?? 0), ["base_min_nights"] = Int(ctx.Request.F("base_min_nights"), 1, 1, 60),
                 ["extra_person"] = Math.Max(0, B.ParseMoney(ctx.Request.F("extra_person")) ?? 0), ["sort"] = Int(ctx.Request.F("sort"), 0, -999, 999),
-                ["active"] = B.Checked(ctx.Request.F("active"))
+                ["active"] = B.Checked(ctx.Request.F("active")),
+                ["access_info"] = B.Clip(ctx.Request.F("access_info"), 2000), ["wifi"] = B.Clip(ctx.Request.F("wifi"), 300), ["checklist"] = B.Clip(ctx.Request.F("checklist"), 4000)
             };
             var id = u?.Id ?? 0;
             if (u is null) id = await store.Units.InsertAsync(values, ct); else await store.Units.UpdateAsync(u.Id, values, ct);
@@ -246,6 +256,10 @@ public static class BookingAdmin
                 Ui.Heading("Ganzes Haus", 3),
                 Ui.Muted("Ist diese Einheit das ganze Haus, die Einheiten ankreuzen, aus denen es besteht: ist eine davon belegt, ist das Haus belegt – und umgekehrt."),
                 Ui.Grid(220, siblings.Select(o => (UiNode?)Ui.Checkbox("contains_" + o.Id, o.Name, u?.Contains.Contains(o.Id) ?? false)).ToArray())),
+            Ui.Heading("Ankunft und Reinigung", 3),
+            Ui.TextArea("access_info", "Zugang (Schlüssel, Türcode, Schlüsselbox)", u?.AccessInfo ?? "", 3) with { Help = "Geht erst am Tag vor der Anreise an den Gast – nie in einer früheren Mail." },
+            Ui.Input("wifi", "WLAN (Name und Passwort)", u?.Wifi ?? ""),
+            Ui.TextArea("checklist", "Reinigungs-Checkliste (ein Punkt je Zeile)", u?.Checklist ?? "", 4),
             Ui.Grid(160, Ui.Input("sort", "Reihenfolge", B.Num(u?.Sort ?? 0), UiInputType.Number)),
             Ui.Checkbox("active", "Buchbar (auf der Website sichtbar)", u?.Active ?? true),
             Ui.FormActions(Ui.Submit("Speichern"), u is null ? null : Ui.Submit("Löschen", UiButtonKind.Danger, "action", "delete", confirm: "Einheit löschen?")));

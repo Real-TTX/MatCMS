@@ -24,6 +24,27 @@ public class StoreTools
             throw new McpException("Dieser Schlüssel darf den Store nicht verwalten (fehlendes Store-Recht).");
     }
 
+    [McpServerTool(Name = "list_matcms_store"), Description(
+        "List the MatCMS Store on matcms.de (the official store server) with this cloud's state per plugin: new (not here), update (here, older), current, own (an own entry with that key, never overwritten). Read-only; any valid key.")]
+    public static async Task<object> ListMatcmsStore(McpContext me, MatcmsStoreService matcms,
+        [Description("Ask matcms.de again instead of using the copy from the last five minutes.")] bool refresh = false, CancellationToken ct = default)
+    {
+        _ = me.Key;
+        var (entries, error) = await matcms.ListAsync(refresh, ct);
+        return new { store = await matcms.BaseUrlAsync(ct), error, plugins = entries };
+    }
+
+    [McpServerTool(Name = "take_over_from_matcms_store"), Description(
+        "Take one plugin over from the MatCMS Store into this cloud's store: the package is checked against the store keys in this image (signature), its pictures and publisher come along, profiles that use it roll the new version out. Never overwrites an own entry with the same key. Requires the store right.")]
+    public static async Task<object> TakeOverFromMatcmsStore(McpContext me, MatcmsStoreService matcms,
+        [Description("The plugin key, e.g. \"forum\".")] string key, CancellationToken ct = default)
+    {
+        RequireStore(me);
+        var r = await matcms.ImportAsync(key, ct);
+        if (!r.Ok) throw new McpException(r.Message);
+        return new { ok = true, message = r.Message, key = r.Key, version = r.Version };
+    }
+
     [McpServerTool(Name = "list_store"), Description(
         "List the cloud-wide store catalogue: templates (themes), components (reusable blocks), mail templates and plugins, each with how many profiles use it. Read-only; any valid key.")]
     public static async Task<object> ListStore(McpContext me, StoreService store, CancellationToken ct)

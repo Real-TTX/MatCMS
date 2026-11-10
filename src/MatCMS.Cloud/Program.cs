@@ -141,6 +141,7 @@ builder.Services.AddScoped<AttentionService>();
 builder.Services.AddScoped<SyncHistoryService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
+builder.Services.AddScoped<MatcmsStoreService>();
 builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<HostingOverviewService>();

@@ -134,6 +134,9 @@ public static class SettingKeys
     /// section, not in the configuration backup — a restored cloud seeds its own starter set on its first start anyway.</summary>
     public const string StoreSeeded = "store.seeded";
 
+    /// <summary>The address of the MatCMS Store (the store server on matcms.de) the cloud takes plugins from. Empty = https://matcms.de.</summary>
+    public const string MatcmsStoreUrl = "store.matcms.url";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>The notification matrix (JSON, <c>NotificationService</c>): who gets which event. Once saved it
     /// replaces the three keys below, which stay only so the first load can translate them into it.</summary>

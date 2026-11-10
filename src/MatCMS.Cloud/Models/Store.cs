@@ -39,6 +39,14 @@ public class StorePlugin
 
     /// <summary>The publisher's website (absolute http(s) or empty), linked from the name.</summary>
     public string PublisherUrl { get; set; } = "";
+
+    /// <summary>Where the entry came from: "" = this cloud's own (uploaded here), "matcms" = taken over from the MatCMS Store on matcms.de
+    /// (MatcmsStoreService). Such an entry is not edited here — repacking would break its signature — and an own upload turns it back into "".</summary>
+    public string Origin { get; set; } = "";
+
+    /// <summary>The MatCMS Store signature of exactly this bundle (base64) and its key id; empty for an own entry. Passed on to the sites in the catalogue.</summary>
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 /// <summary>

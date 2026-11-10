@@ -321,7 +321,7 @@ public class StoreService
                 .Select(x => new { x.StorePluginId, x.Id, x.Caption }).ToListAsync())
             .ToLookup(x => x.StorePluginId, x => new CatalogImage { Id = x.Id, Caption = x.Caption });
         var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description, Publisher = p.Publisher, PublisherUrl = p.PublisherUrl } })
+            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description, Publisher = p.Publisher, PublisherUrl = p.PublisherUrl, Origin = p.Origin, Signature = p.Signature, SignatureKeyId = p.SignatureKeyId } })
             .ToListAsync();
         foreach (var p in plugins) p.Plugin.Images = images[p.Id].ToList();
         return await CatalogRestAsync(plugins.Select(p => p.Plugin).ToList());

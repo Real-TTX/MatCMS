@@ -1,6 +1,6 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 10.11.2026 — **S0 und S1 gebaut** (Matthias: „Ja, anfangen“ – mit den Vorschlägen aus §12), noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
+Stand: 11.11.2026 — **S0 und S1 gebaut und live** (matcms.de/store, 7 MATTHIX-Plugins signiert), **S2 gebaut**, noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
 
 **Gebaut:**
 - **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug
@@ -13,6 +13,19 @@ Stand: 10.11.2026 — **S0 und S1 gebaut** (Matthias: „Ja, anfangen“ – mit
   (prüfen, sperren, Konto zuordnen); Menüpunkt „Store“ im Kopfmenü; Mails eingereicht/freigegeben/abgelehnt. Tests `MatcmsStoreTests` (ganzer Weg,
   Signatur aus `MatCMS.Shared` vom Plugin angenommen, Key-Besitz, Versionen nur aufwärts, reservierte Keys, Wartungsmodus). Lokal mit den sieben
   MATTHIX-Plugins und echten Signaturen durchgespielt.
+
+- **S2** — die Cloud übernimmt aus dem MatCMS Store (`MatCMS.Cloud/Services/MatcmsStoreService.cs`): Admin → Store, Reiter **„MatCMS Store“**
+  (Katalog mit Stand je Eintrag: noch nicht übernommen / neuere Version da / aktuell / eigener Eintrag; „Übernehmen“/„Aktualisieren“), REST
+  `GET /api/v1/store/matcms`, `POST /api/v1/store/matcms/{key}/take-over` (`CanManageStore`), MCP `list_matcms_store`, `take_over_from_matcms_store`.
+  Übernehmen = Paket laden (nur Pfade auf dem Store-Server), **Signatur gegen `StoreKeys.Known` des Images prüfen**, `UpsertPluginAsync` (Profile
+  mit dem Eintrag rollen aus), Herausgeber und Bilder (ersetzt) mit. `StorePlugin.Origin = matcms`, `Signature`, `SignatureKeyId` (Migration
+  `StorePluginOrigin`), additiv im Katalog für die Websites (`CatalogPlugin.Origin/Signature/SignatureKeyId`). Ein übernommener Eintrag wird in der
+  Cloud nicht bearbeitet (Repack würde die Signatur brechen); ein eigenes Paket macht ihn wieder zum eigenen Eintrag. Ein **eigener** Eintrag mit
+  demselben Key wird nie überschrieben. Store-Adresse: Cloud-Einstellung `store.matcms.url` (leer = https://matcms.de). Tests
+  `MatcmsStoreTakeOverTests`; einmal gegen das echte matcms.de mit dem echten Schlüssel: alle 7 Plugins übernommen.
+  **Anders als §8:** kein eigener Knopf im Profil — übernommen wird im Store, ins Profil kommt der Eintrag wie jeder andere über „Aus Global
+  hinzufügen“; kein stündliches Abfragen und kein „automatisch übernehmen“ — die Liste fragt matcms.de beim Öffnen (5 Minuten zwischengespeichert)
+  und zeigt neuere Versionen dort.
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

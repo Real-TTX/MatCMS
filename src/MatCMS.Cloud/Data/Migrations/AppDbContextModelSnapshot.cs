@@ -1708,11 +1708,23 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Publisher")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PublisherUrl")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SignatureKeyId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

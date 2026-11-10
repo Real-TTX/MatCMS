@@ -488,6 +488,14 @@ somebody else's plugin — the way in for later submissions). `CleanPublisher` k
 http(s) — it is rendered as a link on public websites. Not rolled out, no revision bump. The instances' catalogue carries it
 (`CatalogPlugin.Publisher/PublisherUrl`, additive), the site's store dialog shows it.
 
+**Plugins can be taken over from the MatCMS Store** (the store server on matcms.de, `docs/official-store.md` S2; `Services/MatcmsStoreService.cs`,
+Store tab "MatCMS Store", REST `GET /api/v1/store/matcms` + `POST …/{key}/take-over`, MCP `list_matcms_store`/`take_over_from_matcms_store`). A take-over
+downloads the package (only paths ON the store server — addresses come from a catalogue), checks the signature against `StoreKeys.Known` of THIS image,
+then goes through `UpsertPluginAsync` like an upload, with publisher and pictures (replaced). The row keeps `Origin = "matcms"`, `Signature`,
+`SignatureKeyId` (passed on in `CatalogPlugin`, additive) and is NOT repacked on the Plugin page — that would change the signed bytes; an own upload
+clears the origin. An OWN entry with the same key is never overwritten. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
+Store address = CloudSetting `store.matcms.url` (empty = https://matcms.de). Test seams `HandlerFactory`/`KeysOverride` (`MatcmsStoreTakeOverTests`).
+
 **The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the
 public address `/api/public/store/plugins/{key}/image/{id}`). That endpoint is anonymous like the catalogue but answers a picture only for the
 plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. A template carries its

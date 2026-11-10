@@ -41,6 +41,25 @@ public static class StoreApi
             return Results.Ok(new { canManageStore = key!.CanManageStore, plugins = o.Plugins, templates = o.Templates, components = o.Components, mailTemplates = o.MailTemplates });
         }).RequireRateLimiting("operatorApi");
 
+        // ---- The MatCMS Store (matcms.de): read its catalogue, take an entry over -----------------
+        app.MapGet("/api/v1/store/matcms", async (HttpContext ctx, ApiKeyService keys, MatcmsStoreService matcms, bool? refresh) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            var (entries, problem) = await matcms.ListAsync(refresh == true, ctx.RequestAborted);
+            return Results.Ok(new { store = await matcms.BaseUrlAsync(ctx.RequestAborted), error = problem, plugins = entries });
+        }).RequireRateLimiting("operatorApi");
+
+        app.MapPost("/api/v1/store/matcms/{pluginKey}/take-over", async (HttpContext ctx, string pluginKey, ApiKeyService keys, MatcmsStoreService matcms) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireStore(key!) is { } g) return g;
+            var r = await matcms.ImportAsync(pluginKey, ctx.RequestAborted);
+            return r.Ok ? Results.Ok(new { ok = true, message = r.Message, key = r.Key, version = r.Version })
+                        : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status422UnprocessableEntity);
+        }).RequireRateLimiting("operatorApi");
+
         // ---- Templates (identity = Name) ------------------------------------------
         app.MapGet("/api/v1/store/templates", async (HttpContext ctx, ApiKeyService keys, StoreService store) =>
         {

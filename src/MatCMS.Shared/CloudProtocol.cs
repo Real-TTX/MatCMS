@@ -748,6 +748,12 @@ public sealed class CatalogPlugin
     /// site talks to its cloud by may be one the admin's browser cannot reach (an internal Docker name).
     /// </summary>
     public List<CatalogImage> Images { get; set; } = new();
+
+    /// <summary>Taken over from the MatCMS Store: "matcms", else "". With it the store's signature of exactly this bundle and its key id, so a site can
+    /// check the package against the keys in its own image (MatCMS.Shared/StoreSignature). Additive: an older cloud sends none, an older site ignores them.</summary>
+    public string Origin { get; set; } = "";
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 public sealed class CatalogImage

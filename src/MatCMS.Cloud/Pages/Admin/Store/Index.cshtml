@@ -13,6 +13,75 @@
     <button type="button" class="tab" data-tab="templates">@T["profiles.tabTemplates"]</button>
     <button type="button" class="tab" data-tab="components">@T["profiles.tabComponents"]</button>
     <button type="button" class="tab" data-tab="mailtemplates">@T["profiles.tabMailTemplates"]</button>
+    <button type="button" class="tab" data-tab="matcms">@T["store.matcms.tab"]</button>
+</div>
+
+@* ============ MATCMS STORE (matcms.de) ============
+   What the store server on matcms.de offers and where this cloud stands with each entry. Taking over checks the signature against the
+   store keys in this image; nothing is mirrored by itself. *@
+<div class="tab-panel" data-panel="matcms" hidden>
+    <div data-list data-list-key="store-matcms">
+        <div class="page-head">
+            <h2>@T["store.matcms.tab"]</h2>
+            <div class="list-toolbar">
+                <input type="search" class="list-search" data-list-search placeholder="@T["action.search"]" aria-label="@T["action.search"]" autocomplete="off" />
+                <a class="btn btn-ghost btn-sm" href="?tab=matcms&amp;refresh=1">@T["store.matcms.refresh"]</a>
+            </div>
+        </div>
+        @if (Model.MatcmsError is not null)
+        {
+            <div class="alert alert-error">@Model.MatcmsError</div>
+        }
+        <table class="data" data-list-table>
+            <thead>
+                <tr><th>@T["common.name"]</th><th>@T["store.publisher"]</th><th>@T["instances.version"]</th><th>@T["store.matcms.here"]</th><th></th></tr>
+            </thead>
+            <tbody>
+                @if (Model.Matcms.Count == 0)
+                {
+                    <partial name="_EmptyRow" model='@T["store.matcms.empty"]' />
+                }
+                @foreach (var e in Model.Matcms)
+                {
+                    <tr data-search="@(e.Name + " " + e.Key + " " + e.Publisher + " " + e.Summary)">
+                        <td>
+                            <strong>@e.Name</strong> <span class="badge badge-off">@(e.Kind == "native" ? "Native" : T["store.matcms.script"])</span>
+                            <div class="muted">@(e.Summary.Length > 0 ? e.Summary : e.Description)</div>
+                            <div class="muted mono">@e.Key</div>
+                        </td>
+                        <td>@e.Publisher@(e.PublisherVerified ? " ✓" : "")</td>
+                        <td class="mono">@e.Version</td>
+                        <td>
+                            @switch (e.State)
+                            {
+                                case "current": <span class="badge badge-on">@T["store.matcms.current"]</span> break;
+                                case "update": <span class="badge badge-new">@T["store.matcms.update", e.LocalVersion]</span> break;
+                                case "own": <span class="badge badge-err">@T["store.matcms.own", e.LocalVersion]</span> break;
+                                default: <span class="badge badge-off">@T["store.matcms.notHere"]</span> break;
+                            }
+                        </td>
+                        <td>
+                            <div class="actions">
+                                @if (e.Page.StartsWith("https://") || e.Page.StartsWith("http://"))
+                                {
+                                    <a class="btn btn-sm btn-ghost" href="@e.Page" target="_blank" rel="noopener" title="@T["store.matcms.page"]"><i class="ti ti-external-link" aria-hidden="true"></i> <span class="btn-label">@T["store.matcms.page"]</span></a>
+                                }
+                                @if (e.State is "new" or "update")
+                                {
+                                    <form method="post" asp-page-handler="TakeOver" class="inline-form">
+                                        <input type="hidden" name="key" value="@e.Key" />
+                                        <button type="submit" class="btn btn-sm">@(e.State == "new" ? T["store.matcms.take"] : T["store.matcms.takeUpdate"])</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <div class="list-empty" data-list-empty hidden>@T["list.noResults"]</div>
+        <div class="help">@T["store.matcms.help", Model.MatcmsUrl]</div>
+    </div>
 </div>
 
 @* ============ PLUGINS ============ *@

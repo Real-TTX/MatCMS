@@ -177,6 +177,14 @@ public class PluginModel : PageModel
         return BackToImages(id);
     }
 
+    public async Task<IActionResult> OnPostPublisherAsync(int id, string? publisher, string? publisherUrl)
+    {
+        if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");
+        await _store.SetPluginPublisherAsync(key, publisher, publisherUrl);
+        TempData["Flash"] = string.IsNullOrWhiteSpace(publisher) ? "Herausgeber entfernt." : "Herausgeber gespeichert.";
+        return Redirect(Url.Page("Plugin", new { id }) + "#herausgeber");
+    }
+
     public async Task<IActionResult> OnPostImageCaptionAsync(int id, int imageId, string? caption)
     {
         if (await KeyOfAsync(id) is not { } key) return RedirectToPage("Index");

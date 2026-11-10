@@ -31,6 +31,14 @@ public class StorePlugin
     public byte[] Bundle { get; set; } = [];
 
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Who publishes the plugin ("Herausgeber"), shown in the catalogue and on the sites' store windows. A property of the STORE
+    /// entry, not of the bundle: the operator sets it, a new bundle keeps it. A bundle's own <c>Publisher</c> only fills it while it is empty
+    /// (the first upload of a plugin someone else wrote). Empty = not shown.</summary>
+    public string Publisher { get; set; } = "";
+
+    /// <summary>The publisher's website (absolute http(s) or empty), linked from the name.</summary>
+    public string PublisherUrl { get; set; } = "";
 }
 
 /// <summary>

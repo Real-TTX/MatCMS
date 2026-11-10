@@ -59,6 +59,19 @@
                                 }
                             </div>
                             <div class="store-card-sub mono">@item.Sub</div>
+                            @if (!string.IsNullOrWhiteSpace(item.Publisher))
+                            {
+                                <div class="store-card-publisher muted">@T["store.dialogPublisher"]
+                                    @if (item.SafePublisherUrl is { } purl)
+                                    {
+                                        <a href="@purl" target="_blank" rel="noopener noreferrer">@item.Publisher</a>
+                                    }
+                                    else
+                                    {
+                                        <span>@item.Publisher</span>
+                                    }
+                                </div>
+                            }
                             @if (!string.IsNullOrWhiteSpace(item.Description))
                             {
                                 <div class="store-card-text">@item.Description</div>

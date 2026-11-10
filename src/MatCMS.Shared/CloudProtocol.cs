@@ -737,6 +737,11 @@ public sealed class CatalogPlugin
     public string Version { get; set; } = "";
     public string Description { get; set; } = "";
 
+    /// <summary>Who publishes the plugin in this store ("Herausgeber") and the publisher's website (http(s) or empty). Additive: an older
+    /// cloud sends none, an older site ignores them.</summary>
+    public string Publisher { get; set; } = "";
+    public string PublisherUrl { get; set; } = "";
+
     /// <summary>
     /// The plugin's pictures, cover first. Additive: an older cloud sends none, an older site ignores the field. A site fetches the bytes
     /// with its own instance credentials (<c>/api/store/{publicId}/image/{id}</c>) and serves them to its admin itself — the address a

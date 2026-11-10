@@ -13,13 +13,16 @@ using Xunit;
 
 namespace MatCMS.Plugin.Tests;
 
-/// <summary>A tiny HTTP server that answers every request with the same JSON — the cloud's public store catalogue, without a cloud.</summary>
+/// <summary>A tiny HTTP server that answers every request with the same JSON — the cloud's public store catalogue, without a cloud — and
+/// a picture of the store (a 1×1 PNG) at <c>/api/public/store/plugins/{key}/image/{id}</c>.</summary>
 internal sealed class CatalogStub : IDisposable
 {
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly CancellationTokenSource _stop = new();
     public string Body { get; set; } = "{}";
     public int Requests;
+    public int PictureRequests;
+    public static readonly byte[] Png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
     public string Url => "http://127.0.0.1:" + ((IPEndPoint)_listener.LocalEndpoint).Port;
 
     public CatalogStub()
@@ -40,8 +43,10 @@ internal sealed class CatalogStub : IDisposable
                         while (!head.ToString().Contains("\r\n\r\n")) { var n = await stream.ReadAsync(buf); if (n == 0) return; head.Append(Encoding.ASCII.GetString(buf, 0, n)); }
                         Interlocked.Increment(ref Requests);
                         var ok = head.ToString().StartsWith("GET /api/public/store ", StringComparison.Ordinal);
-                        var body = Encoding.UTF8.GetBytes(ok ? Body : "nope");
-                        var header = $"HTTP/1.1 {(ok ? "200 OK" : "404 Not Found")}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
+                        var picture = head.ToString().StartsWith("GET /api/public/store/plugins/leserstimmen/image/", StringComparison.Ordinal);
+                        if (picture) Interlocked.Increment(ref PictureRequests);
+                        var body = picture ? Png : Encoding.UTF8.GetBytes(ok ? Body : "nope");
+                        var header = $"HTTP/1.1 {(ok || picture ? "200 OK" : "404 Not Found")}\r\nContent-Type: {(picture ? "image/png" : "application/json")}\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
                         await stream.WriteAsync(Encoding.ASCII.GetBytes(header));
                         await stream.WriteAsync(body);
                     }
@@ -69,8 +74,16 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
     {
         ["format"] = 1,
         ["plugins"] = new JsonArray(
-            new JsonObject { ["key"] = "leserstimmen", ["name"] = "Leserstimmen", ["version"] = "1.3", ["description"] = "Rezensionen mit Sternen.", ["kind"] = "script", ["updated"] = "2026-10-20" },
-            new JsonObject { ["key"] = "demo-native", ["name"] = "Demo <b>Native</b>", ["version"] = "2.0", ["description"] = "Kompiliert.", ["kind"] = "native", ["updated"] = "2026-10-21" }),
+            new JsonObject
+            {
+                ["key"] = "leserstimmen", ["name"] = "Leserstimmen", ["version"] = "1.3", ["description"] = "Rezensionen mit Sternen.", ["kind"] = "script", ["updated"] = "2026-10-20",
+                ["publisher"] = "MATTHIX", ["publisherUrl"] = "https://matthix.de",
+                ["images"] = new JsonArray(
+                    new JsonObject { ["id"] = 7, ["caption"] = "Karten <mit> Sternen", ["url"] = "/api/public/store/plugins/leserstimmen/image/7" },
+                    new JsonObject { ["id"] = 8, ["caption"] = "Admin", ["url"] = "/api/public/store/plugins/leserstimmen/image/8" })
+            },
+            new JsonObject { ["key"] = "demo-native", ["name"] = "Demo <b>Native</b>", ["version"] = "2.0", ["description"] = "Kompiliert.", ["kind"] = "native", ["updated"] = "2026-10-21",
+                ["publisher"] = "Böse", ["publisherUrl"] = "javascript:alert(1)" }),
         ["templates"] = new JsonArray(new JsonObject { ["name"] = "Klar", ["description"] = "Ruhig.", ["accent"] = "#2563eb" }),
         ["components"] = new JsonArray()
     }.ToJsonString();
@@ -156,10 +169,39 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         Assert.Contains("2 Plugins · 1 Templates · 0 Komponenten", WebUtility.HtmlDecode(fromScript));
         Assert.Contains("Demo &lt;b&gt;Native&lt;/b&gt;", fromScript);                    // what the catalogue says is text, never markup
         Assert.Contains("background:#2563eb", fromScript);
+        // pictures through THIS site, one lightbox group per plugin; the publisher with a link only when the address is http(s)
+        Assert.Contains("data-lightbox-group=\"se-leserstimmen\"", fromScript);
+        Assert.Contains("href=\"/store-einblick/bild/leserstimmen/7\" data-lightbox data-caption=\"Karten &lt;mit&gt; Sternen\"", fromScript);
+        Assert.Contains("href=\"/store-einblick/bild/leserstimmen/8\"", fromScript);
+        Assert.Contains("2 Bilder", fromScript);
+        Assert.Contains("<a href=\"https://matthix.de/\" rel=\"noopener\" target=\"_blank\">MATTHIX</a>", fromScript);
+        Assert.Contains("<strong>B&#246;se</strong>", fromScript);
+        Assert.DoesNotContain("javascript:", fromScript);
+        Assert.DoesNotContain(stub.Url, fromScript);                                     // the visitor's browser never talks to the cloud
 
         await InstallAsync(Native, stub.Url);
         var fromNative = Section(await visitor.GetStringAsync("/store-test"));
         Assert.Equal(fromScript, fromNative);
+    }
+
+    [Fact]
+    public async Task A_picture_is_passed_through_only_when_the_catalogue_lists_it_and_only_once()
+    {
+        using var stub = new CatalogStub { Body = Catalog };
+        await InstallAsync(Script, stub.Url);
+        var visitor = _app.Browser();
+
+        var res = await visitor.GetAsync("/store-einblick/bild/leserstimmen/7");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal("image/png", res.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(CatalogStub.Png, await res.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.OK, (await visitor.GetAsync("/store-einblick/bild/leserstimmen/7")).StatusCode);
+        Assert.Equal(1, stub.PictureRequests);                                             // the second answer came from memory
+
+        Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/store-einblick/bild/leserstimmen/999")).StatusCode);   // not in the catalogue
+        Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/store-einblick/bild/demo-native/7")).StatusCode);     // another plugin's id
+        Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/store-einblick/bild/leserstimmen/abc")).StatusCode);
+        Assert.Equal(1, stub.PictureRequests);                                             // none of those reached the cloud
     }
 
     [Fact]

@@ -481,6 +481,19 @@ has no image library, so they are stored as they came; no SVG). They are kept ou
 revision. The catalogue names them (`CatalogPlugin.Images`), a site fetches each through `/api/store/{publicId}/image/{id}`
 (instance auth, nosniff, sandbox CSP) and serves it to its own admin. Not yet in the cloud's configuration backup.
 
+**A store plugin has a publisher** ("Herausgeber": `StorePlugin.Publisher` + `PublisherUrl`, migration `StorePluginPublisher`; card on `Store/Plugin`,
+REST `PUT /api/v1/store/plugins/{key}/publisher`, MCP `set_store_plugin_publisher`, all through `StoreService.SetPluginPublisherAsync`). It belongs to the
+STORE ENTRY, not the bundle: a new bundle keeps it; a bundle's manifest `Publisher`/`PublisherUrl` only fills an EMPTY entry (the first upload of
+somebody else's plugin — the way in for later submissions). `CleanPublisher` keeps the name to one line (≤ 80) and the address only as absolute
+http(s) — it is rendered as a link on public websites. Not rolled out, no revision bump. The instances' catalogue carries it
+(`CatalogPlugin.Publisher/PublisherUrl`, additive), the site's store dialog shows it.
+
+**The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the
+public address `/api/public/store/plugins/{key}/image/{id}`). That endpoint is anonymous like the catalogue but answers a picture only for the
+plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. The "Store-Einblick"
+plugin (1.1) never links it for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
+catalogue, bounded memory cache), so a visitor's browser talks to the website alone.
+
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
 rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the
 profile's own items and the ones it takes from the store, with a *Global* / *eigenes* badge in the

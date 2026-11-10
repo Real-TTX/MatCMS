@@ -193,6 +193,17 @@ public static class StoreApi
             return await store.DeletePluginAsync(pluginKey) ? Results.Ok(new { ok = true }) : NotFound("Plugin");
         }).RequireRateLimiting("operatorApi");
 
+        // { "publisher": "…", "publisherUrl": "https://…" } — who publishes the plugin; an empty publisher clears it. Not in the bundle.
+        app.MapPut("/api/v1/store/plugins/{pluginKey}/publisher", async (HttpContext ctx, string pluginKey, PublisherBody body, ApiKeyService keys, StoreService store) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireStore(key!) is { } g) return g;
+            if (!await store.SetPluginPublisherAsync(pluginKey, body.Publisher, body.PublisherUrl, ctx.RequestAborted)) return NotFound("Plugin");
+            var clean = StoreService.CleanPublisher(body.Publisher, body.PublisherUrl);
+            return Results.Ok(new { ok = true, publisher = clean?.Name ?? "", publisherUrl = clean?.Url ?? "" });
+        }).RequireRateLimiting("operatorApi");
+
         // ---- a plugin's pictures (the store dialog's gallery). Bytes travel raw, like the bundle — REST only, not MCP. ----
         app.MapGet("/api/v1/store/plugins/{pluginKey}/images", async (HttpContext ctx, string pluginKey, ApiKeyService keys, StoreService store) =>
         {
@@ -252,6 +263,7 @@ public static class StoreApi
     }
 
     private sealed record ImagePatch(string? Caption, int? Move);
+    private sealed record PublisherBody(string? Publisher, string? PublisherUrl);
 
     // ---- helpers ----
     private static IResult BadReq(string msg) => Results.Json(new { error = msg }, statusCode: StatusCodes.Status400BadRequest);

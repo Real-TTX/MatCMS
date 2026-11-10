@@ -242,6 +242,10 @@ internal sealed class PluginBuilder : IPluginBuilder, IAdminBuilder, ISettingsBu
         var opts = options ?? new PublicRouteOptions();
         // A webhook is POSTed to; answering a GET for it would only give a stranger something to probe.
         if (opts.Webhook) opts = opts with { Methods = PluginMethod.Post };
+        // A bigger body only for a signed-in member's form (an upload): an anonymous route with it would let anybody fill the server.
+        if (opts.MaxBodyMegabytes != 0
+            && (opts.MaxBodyMegabytes < 0 || opts.MaxBodyMegabytes > PublicRouteOptions.MaxBodyLimitMegabytes || !opts.RequireMember || !opts.Antiforgery || opts.Webhook))
+            throw new InvalidOperationException($"Route '{pattern}': MaxBodyMegabytes needs RequireMember and Antiforgery, no webhook, and at most {PublicRouteOptions.MaxBodyLimitMegabytes}.");
         _slice.Routes.Add(new PluginRegistry.RouteEntry(Info.Key, Info, p, handler, opts));
     }
 

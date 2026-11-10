@@ -660,7 +660,8 @@ app.Use(async (ctx, next) =>
     }
 
     var site = ctx.RequestServices.GetRequiredService<SiteContext>();
-    if (!site.MaintenanceEnabled)
+    // A plugin route that other servers fetch from (a store catalogue, a download) keeps answering — PublicRouteOptions.DuringMaintenance.
+    if (!site.MaintenanceEnabled || MatCMS.Services.Plugins.PluginRouteTransformer.AnswersDuringMaintenance(ctx))
     {
         await next();
         return;

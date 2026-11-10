@@ -44,6 +44,14 @@ public class PluginPageModel : PageModel
         400 => "Bad request", 413 => "Payload too large", 429 => "Too many requests", 500 => "Internal server error", _ => "Error"
     };
 
+    private void AllowBody(long bytes)
+    {
+        if (HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } size)
+            size.MaxRequestBodySize = bytes;
+        HttpContext.Features.Set<Microsoft.AspNetCore.Http.Features.IFormFeature>(
+            new Microsoft.AspNetCore.Http.Features.FormFeature(Request, new Microsoft.AspNetCore.Http.Features.FormOptions { MultipartBodyLengthLimit = bytes }));
+    }
+
     private async Task<IActionResult> RunAsync()
     {
         if (HttpContext.Items[PluginRouteTransformer.ItemKey] is not PluginMatch match) return NotFound();
@@ -66,6 +74,10 @@ public class PluginPageModel : PageModel
             if (!string.IsNullOrWhiteSpace(options.RequiredRole) && !member.InRole(options.RequiredRole!))
                 return Redirect("/anmelden?denied=true&returnUrl=" + back);
         }
+
+        // A route that takes a big upload (PublicRouteOptions.MaxBodyMegabytes, members only): raise both limits BEFORE anything reads the body — the
+        // antiforgery check below already reads the form. Kestrel's own limit (~28 MB) and the form reader's (128 MB) would refuse it otherwise.
+        if (options.MaxBodyMegabytes > 0 && Request.Method == "POST") AllowBody(options.MaxBodyMegabytes * 1024L * 1024L);
 
         if (options.Antiforgery && Request.Method == "POST")
         {

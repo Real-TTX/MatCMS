@@ -7,4 +7,5 @@
   <Project Path="tests/MatCMS.Plugins.Tests/MatCMS.Plugins.Tests.csproj" />
   <Project Path="tests/MatCMS.Cloud.Tests/MatCMS.Cloud.Tests.csproj" />
   <Project Path="tests/Fixtures/RefPlugin/RefPlugin.csproj" />
+  <Project Path="tools/StoreSign/StoreSign.csproj" />
 </Solution>

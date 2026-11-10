@@ -68,6 +68,23 @@ public sealed record PublicRouteOptions
     /// the call — a signature over the body — is the handler's job. POST only.
     /// </summary>
     public bool Webhook { get; init; }
+
+    /// <summary>
+    /// The route keeps answering while the site is in maintenance mode (Einstellungen → Wartung). For what OTHER servers fetch — a catalogue, a
+    /// download, a feed — and must not see as an outage while the site's pages are being prepared; the plugin API under <c>/api/v1</c> is exempt
+    /// anyway. Pages for visitors should leave it off: in maintenance mode they get the maintenance page like the rest of the site.
+    /// </summary>
+    public bool DuringMaintenance { get; init; }
+
+    /// <summary>
+    /// The largest request body this route accepts, in megabytes (0 = the host's limit, about 28 MB). For a big upload by a signed-in member — a
+    /// package, a video — so only together with <see cref="RequireMember"/> and <see cref="Antiforgery"/>, and at most <see cref="MaxBodyLimitMegabytes"/>;
+    /// the builder refuses anything else. The limit is raised only after the member check, so nobody signed out can send that much.
+    /// </summary>
+    public int MaxBodyMegabytes { get; init; }
+
+    /// <summary>The highest <see cref="MaxBodyMegabytes"/> a route may ask for.</summary>
+    public const int MaxBodyLimitMegabytes = 200;
 }
 
 /// <summary>What an API route needs the caller's key to allow, for this plugin (the key's rights are per plugin and per kind).</summary>

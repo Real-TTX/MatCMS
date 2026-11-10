@@ -490,8 +490,10 @@ http(s) — it is rendered as a link on public websites. Not rolled out, no revi
 
 **The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the
 public address `/api/public/store/plugins/{key}/image/{id}`). That endpoint is anonymous like the catalogue but answers a picture only for the
-plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. The "Store-Einblick"
-plugin (1.1) never links it for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
+plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. A template carries its
+LOOK (accent, secondary, heading/text/background/alt colours, header colours, fonts, button style and radius — what every site using it shows anyway, never
+its layout, CSS or script) and a component its Tabler icon, so a showcase can draw a template as a small page in its own colours. The "Store-Einblick"
+plugin (1.2) validates every one of those values before it puts them into a style attribute, and never links the picture address for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
 catalogue, bounded memory cache), so a visitor's browser talks to the website alone.
 
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile

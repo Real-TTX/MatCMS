@@ -101,7 +101,7 @@ public static class StoreSeeder
         {
             Type = "image-text",
             Name = "Bild mit Text",
-            Description = "Bild links, Text rechts — der Arbeitspflicht-Block jeder Seite.",
+            Description = "Bild links, Text rechts — das Arbeitspferd jeder Seite.",
             Icon = "photo",
             FieldsJson = """
                 [

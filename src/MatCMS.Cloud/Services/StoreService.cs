@@ -364,12 +364,25 @@ public class StoreService
                 ["publisher"] = p.Publisher, ["publisherUrl"] = p.PublisherUrl, ["images"] = images
             });
         }
+        // A template's LOOK (colours, fonts, button corners) — what a showcase needs to draw a small picture of a page in it. Public
+        // anyway: every site using the template shows exactly these values. Never its layout, CSS or script.
         var templates = new System.Text.Json.Nodes.JsonArray();
-        foreach (var t in await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name).Select(t => new { t.Name, t.Description, t.AccentColor }).ToListAsync(ct))
-            templates.Add(new System.Text.Json.Nodes.JsonObject { ["name"] = t.Name, ["description"] = t.Description, ["accent"] = t.AccentColor });
+        foreach (var t in await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
+                     .Select(t => new
+                     {
+                         t.Name, t.Description, t.AccentColor, t.SecondaryColor, t.HeadingColor, t.TextColor, t.BackgroundColor, t.AltBackground,
+                         t.HeaderBackground, t.HeaderTextColor, t.HeadingFont, t.BodyFont, t.ButtonStyle, t.ButtonRadius
+                     }).ToListAsync(ct))
+            templates.Add(new System.Text.Json.Nodes.JsonObject
+            {
+                ["name"] = t.Name, ["description"] = t.Description, ["accent"] = t.AccentColor, ["secondary"] = t.SecondaryColor,
+                ["heading"] = t.HeadingColor, ["text"] = t.TextColor, ["background"] = t.BackgroundColor, ["alt"] = t.AltBackground,
+                ["headerBg"] = t.HeaderBackground, ["headerText"] = t.HeaderTextColor, ["headingFont"] = t.HeadingFont, ["bodyFont"] = t.BodyFont,
+                ["buttonStyle"] = t.ButtonStyle, ["buttonRadius"] = t.ButtonRadius
+            });
         var components = new System.Text.Json.Nodes.JsonArray();
-        foreach (var c in await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new { c.Type, c.Name, c.Description }).ToListAsync(ct))
-            components.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = c.Type, ["name"] = c.Name, ["description"] = c.Description });
+        foreach (var c in await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new { c.Type, c.Name, c.Description, c.Icon }).ToListAsync(ct))
+            components.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = c.Type, ["name"] = c.Name, ["description"] = c.Description, ["icon"] = c.Icon });
         return new System.Text.Json.Nodes.JsonObject
         {
             ["format"] = 1, ["generated"] = DateTime.UtcNow.ToString("O"), ["plugins"] = plugins, ["templates"] = templates, ["components"] = components

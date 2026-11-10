@@ -1,6 +1,23 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 10.11.2026 — **Entwurf, nichts gebaut.** Zweite Fassung nach Matthias' Klarstellung.
+Stand: 10.11.2026 — **S0 und S1 gebaut** (Matthias: „Ja, anfangen“ – mit den Vorschlägen aus §12), noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
+
+**Gebaut:**
+- **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug
+  `tools/StoreSign` (`keygen`, `pubkey`, `sign`, `sign-package`; privater Schlüssel in `%APPDATA%\MatCMS\store-signing\key.pem` auf Matthias' Rechner – sichern!),
+  `PublicRouteOptions.DuringMaintenance` und `MaxBodyMegabytes` (nur mit `RequireMember` + `Antiforgery`, höchstens 200). Tests `StoreSignatureTests`, `PluginRouteLimitsTests`.
+- **S1** — `plugins/matcms-store` (nativ, Key `matcms-store`, 0.1): `/store` (Reiter Skript/Native, Suche, Schlagwörter), `/store/{key}` (Bilderleiste mit
+  Lightbox, Text, Fakten, Versionen, Paket-Download), `/store/herausgeber/{slug}`, `/store/registrieren`, `/store/konto` (Herausgeber werden, Profil,
+  Einträge), `/store/konto/hochladen`, `/store/konto/eintrag/{key}` (Texte, Bilder, Titelbild); API `/store/api/catalog`, `…/plugins/{key}`,
+  `…/{version}/bundle`, `…/images/{id}`; Admin Prüfen (Freigabe nur mit gültiger Signatur), Einträge (Version/Eintrag zurückziehen), Herausgeber
+  (prüfen, sperren, Konto zuordnen); Menüpunkt „Store“ im Kopfmenü; Mails eingereicht/freigegeben/abgelehnt. Tests `MatcmsStoreTests` (ganzer Weg,
+  Signatur aus `MatCMS.Shared` vom Plugin angenommen, Key-Besitz, Versionen nur aufwärts, reservierte Keys, Wartungsmodus). Lokal mit den sieben
+  MATTHIX-Plugins und echten Signaturen durchgespielt.
+
+**Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
+Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.
+Texte und Bilder eines Eintrags ändert der Herausgeber direkt (ohne erneute Prüfung; alles wird als Text ausgegeben, nie als HTML). „Registrieren erlauben“
+ist im Plugin standardmäßig an – live erst einschalten, wenn die Bedingungen für Herausgeber stehen (§12 Frage 4).
 
 **Vorgabe (Matthias, 10.11.2026):**
 

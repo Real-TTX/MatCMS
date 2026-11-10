@@ -35,7 +35,7 @@ public class StoreTools
             templates = o.Templates.Select(t => new { t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, usedBy = t.UsedBy }),
             components = o.Components.Select(c => new { c.Type, c.Name, c.Description, c.Icon, usedBy = c.UsedBy }),
             mailTemplates = o.MailTemplates.Select(m => new { m.Key, m.Name, m.Subject, m.Enabled, m.IsHtml, usedBy = m.UsedBy }),
-            plugins = o.Plugins.Select(p => new { p.Key, p.Name, p.Version, usedBy = p.UsedBy }),
+            plugins = o.Plugins.Select(p => new { p.Key, p.Name, p.Version, p.Publisher, p.PublisherUrl, usedBy = p.UsedBy }),
         };
     }
 
@@ -147,6 +147,20 @@ public class StoreTools
         RequireStore(me);
         if (!await store.DeletePluginAsync(key, ct)) throw new McpException("Plugin nicht gefunden.");
         return new { ok = true };
+    }
+
+    [McpServerTool(Name = "set_store_plugin_publisher"), Description(
+        "Set who publishes a store plugin (\"Herausgeber\"), shown in the catalogue, on the sites' store dialog and in website store showcases. publisherUrl is optional (absolute http(s)). An empty publisher clears it. Not part of the bundle, nothing is rolled out. Requires the store right.")]
+    public static async Task<object> SetStorePluginPublisher(
+        McpContext me, StoreService store,
+        [Description("Plugin key.")] string key,
+        [Description("Publisher name, e.g. a company or person; empty = none.")] string publisher,
+        [Description("Optional website of the publisher (https://…).")] string? publisherUrl = null, CancellationToken ct = default)
+    {
+        RequireStore(me);
+        if (!await store.SetPluginPublisherAsync(key, publisher, publisherUrl, ct)) throw new McpException("Plugin nicht gefunden.");
+        var clean = StoreService.CleanPublisher(publisher, publisherUrl);
+        return new { ok = true, key, publisher = clean?.Name ?? "", publisherUrl = clean?.Url ?? "" };
     }
 
     private static bool IsValidJson(string s)

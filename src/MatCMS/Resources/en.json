@@ -1432,6 +1432,7 @@
   "store.dialogEmpty": "The cloud currently offers nothing here.",
   "store.dialogInstalled": "installed",
   "store.dialogInstall": "Install",
+  "store.dialogPublisher": "Publisher:",
   "store.dialogPictures": "View pictures ({0})",
   "store.viewerPrev": "Previous picture",
   "store.viewerNext": "Next picture",

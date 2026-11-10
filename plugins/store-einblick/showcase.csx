@@ -16,8 +16,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using MatCMS.Plugin;
 
-/// <summary>The plugin: a block that shows the plugin store of a MatCMS cloud — plugins (with their kind: script or native), templates and
-/// components — read from the cloud's public catalogue (<c>GET {cloud}/api/public/store</c>, no key needed), kept for a while in memory.</summary>
+/// <summary>The plugin: a block that shows the plugin store of a MatCMS cloud — plugins (with their kind: script or native, their publisher
+/// and their pictures), templates and components — read from the cloud's public catalogue (<c>GET {cloud}/api/public/store</c>, no key
+/// needed), kept for a while in memory. The pictures are passed through THIS site (<c>/store-einblick/bild/{key}/{id}</c>), never linked to
+/// the cloud: a visitor's browser talks to the website alone.</summary>
 public static class SeShowcase
 {
     public const string BlockType = "store_einblick";
@@ -64,7 +66,11 @@ public static class SeShowcase
         }, RenderAsync);
 
         b.Admin.Section("se.nav", "ti-building-store").Page("status", "se.tab.status", StatusAsync);
+        b.Route(ImageRoute + "/{key}/{id}", ImageAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
     }
+
+    /// <summary>Where this site serves a store picture. The same in both variants, so they draw the same HTML.</summary>
+    public const string ImageRoute = "/store-einblick/bild";
 
     // ---- the catalogue ----------------------------------------------------------------------------------------------
 
@@ -82,7 +88,7 @@ public static class SeShowcase
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Store-Einblick/1.0");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Store-Einblick/1.1");
             using var res = await http.GetAsync(url + "/api/public/store", ct);
             if (!res.IsSuccessStatusCode) throw new HttpRequestException("HTTP " + (int)res.StatusCode);
             var body = await res.Content.ReadAsStringAsync(ct);
@@ -150,8 +156,34 @@ public static class SeShowcase
             foreach (var p in plugins.Take(limit))
             {
                 var native = S(p["kind"]) == "native";
-                sb.Append("<article class=\"se-card\"><header><h3>").Append(E(S(p["name"]))).Append("</h3>")
+                var key = S(p["key"]);
+                var pics = Pictures(p);
+                // The card is its own lightbox group: "next" stays inside this plugin's pictures (the site's gallery.js does the viewing).
+                sb.Append("<article class=\"se-card").Append(pics.Count > 0 ? " se-has-cover" : "").Append('"');
+                if (pics.Count > 0) sb.Append(" data-lightbox-group=\"se-").Append(E(key)).Append('"');
+                sb.Append('>');
+                for (var i = 0; i < pics.Count; i++)
+                {
+                    var src = ImageRoute + "/" + Uri.EscapeDataString(key) + "/" + pics[i].Id.ToString(CultureInfo.InvariantCulture);
+                    if (i == 0)
+                    {
+                        sb.Append("<a class=\"se-cover\" href=\"").Append(E(src)).Append("\" data-lightbox data-caption=\"").Append(E(pics[i].Caption)).Append("\">")
+                          .Append("<img src=\"").Append(E(src)).Append("\" alt=\"").Append(E(pics[i].Caption.Length > 0 ? pics[i].Caption : S(p["name"]))).Append("\" loading=\"lazy\">");
+                        if (pics.Count > 1) sb.Append("<span class=\"se-count\">").Append(E(ctx.T("se.pictures", pics.Count))).Append("</span>");
+                        sb.Append("</a>");
+                    }
+                    else sb.Append("<a class=\"se-more-pic\" href=\"").Append(E(src)).Append("\" data-lightbox data-caption=\"").Append(E(pics[i].Caption)).Append("\" hidden></a>");
+                }
+                sb.Append("<header><h3>").Append(E(S(p["name"]))).Append("</h3>")
                   .Append($"<span class=\"se-badge {(native ? "se-native" : "se-script")}\">").Append(E(ctx.T(native ? "se.o.kindNative" : "se.o.kindScript"))).Append("</span></header>");
+                if (S(p["publisher"]) is { Length: > 0 } pub)
+                {
+                    sb.Append("<div class=\"se-publisher\">").Append(E(ctx.T("se.by"))).Append(' ');
+                    if (SafeUrl(S(p["publisherUrl"])) is { Length: > 0 } purl)
+                        sb.Append("<a href=\"").Append(E(purl)).Append("\" rel=\"noopener\" target=\"_blank\">").Append(E(pub)).Append("</a>");
+                    else sb.Append("<strong>").Append(E(pub)).Append("</strong>");
+                    sb.Append("</div>");
+                }
                 if (S(p["description"]) is { Length: > 0 } d) sb.Append("<p>").Append(E(Cut(d, 260))).Append("</p>");
                 sb.Append("<footer>").Append(E(ctx.T("se.version", S(p["version"]))));
                 if (S(p["updated"]) is { Length: 10 } up && DateTime.TryParse(up, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
@@ -194,6 +226,77 @@ public static class SeShowcase
 
     private static string Cut(string s, int max) => s.Length <= max ? s : s[..max].TrimEnd() + " …";
 
+    /// <summary>An address a visitor may be sent to: absolute http(s), nothing else — it comes from the cloud, not from this site.</summary>
+    public static string SafeUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.AbsoluteUri : "";
+
+    public sealed record Picture(int Id, string Caption);
+
+    /// <summary>A catalogue entry's pictures (at most 8, the store's own limit), in the catalogue's order — the first is the cover.</summary>
+    public static List<Picture> Pictures(JsonObject p) =>
+        (p["images"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
+            .Select(i => i["id"] is JsonValue v && v.TryGetValue<int>(out var id) && id > 0 ? new Picture(id, S(i["caption"])) : null)
+            .Where(x => x is not null).Select(x => x!).Take(8).ToList();
+
+    // ---- the pictures, passed through ---------------------------------------------------------------------------------
+
+    private const int MaxPictureBytes = 3 * 1024 * 1024;     // the store's own limit
+    private const long MaxCachedBytes = 48L * 1024 * 1024;   // all pictures of a busy store fit; beyond that the oldest go
+    private sealed record Pic(byte[] Bytes, string Type, string ETag, DateTime At);
+    private static readonly ConcurrentDictionary<string, Pic> Pics = new();
+
+    /// <summary><c>/store-einblick/bild/{key}/{id}</c>: a picture of a plugin the CURRENT catalogue lists with exactly that picture —
+    /// key and id go into a request to the cloud, so they are checked against the catalogue, never trusted. Fetched once, then served
+    /// from memory (a day for browsers; an id is never reused by the cloud). Only PNG, JPEG or WebP by their first bytes.</summary>
+    public static async Task<PluginResult> ImageAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var key = ctx.Request.R("key") ?? "";
+        if (!int.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0) return PluginResult.NotFound();
+        var cacheKey = key + "/" + id.ToString(CultureInfo.InvariantCulture);
+        if (Pics.TryGetValue(cacheKey, out var hit)) return Answer(hit);
+        var (data, _) = await CatalogAsync(ctx, false, ct);
+        var entry = (data?["plugins"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
+        if (entry is null || !Pictures(entry).Any(x => x.Id == id) || BaseUrl(ctx) is not { } url) return PluginResult.NotFound();
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Store-Einblick/1.1");
+            using var res = await http.GetAsync(url + "/api/public/store/plugins/" + Uri.EscapeDataString(key) + "/image/" + id.ToString(CultureInfo.InvariantCulture),
+                HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!res.IsSuccessStatusCode || res.Content.Headers.ContentLength > MaxPictureBytes) return PluginResult.NotFound();
+            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
+            if (bytes.Length > MaxPictureBytes || Sniff(bytes) is not { } type) return PluginResult.NotFound();
+            var pic = new Pic(bytes, type, """ + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes))[..16] + """, DateTime.UtcNow);
+            Pics[cacheKey] = pic;
+            // Keep the memory bounded: drop the oldest until it fits.
+            while (Pics.Values.Sum(x => (long)x.Bytes.Length) > MaxCachedBytes && Pics.Count > 1)
+            {
+                var oldest = Pics.OrderBy(x => x.Value.At).First().Key;
+                if (oldest == cacheKey) break;
+                Pics.TryRemove(oldest, out _);
+            }
+            return Answer(pic);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            ctx.Log("Store-Einblick picture: " + ex.Message);
+            return PluginResult.NotFound();
+        }
+    }
+
+    private static PluginResult Answer(Pic p) =>
+        PluginResult.File(p.Bytes, p.Type).WithHeader("Cache-Control", "public, max-age=86400").WithHeader("ETag", p.ETag)
+            .WithHeader("X-Content-Type-Options", "nosniff");
+
+    /// <summary>PNG, JPEG or WebP by their first bytes, whatever the other side calls it. Anything else (SVG, HTML) is refused.</summary>
+    public static string? Sniff(byte[] b)
+    {
+        if (b.Length > 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return "image/png";
+        if (b.Length > 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return "image/jpeg";
+        if (b.Length > 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F' && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') return "image/webp";
+        return null;
+    }
+
     // Theme-able: the site's own variables stand behind everything (accent, line, muted, the alternate background).
     private const string Css = "<style>.se-store .se-intro{color:var(--muted,#6b7280);max-width:720px}.se-store .se-counts{color:var(--muted,#6b7280);font-size:14px;margin:4px 0 18px}"
         + ".se-store .se-sub{margin:28px 0 12px}.se-store .se-grid{display:grid;gap:18px}.se-store .se-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}"
@@ -205,6 +308,10 @@ public static class SeShowcase
         + ".se-store .se-script{background:color-mix(in srgb,var(--accent,#2563eb) 14%,transparent);color:var(--accent,#2563eb)}"
         + ".se-store .se-native{background:var(--ink,#111827);color:#fff}.se-store .se-dot{width:14px;height:14px;border-radius:50%;display:inline-block;flex:0 0 auto}"
         + ".se-store .se-empty{color:var(--muted,#6b7280)}.se-store .se-more{margin-top:22px}"
+        + ".se-store .se-has-cover{padding-top:0;overflow:hidden}.se-store .se-cover{position:relative;display:block;margin:0 -20px 6px;aspect-ratio:16/10;background:var(--bg-alt,#f3f4f6);border-bottom:1px solid var(--line,#e5e7eb)}"
+        + ".se-store .se-cover img{width:100%;height:100%;object-fit:cover;object-position:top;display:block;transition:transform .25s ease}.se-store .se-cover:hover img{transform:scale(1.02)}"
+        + ".se-store .se-count{position:absolute;right:10px;bottom:10px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(17,24,39,.78);color:#fff}"
+        + ".se-store .se-publisher{font-size:13px;color:var(--muted,#6b7280);margin-top:-4px}.se-store .se-publisher a{color:inherit;text-decoration:underline;text-underline-offset:2px}"
         + "@media (max-width:900px){.se-store .se-cols-3,.se-store .se-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}}"
         + "@media (max-width:600px){.se-store .se-grid{grid-template-columns:minmax(0,1fr)}}</style>";
 
@@ -242,7 +349,7 @@ public static class SeText
         ["se.o.plugins"] = "Plugins", ["se.o.templates"] = "Templates", ["se.o.components"] = "Komponenten", ["se.o.all"] = "Alles",
         ["se.o.kindAll"] = "Alle", ["se.o.kindScript"] = "Skript", ["se.o.kindNative"] = "Native", ["se.o.yes"] = "Ja", ["se.o.no"] = "Nein",
         ["se.count.plugins"] = "{0} Plugins", ["se.count.templates"] = "{0} Templates", ["se.count.components"] = "{0} Komponenten",
-        ["se.version"] = "Version {0}", ["se.none"] = "Keine Einträge.",
+        ["se.version"] = "Version {0}", ["se.none"] = "Keine Einträge.", ["se.by"] = "von", ["se.pictures"] = "{0} Bilder",
         ["se.unavailable"] = "Der Store ist gerade nicht erreichbar.",
         ["se.err.url"] = "Keine gültige Adresse der Cloud eingestellt (Einstellungen).", ["se.err.fetch"] = "Der Store-Katalog konnte nicht geladen werden.",
         ["se.status.sub"] = "Woher der Block seine Einträge holt.", ["se.status.ok"] = "Katalog geladen von {0}.", ["se.status.refresh"] = "Neu laden",
@@ -262,7 +369,7 @@ public static class SeText
         ["se.o.plugins"] = "Plugins", ["se.o.templates"] = "Templates", ["se.o.components"] = "Components", ["se.o.all"] = "Everything",
         ["se.o.kindAll"] = "All", ["se.o.kindScript"] = "Script", ["se.o.kindNative"] = "Native", ["se.o.yes"] = "Yes", ["se.o.no"] = "No",
         ["se.count.plugins"] = "{0} plugins", ["se.count.templates"] = "{0} templates", ["se.count.components"] = "{0} components",
-        ["se.version"] = "Version {0}", ["se.none"] = "No entries.",
+        ["se.version"] = "Version {0}", ["se.none"] = "No entries.", ["se.by"] = "by", ["se.pictures"] = "{0} pictures",
         ["se.unavailable"] = "The store cannot be reached at the moment.",
         ["se.err.url"] = "No valid cloud address set (settings).", ["se.err.fetch"] = "The store catalogue could not be loaded.",
         ["se.status.sub"] = "Where the block gets its entries.", ["se.status.ok"] = "Catalogue loaded from {0}.", ["se.status.refresh"] = "Reload",

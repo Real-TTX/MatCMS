@@ -150,9 +150,23 @@ public class StoreService
         row.Description = pdesc ?? "";
         row.Bundle = bundle;
         row.UploadedAt = DateTime.UtcNow;
+        // The publisher is the store's to say; the bundle may only suggest one while the entry has none.
+        if (row.Publisher.Length == 0 && ReadBundlePublisher(bundle) is { } pub && CleanPublisher(pub.Name, pub.Url) is { } clean)
+            (row.Publisher, row.PublisherUrl) = clean;
         await _db.SaveChangesAsync(ct);
         await TouchAsync(_db.ProfileStorePlugins.Where(x => x.StorePluginId == row.Id).Select(x => x.ProfileId), ct);
         return new PluginResult(isNew, row.Key, row.Name, row.Version);
+    }
+
+    /// <summary>Sets (or, with an empty name, clears) the publisher of a store plugin. Not part of the bundle and not rolled out, so no
+    /// profile revision moves — the sites read it from the catalogue. False = no such plugin.</summary>
+    public async Task<bool> SetPluginPublisherAsync(string key, string? publisher, string? url, CancellationToken ct = default)
+    {
+        var row = await _db.StorePlugins.FirstOrDefaultAsync(x => x.Key == key, ct);
+        if (row is null) return false;
+        (row.Publisher, row.PublisherUrl) = CleanPublisher(publisher, url) ?? ("", "");
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task<bool> DeletePluginAsync(string key, CancellationToken ct = default)
@@ -274,7 +288,7 @@ public class StoreService
     public async Task<StoreOverview> OverviewAsync(CancellationToken ct = default)
     {
         var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, _db.ProfileStorePlugins.Count(x => x.StorePluginId == p.Id), null))
+            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, _db.ProfileStorePlugins.Count(x => x.StorePluginId == p.Id), null, p.Publisher, p.PublisherUrl))
             .ToListAsync(ct);
         var templates = await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
             .Select(t => new StoreTemplateRow(t.Name, t.Description, t.AccentColor, t.HeadingFont, t.BodyFont, _db.ProfileStoreTemplates.Count(x => x.StoreTemplateId == t.Id)))
@@ -307,7 +321,7 @@ public class StoreService
                 .Select(x => new { x.StorePluginId, x.Id, x.Caption }).ToListAsync())
             .ToLookup(x => x.StorePluginId, x => new CatalogImage { Id = x.Id, Caption = x.Caption });
         var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description } })
+            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description, Publisher = p.Publisher, PublisherUrl = p.PublisherUrl } })
             .ToListAsync();
         foreach (var p in plugins) p.Plugin.Images = images[p.Id].ToList();
         return await CatalogRestAsync(plugins.Select(p => p.Plugin).ToList());
@@ -332,13 +346,22 @@ public class StoreService
     public async Task<System.Text.Json.Nodes.JsonObject> PublicCatalogAsync(CancellationToken ct = default)
     {
         var plugins = new System.Text.Json.Nodes.JsonArray();
+        var pictures = (await _db.StorePluginImages.AsNoTracking().OrderBy(x => x.Sort).ThenBy(x => x.Id)
+                .Select(x => new { x.StorePluginId, x.Id, x.Caption }).ToListAsync(ct))
+            .ToLookup(x => x.StorePluginId);
         foreach (var p in await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name).ToListAsync(ct))
         {
             var native = NativeBundleInfo.Read(p.Bundle);
+            // Pictures by their PUBLIC address (relative to the cloud): a website's showcase passes them on through its own route,
+            // so a visitor's browser never has to talk to the cloud.
+            var images = new System.Text.Json.Nodes.JsonArray();
+            foreach (var img in pictures[p.Id])
+                images.Add(new System.Text.Json.Nodes.JsonObject { ["id"] = img.Id, ["caption"] = img.Caption, ["url"] = PublicImagePath(p.Key, img.Id) });
             plugins.Add(new System.Text.Json.Nodes.JsonObject
             {
                 ["key"] = p.Key, ["name"] = p.Name, ["version"] = p.Version, ["description"] = p.Description,
-                ["kind"] = native is null ? "script" : "native", ["api"] = native?.Api ?? "", ["updated"] = p.UploadedAt.ToString("yyyy-MM-dd")
+                ["kind"] = native is null ? "script" : "native", ["api"] = native?.Api ?? "", ["updated"] = p.UploadedAt.ToString("yyyy-MM-dd"),
+                ["publisher"] = p.Publisher, ["publisherUrl"] = p.PublisherUrl, ["images"] = images
             });
         }
         var templates = new System.Text.Json.Nodes.JsonArray();
@@ -352,6 +375,13 @@ public class StoreService
             ["format"] = 1, ["generated"] = DateTime.UtcNow.ToString("O"), ["plugins"] = plugins, ["templates"] = templates, ["components"] = components
         };
     }
+
+    /// <summary>Where the public may fetch one picture of a store plugin (see <c>GET /api/public/store/plugins/{key}/image/{id}</c>).</summary>
+    public static string PublicImagePath(string key, int id) => $"/api/public/store/plugins/{Uri.EscapeDataString(key)}/image/{id}";
+
+    /// <summary>One picture for the PUBLIC: only when it belongs to the named plugin (an id alone must not walk through every picture).</summary>
+    public Task<StorePluginImage?> GetPublicPluginImageAsync(string key, int id, CancellationToken ct = default) =>
+        _db.StorePluginImages.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.StorePlugin!.Key == key, ct);
 
     /// <summary>A component by its type exactly as stored (what the catalogue lists); see <see cref="GetComponentAsync"/> for the
     /// lower-casing lookup of the operator API.</summary>
@@ -374,7 +404,7 @@ public class StoreService
 
     public Task<List<StorePluginRow>> ListPluginsAsync(CancellationToken ct = default) =>
         _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, null, p.UploadedAt)).ToListAsync(ct);
+            .Select(p => new StorePluginRow(p.Key, p.Name, p.Version, p.Description, p.Bundle.Length, null, p.UploadedAt, p.Publisher, p.PublisherUrl)).ToListAsync(ct);
 
     /// <summary>A plugin with its bundle (the ZIP), for the download.</summary>
     public Task<StorePlugin?> GetPluginAsync(string key, CancellationToken ct = default) =>
@@ -400,6 +430,39 @@ public class StoreService
         }
         catch (Exception ex) { return (null, null, null, null, "Ungültiges Bundle: " + ex.Message); }
     }
+
+    /// <summary>The publisher a bundle's manifest suggests (<c>Publisher</c>, <c>PublisherUrl</c> — plain strings like every manifest field the
+    /// cloud reads), or null when it names none or cannot be read.</summary>
+    public static (string Name, string Url)? ReadBundlePublisher(byte[] bytes)
+    {
+        try
+        {
+            using var ms = new MemoryStream(bytes);
+            using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
+            if (zip.GetEntry(PluginBundle.ManifestEntry) is not { } entry) return null;
+            using var r = new StreamReader(entry.Open());
+            using var doc = JsonDocument.Parse(r.ReadToEnd());
+            string Get(string p) => doc.RootElement.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+            var name = Get("Publisher");
+            return name.Trim().Length == 0 ? null : (name, Get("PublisherUrl"));
+        }
+        catch { return null; }
+    }
+
+    public const int MaxPublisherLength = 80;
+
+    /// <summary>A publisher as it may be stored: the name trimmed, without line breaks, at most <see cref="MaxPublisherLength"/>; the address
+    /// only as an absolute http(s) URL (anything else is dropped — it is rendered as a link on public websites). Null = the name is empty.</summary>
+    public static (string Name, string Url)? CleanPublisher(string? name, string? url)
+    {
+        var n = string.Join(' ', (name ?? "").Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();
+        if (n.Length == 0) return null;
+        if (n.Length > MaxPublisherLength) n = n[..MaxPublisherLength].TrimEnd();
+        var u = (url ?? "").Trim();
+        u = u.Length <= 300 && Uri.TryCreate(u, UriKind.Absolute, out var parsed) && (parsed.Scheme == Uri.UriSchemeHttps || parsed.Scheme == Uri.UriSchemeHttp)
+            ? parsed.ToString() : "";
+        return (n, u);
+    }
 }
 
 // ---- inputs (shared by REST + MCP) ------------------------------------------
@@ -415,7 +478,8 @@ public record StoreMailTemplateInput(string Key, string? Name, string? Descripti
 // UsedBy / UploadedAt are only there where the list asks for them; a null one stays out of the JSON.
 public record StorePluginRow(string Key, string Name, string Version, string Description, int SizeBytes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTime? UploadedAt);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTime? UploadedAt,
+    string Publisher = "", string PublisherUrl = "");
 public record StoreTemplateRow(string Name, string Description, string AccentColor, string HeadingFont, string BodyFont,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? UsedBy);
 public record StoreComponentRow(string Type, string Name, string Description, string Icon,

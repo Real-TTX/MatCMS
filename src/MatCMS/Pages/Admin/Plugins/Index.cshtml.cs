@@ -69,6 +69,8 @@ public class IndexModel : PageModel
             RouteValue: p.Key,
             InstalledVersion: Items.FirstOrDefault(i => i.Key == p.Key)?.Version,
             Version: p.Version,
+            Publisher: p.Publisher,
+            PublisherUrl: p.PublisherUrl,
             Images: (p.Images ?? []).Select(img => new Shared.StoreImage(
                 Url.Page("/Admin/Plugins/Index", "StoreImage", new { imageId = img.Id })!, img.Caption)).ToList())).ToList(),
         Error: CatalogError);

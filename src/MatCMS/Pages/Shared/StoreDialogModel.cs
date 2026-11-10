@@ -12,10 +12,16 @@ namespace MatCMS.Pages.Shared;
 /// <param name="Version">Version offered by the store, or null for things that have none.</param>
 /// <param name="Accent">Optional colour for the card's strip (templates).</param>
 /// <param name="Images">Pictures (plugins): the first is the card's cover, all of them open as a gallery. Addresses on THIS site.</param>
+/// <param name="Publisher">Who publishes it in the store ("Herausgeber"); empty = not shown.</param>
+/// <param name="PublisherUrl">The publisher's website (http(s) only, checked again here), linked from the name.</param>
 public sealed record StoreItem(
     string Title, string Sub, string Description, string RouteValue,
     string? InstalledVersion = null, string? Version = null, string? Accent = null,
-    IReadOnlyList<StoreImage>? Images = null);
+    IReadOnlyList<StoreImage>? Images = null, string? Publisher = null, string? PublisherUrl = null)
+{
+    /// <summary>The publisher's address when it is safe to link (absolute http/https), else null — it came from the cloud, not from us.</summary>
+    public string? SafePublisherUrl => Uri.TryCreate(PublisherUrl ?? "", UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.ToString() : null;
+}
 
 /// <summary>One picture of a store offering: where this site serves it, and its caption.</summary>
 public sealed record StoreImage(string Url, string Caption);

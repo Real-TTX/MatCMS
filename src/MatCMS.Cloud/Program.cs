@@ -1010,6 +1010,19 @@ app.MapGet("/api/public/store", async (HttpContext ctx, StoreService store, Micr
     return Results.Text(json!, "application/json; charset=utf-8");
 }).RequireRateLimiting("instanceApi");
 
+// One picture of a store plugin for the PUBLIC, named in the public catalogue — what a website's store showcase passes on. Only
+// pictures of a plugin that is in the store (the key must match the id), so an id alone does not walk the table. Screenshots are
+// shop-window material, but the bytes came from an upload: sniffing off, a sandbox CSP, and a long cache (an id is never reused).
+app.MapGet("/api/public/store/plugins/{key}/image/{id:int}", async (HttpContext ctx, string key, int id, StoreService store) =>
+{
+    var img = await store.GetPublicPluginImageAsync(key, id, ctx.RequestAborted);
+    if (img is null) return Results.NotFound();
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
+    ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
+    return Results.File(img.Data, img.ContentType);
+}).RequireRateLimiting("instanceApi");
+
 app.MapGet("/api/store/{publicId}/catalog", async (
     HttpContext ctx, string publicId, InstanceService instances, StoreService store) =>
 {

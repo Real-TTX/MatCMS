@@ -133,6 +133,26 @@
 
 </form>
 
+    @* Who publishes the plugin — a property of the store entry, saved on its own like the pictures. *@
+    <div class="card" id="herausgeber">
+        <h2>@T["store.publisher"]</h2>
+        <p class="muted">@T["store.publisherHint"]</p>
+        <form method="post" asp-page-handler="Publisher" asp-route-id="@Model.Item.Id">
+            <div class="form-row">
+                <div class="form-field">
+                    <label for="publisher">@T["store.publisherName"]</label>
+                    <input id="publisher" name="publisher" maxlength="@MatCMS.Cloud.Services.StoreService.MaxPublisherLength" value="@Model.Item.Publisher" />
+                </div>
+                <div class="form-field">
+                    <label for="publisherUrl">@T["store.publisherUrl"]</label>
+                    <input id="publisherUrl" name="publisherUrl" type="url" maxlength="300" placeholder="https://" value="@Model.Item.PublisherUrl" />
+                    <div class="help">@T["store.publisherUrlHint"]</div>
+                </div>
+            </div>
+            <div><button type="submit" class="btn btn-ghost">@T["common.save"]</button></div>
+        </form>
+    </div>
+
     @* The pictures the sites' store dialog shows (cover = the first). Their own forms, outside plugin-form — forms cannot nest — and
        each saves at once, so there is nothing here the Save button below would have to carry. *@
     <div class="card" id="bilder">

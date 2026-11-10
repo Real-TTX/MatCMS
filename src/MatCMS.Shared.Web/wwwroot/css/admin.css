@@ -1418,6 +1418,8 @@ a.tab { display: inline-block; text-decoration: none; }
 .store-card-strip { display: block; height: 6px; border-radius: 3px; margin-bottom: 8px; }
 .store-card-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .store-card-sub { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.store-card-publisher { font-size: 12.5px; }
+.store-card-publisher a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .store-card-text { font-size: 13px; color: var(--muted); }
 .store-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
 /* A plugin's pictures: the cover fills the card's top edge to edge, a click opens the gallery. */

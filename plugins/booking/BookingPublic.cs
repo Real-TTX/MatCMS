@@ -279,7 +279,7 @@ public static class BookingCss
 .bk-month td.bk-free{cursor:pointer}.bk-month td.bk-sel{background:var(--bk-accent);color:#fff}
 .bk-legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;font-size:.85em;color:var(--bk-muted);margin-top:14px}
 .bk-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
-.bk-units{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px}
+.bk-units{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:22px}
 .bk-unit{border:1px solid var(--bk-line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;background:var(--bk-bg)}
 .bk-unit img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
 .bk-unit-body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}.bk-unit h3{margin:0;font-size:1.15em}.bk-unit-body p{margin:0}

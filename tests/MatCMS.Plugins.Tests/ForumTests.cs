@@ -209,7 +209,7 @@ public class ForumTests : IClassFixture<ForumApp>
         var alice = await _f.AsAsync("alice");
         var thread = await StartThreadAsync(alice, "Sicherheit <script>", "<script>alert(1)</script> <img src=x onerror=alert(2)>\n"
             + "[url=javascript:alert(3)]klick[/url] [url=https://example.org/a?b=1&c=2]gut[/url] [img]http://tracker.example/x.png[/img] [img]https://example.org/ok.png[/img]\n"
-            + "[quote=Eve|1]zitat[/quote][code][b]kein fett[/b] <b>roh</b>[/code]\n[list][*]eins[*]zwei[/list] https://example.org/bare");
+            + "[quote=Eve|1]zitat[/quote][code][b]kein fett[/b] <b>roh</b>[/code]\n[list][*]eins[*]zwei[/list] https://example.org/bare\n[code] offen [b]fett[/b]");
         var html = await alice.GetStringAsync(thread);
         var body = html[html.IndexOf("class=\"forum-posts\"", StringComparison.Ordinal)..];
         body = body[..body.IndexOf("id=\"antworten\"", StringComparison.Ordinal)];
@@ -226,6 +226,7 @@ public class ForumTests : IClassFixture<ForumApp>
         Assert.Contains("<pre class=\"forum-code\"><code>[b]kein fett[/b] &lt;b&gt;roh&lt;/b&gt;</code></pre>", body);
         Assert.Contains("<ul><li>eins</li><li>zwei</li></ul>", body);
         Assert.Contains("<a href=\"https://example.org/bare\"", body);
+        Assert.Contains("[code] offen <strong>fett</strong>", body);                   // a [code] that is never closed stays text, not the rest of the post
         Assert.Contains("Sicherheit &lt;script&gt;", html);                                // the title too
     }
 

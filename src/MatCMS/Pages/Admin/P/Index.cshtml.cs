@@ -96,6 +96,7 @@ public class IndexModel : PageModel
         var current = page.Tab is not null ? page : section.Tabs.FirstOrDefault(t => t.Pattern.FirstLiteral == page.Pattern.FirstLiteral);
         Tabs = TabsOf(section, slice, current, settingsActive: false);
         ViewData["Title"] = !string.IsNullOrWhiteSpace(result.Title) ? result.Title : PluginStrings.Label(slice, Locale, section.Label);
+        ViewData["CrumbParent"] = PluginStrings.Label(slice, Locale, section.Label); ViewData["CrumbParentUrl"] = section.Url;
         return Page();
     }
 
@@ -132,6 +133,7 @@ public class IndexModel : PageModel
         // A plugin with several groups of settings shows ONE group at a time, with the groups as a sub-menu at the left — never one long form. Asked for without a group, the first one opens.
         if (group.Length == 0 && groups.Count >= 2 && Request.Method == "GET") return Redirect((section?.Url ?? "/admin/p/" + key) + "/" + SettingsPath + "?group=" + Uri.EscapeDataString(groups[0].Group));
         if (group.Length > 0) ViewData["Title"] = PluginStrings.Label(slice, Locale, group);
+        if (section is not null) { ViewData["CrumbParent"] = PluginStrings.Label(slice, Locale, section.Label); ViewData["CrumbParentUrl"] = section.Url; }
 
         Dictionary<string, string>? errors = null;
         Dictionary<string, string>? posted = null;
@@ -156,7 +158,8 @@ public class IndexModel : PageModel
         {
             var baseUrl = (section?.Url ?? "/admin/p/" + key) + "/" + SettingsPath;
             var nav = groups.Select(g => Ui.NavItem(PluginStrings.Label(slice, Locale, g.Group), baseUrl + "?group=" + Uri.EscapeDataString(g.Group), active: g.Group == group)).ToList();
-            Html = Draw(Ui.Split(nav, Ui.Card(PluginStrings.Label(slice, Locale, group), form)));
+            // no card title: the active sub-menu entry and the topbar already name the group (it stood there three times)
+            Html = Draw(Ui.Split(nav, Ui.Card(form)));
         }
         else Html = Draw(form);
         return Page();

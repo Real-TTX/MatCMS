@@ -142,7 +142,7 @@ public static class VereinCss
 .vm-events li{display:flex;gap:16px;align-items:flex-start}
 .vm-events li.is-cancelled .vm-ev strong{text-decoration:line-through}
 .vm-date{flex:none;width:64px;border-radius:12px;background:var(--verein-accent,var(--accent,#8a1f33));color:#fff;text-align:center;padding:8px 4px;line-height:1.05}
-.vm-date b{display:block;font-size:1.6rem;font-family:var(--font-head,inherit)}
+.vm-date b{display:block;font-size:1.6rem;line-height:1;margin-bottom:3px;font-family:var(--font-head,inherit);font-variant-numeric:lining-nums}
 .vm-date small{display:block;text-transform:uppercase;font-size:12px;letter-spacing:.08em;font-weight:700}
 .vm-date em{display:block;font-style:normal;font-size:11.5px;opacity:.85;margin-top:2px}
 .vm-ev{display:flex;flex-direction:column;gap:3px;min-width:0}

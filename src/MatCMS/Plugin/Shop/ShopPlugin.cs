@@ -103,9 +103,10 @@ public sealed class ShopPlugin : IPlugin
             .Link("shop.tab.brands", "brands", "ti-award")
             .Link("shop.tab.attributes", "attributes", "ti-adjustments")
             .Link("shop.tab.customers", "customers", "ti-users")
+            .Link("shop.tab.coupons", "coupons", "ti-ticket")
             .Link("shop.tab.reports", "reports", "ti-chart-bar")
             .Link("shop.tab.data", "data", "ti-arrows-exchange")
-            .Link("shop.nav.conditions", "shipping", "ti-adjustments-horizontal", also: new[] { "payment", "coupons", "taxes", "legal", "numbers" })
+            .Link("shop.nav.conditions", "shipping", "ti-adjustments-horizontal", also: new[] { "payment", "taxes", "legal", "numbers" })
             .Link("shop.nav.settings", "_settings", "ti-settings");
         b.Admin.Tile(ShopAdmin.TileAsync);
         b.Admin.Attention(ShopAdmin.AttentionAsync);

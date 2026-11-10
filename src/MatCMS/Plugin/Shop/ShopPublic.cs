@@ -683,7 +683,7 @@ internal static partial class ShopPublic
     private static async Task<string> EmptyCartAsync(IPluginContext ctx, ShopConfig cfg, ShopStore store, CancellationToken ct)
     {
         var sb = new StringBuilder("<div class=\"shop-cart-empty\"><div class=\"icon\" aria-hidden=\"true\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"9\" cy=\"20\" r=\"1.5\"/><circle cx=\"18\" cy=\"20\" r=\"1.5\"/><path d=\"M3 4h2l2.5 11h11L21 7H6\"/></svg></div>");
-        sb.Append($"<h2>{E(ctx.T("shop.cartEmpty"))}</h2><p class=\"shop-muted\">{E(ctx.T("shop.cartEmptyHelp"))}</p><p><a class=\"shop-btn big\" href=\"/shop\">{E(ctx.T("shop.continue"))}</a></p>");
+        sb.Append($"<h2>{E(ctx.T("shop.cartEmpty"))}</h2><p><a class=\"shop-btn big\" href=\"/shop\">{E(ctx.T("shop.continue"))}</a></p>");
         var cats = await store.CategoriesAsync(ct);
         var (counts, _) = await store.FacetsAsync(ct);
         var roots = ShopCategories.Roots(cats).Where(c => counts.ContainsKey(c.Slug)).Take(8).ToList();

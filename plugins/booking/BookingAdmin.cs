@@ -4,7 +4,7 @@ namespace MatCMS.Plugin.Booking;
 
 /// <summary>
 /// Admin → Buchungen (phase B1): houses, units (with their blocks), seasons with the price table of every unit, fees and tourist tax, and "Preis prüfen" —
-/// the same bill a guest will get, with the reasons when a stay does not fit. Requests, guests and the occupancy chart come in B2/B3.
+/// the same bill a guest will get, with the reasons when a stay does not fit. The overview shows today's arrivals and departures; the set-up list only while something is missing.
 /// </summary>
 public static class BookingAdmin
 {
@@ -30,12 +30,12 @@ public static class BookingAdmin
             .Link("Kanäle", "channels", "ti-arrows-exchange")
             .Link("Meldungen", "checkins", "ti-id", also: new[] { "checkins/" })
             .Link("Reinigung", "cleaning", "ti-wash-machine", also: new[] { "cleaning/" })
-            .Link("Kundenverbund", "federation", "ti-affiliate")
+            .Link("Verbund", "federation", "ti-affiliate", also: new[] { "federation/" })
+            .Link("Objekte", "properties", "ti-building-cottage", heading: "Einrichtung", also: new[] { "properties/" })
             .Link("Einheiten", "units", "ti-bed", also: new[] { "units/" })
             .Link("Saisons & Preise", "seasons", "ti-calendar-dollar", also: new[] { "seasons/" })
             .Link("Gebühren & Kurtaxe", "fees", "ti-receipt", also: new[] { "fees/" })
             .Link("Preis prüfen", "check", "ti-calculator")
-            .Link("Objekte", "properties", "ti-building-cottage", heading: "Einrichtung", also: new[] { "properties/" })
             .Link("Einstellungen", "_settings", "ti-settings")
             .Badge(async (c, ct) => (await BookingFlow.ListAsync(c.Data, new[] { BookingStatus.Request }, ct)).Count is var n and > 0 ? n.ToString(CultureInfo.InvariantCulture) : null);
         BookingAdminBookings.Register(section);
@@ -59,7 +59,7 @@ public static class BookingAdmin
         all.Count < 2 ? null : Ui.Tabs(all.Select(p => Ui.Tab(p.Name, Root + page + "?objekt=" + p.Id, p.Id == current?.Id)).ToArray());
 
     private static PluginResult NoHouse(string title) => PluginResult.Page(Ui.Stack(
-        Ui.PageHead("Zuerst ein Objekt anlegen – das Haus oder die Villa, zu der die Einheiten gehören", title),
+        Ui.PageHead(null, title),
         Ui.Card(Ui.Empty("Noch kein Objekt."), Ui.Button("Objekt anlegen", Root + "properties/new", icon: "ti-plus"))), title);
 
     // ---- overview ---------------------------------------------------------------------------------------------------
@@ -81,17 +81,26 @@ public static class BookingAdmin
         foreach (var h in houses) { seasons += (await store.SeasonsAsync(h.Id, ct)).Count; fees += (await store.FeesAsync(h.Id, ct)).Count; }
         steps.Add(("Saisons und Preise festlegen", seasons > 0, Root + "seasons"));
         steps.Add(("Gebühren und Kurtaxe (Endreinigung, Bettwäsche …)", fees > 0, Root + "fees"));
+        var today = B.Today;
+        var paid = await BookingPayments.PaidAsync(ctx.Data, ct);
+        var unpaid = all.Count(x => x.Status == BookingStatus.Confirmed && x.Departure >= today && !(paid.TryGetValue(x.Id, out var v) && v > 0));
+        var names = units.ToDictionary(u => u.Id, u => u.Name);
+        UiNode Today(string title, IEnumerable<Booking> list) => Ui.Card(title, Ui.Table(
+            new[] { Ui.Column("Unterkunft"), Ui.Column("Gast"), Ui.Column("Personen", right: true) },
+            list.Select(x => Ui.Row(names.GetValueOrDefault(x.UnitId, "–"), Ui.Link(x.Name.Length > 0 ? x.Name : x.Number, Root + "bookings/" + x.Id), B.Num(x.Adults + x.Children))),
+            emptyText: "Niemand."));
+        var confirmed = all.Where(x => x.Status == BookingStatus.Confirmed).ToList();
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Anfragen, Buchungen, Häuser, Saisons und Preise – Gästekartei und Kalender-Abgleich folgen", "Buchungen"),
             Ui.Stats(
                 Ui.Stat("Offene Anfragen", B.Num(open), tone: open > 0 ? UiTone.Warning : UiTone.Success, href: Root + "bookings"),
                 Ui.Stat("Kommende Buchungen", B.Num(coming), href: Root + "bookings?tab=kommend"),
+                Ui.Stat("Unbezahlt", B.Num(unpaid), tone: unpaid > 0 ? UiTone.Warning : UiTone.Default, href: Root + "bookings?tab=kommend"),
                 Ui.Stat("Objekte", B.Num(houses.Count), href: Root + "properties"),
-                Ui.Stat("Einheiten", B.Num(units.Count(u => u.Active)), units.Any(u => !u.Active) ? units.Count(u => !u.Active) + " inaktiv" : null, href: Root + "units"),
-                Ui.Stat("Saisons", B.Num(seasons), href: Root + "seasons")),
-            Ui.Card("Einrichten", Ui.Stack(steps.Select(s => (UiNode?)Ui.Inline(
-                Ui.Badge(s.Done ? "erledigt" : "offen", s.Done ? UiTone.Success : UiTone.Warning), Ui.Link(s.Text, s.Href))).ToArray()),
-                Ui.Button("Einen Aufenthalt durchrechnen", Root + "check", UiButtonKind.Ghost, "ti-calculator", small: true))), "Buchungen");
+                Ui.Stat("Einheiten", B.Num(units.Count(u => u.Active)), units.Any(u => !u.Active) ? units.Count(u => !u.Active) + " inaktiv" : null, href: Root + "units")),
+            Ui.Grid(320, Today("Anreisen heute", confirmed.Where(x => x.Arrival == today)), Today("Abreisen heute", confirmed.Where(x => x.Departure == today))),
+            // the set-up list only while something is missing — once everything is there it is noise
+            steps.All(s => s.Done) ? null : Ui.Card("Einrichten", Ui.Stack(steps.Select(s => (UiNode?)Ui.Inline(
+                Ui.Badge(s.Done ? "erledigt" : "offen", s.Done ? UiTone.Success : UiTone.Warning), Ui.Link(s.Text, s.Href))).ToArray()))), "Buchungen");
     }
 
     // ---- houses -----------------------------------------------------------------------------------------------------
@@ -102,7 +111,7 @@ public static class BookingAdmin
         var houses = await store.PropertiesAsync(ct);
         var units = await store.UnitsAsync(ct);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Das Haus oder die Villa: Adresse, Land (für Kurtaxe und Meldedaten), Check-in- und Check-out-Zeit", "Objekte"),
+            Ui.PageHead(null, "Objekte"),
             Ui.Table(new[] { Ui.Column("Objekt"), Ui.Column("Ort"), Ui.Column("Einheiten", right: true) },
                 houses.Select(h => Ui.RowFor(h.Name, Ui.Link(h.Name, Root + "properties/" + h.Id), h.Address, B.Num(units.Count(u => u.PropertyId == h.Id)))),
                 emptyText: "Noch kein Objekt.") with { Below = new UiNode[] { Ui.Button("Neues Objekt", Root + "properties/new", icon: "ti-plus") } }), "Objekte");
@@ -171,7 +180,7 @@ public static class BookingAdmin
         var units = await store.UnitsAsync(ct);
         string House(long id) => houses.FirstOrDefault(h => h.Id == id)?.Name ?? "–";
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Was gebucht wird: ein Apartment, ein Zimmer oder das ganze Haus", "Einheiten"),
+            Ui.PageHead(null, "Einheiten"),
             Ui.Table(new[] { Ui.Column("Einheit"), Ui.Column("Objekt"), Ui.Column("Personen"), Ui.Column("Grundpreis", right: true), Ui.Column("Status") },
                 units.Select(u => Ui.RowFor(u.Name + " " + House(u.PropertyId), Ui.Inline(Ui.Link(u.Name, Root + "units/" + u.Id), u.Contains.Count > 0 ? Ui.Badge("ganzes Haus", UiTone.Info) : null),
                     House(u.PropertyId), u.GuestsStd == u.GuestsMax ? B.Num(u.GuestsMax) : u.GuestsStd + "–" + u.GuestsMax, B.Money(u.BasePrice, Cur(ctx)) + " / Nacht",
@@ -248,21 +257,20 @@ public static class BookingAdmin
                 Ui.Input("bedrooms", "Schlafzimmer", B.Num(u?.Bedrooms ?? 1), UiInputType.Number),
                 Ui.Input("guests_std", "Personen im Preis", B.Num(u?.GuestsStd ?? 2), UiInputType.Number),
                 Ui.Input("guests_max", "Personen höchstens", B.Num(u?.GuestsMax ?? 4), UiInputType.Number),
-                Ui.Input("buffer_days", "Puffertage", B.Num(u?.BufferDays ?? 0), UiInputType.Number) with { Help = "Freie Tage zwischen zwei Gästen (Reinigung). 0 = Abreise und Anreise am selben Tag." }),
+                Ui.Input("buffer_days", "Puffertage", B.Num(u?.BufferDays ?? 0), UiInputType.Number) with { Help = "Freie Tage zwischen zwei Gästen" },
+                Ui.Input("sort", "Reihenfolge", B.Num(u?.Sort ?? 0), UiInputType.Number)),
             Ui.Heading("Grundpreis (außerhalb jeder Saison)", 3),
             Ui.Grid(160,
                 Ui.Input("base_price", "Preis je Nacht (" + B.Symbol(cur) + ")", u is null ? "" : B.MoneyField(u.BasePrice)),
                 Ui.Input("base_min_nights", "Mindestnächte", B.Num(u?.BaseMinNights ?? 1), UiInputType.Number),
-                Ui.Input("extra_person", "Aufschlag je weitere Person und Nacht", u is null ? "" : B.MoneyField(u.ExtraPerson))),
+                Ui.Input("extra_person", "+ Person/Nacht (" + B.Symbol(cur) + ")", u is null ? "" : B.MoneyField(u.ExtraPerson))),
             siblings.Count == 0 ? null : Ui.Stack(
-                Ui.Heading("Ganzes Haus", 3),
-                Ui.Muted("Ist diese Einheit das ganze Haus, die Einheiten ankreuzen, aus denen es besteht: ist eine davon belegt, ist das Haus belegt – und umgekehrt."),
+                Ui.Heading("Ganzes Haus – besteht aus", 3),
                 Ui.Grid(220, siblings.Select(o => (UiNode?)Ui.Checkbox("contains_" + o.Id, o.Name, u?.Contains.Contains(o.Id) ?? false)).ToArray())),
             Ui.Heading("Ankunft und Reinigung", 3),
             Ui.TextArea("access_info", "Zugang (Schlüssel, Türcode, Schlüsselbox)", u?.AccessInfo ?? "", 3) with { Help = "Geht erst am Tag vor der Anreise an den Gast – nie in einer früheren Mail." },
             Ui.Input("wifi", "WLAN (Name und Passwort)", u?.Wifi ?? ""),
             Ui.TextArea("checklist", "Reinigungs-Checkliste (ein Punkt je Zeile)", u?.Checklist ?? "", 4),
-            Ui.Grid(160, Ui.Input("sort", "Reihenfolge", B.Num(u?.Sort ?? 0), UiInputType.Number)),
             Ui.Checkbox("active", "Buchbar (auf der Website sichtbar)", u?.Active ?? true),
             Ui.FormActions(Ui.Submit("Speichern"), u is null ? null : Ui.Submit("Löschen", UiButtonKind.Danger, "action", "delete", confirm: "Einheit löschen?")));
 
@@ -306,14 +314,13 @@ public static class BookingAdmin
             ? "keine Preise" : B.Money(ps.Where(x => x > 0).Min(), cur) + (ps.Max() != ps.Where(x => x > 0).Min() ? " – " + B.Money(ps.Max(), cur) : "");
         var years = seasons.Select(s => s.From.Year).Distinct().OrderBy(y => y).ToList();
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Zeiträume mit eigenen Preisen. Überschneiden sich zwei, gilt die mit dem höheren Rang (Silvester in der Nebensaison).", "Saisons & Preise"),
+            Ui.PageHead(null, "Saisons & Preise"),
             HouseTabs(houses, house, "seasons"),
             Ui.Table(new[] { Ui.Column("Saison"), Ui.Column("Zeitraum"), Ui.Column("Rang", right: true), Ui.Column("Preis je Nacht", right: true) },
                 seasons.Select(s => Ui.RowFor(s.Name, Ui.Link(s.Name, Root + "seasons/" + s.Id), B.Date(s.From) + " – " + B.Date(s.To), B.Num(s.Rank), Range(s))),
                 emptyText: "Noch keine Saison – bis dahin gilt überall der Grundpreis der Einheit.")
                 with { Below = new UiNode[] { Ui.Button("Neue Saison", Root + "seasons/new?objekt=" + house.Id, icon: "ti-plus") } },
-            years.Count == 0 ? null : Ui.Card("Nächstes Jahr", Ui.Form(
-                Ui.Muted("Kopiert alle Saisons eines Jahres mit ihren Preisen ein Jahr weiter – danach nur noch die Daten anpassen (Ostern wandert)."),
+            years.Count == 0 ? null : Ui.Card("Saisons kopieren", Ui.Form(
                 Ui.Inline(Ui.Select("year", "Jahr", B.Num(years[^1]), years.Select(y => Ui.Option(B.Num(y), y + " → " + (y + 1))).ToArray()),
                     Ui.Submit("Kopieren", UiButtonKind.Ghost, "action", "copy", icon: "ti-copy"))))), "Saisons & Preise");
     }
@@ -364,13 +371,14 @@ public static class BookingAdmin
         {
             var r = rates.FirstOrDefault(x => x.UnitId == u.Id && x.SeasonId == s?.Id);
             var days = r is null ? "" : string.Join(",", r.ArrivalDays);
-            return Ui.Card(u.Name, Ui.Grid(130,
-                Ui.Input("price_" + u.Id, "Preis je Nacht (" + cur + ")", r is null ? "" : B.MoneyField(r.Price)) with { Help = "Leer = Grundpreis " + B.Money(u.BasePrice, Cur(ctx)) },
+            // one row of fields per unit under its name (no card per unit), labels short enough to stay on one line so the fields line up
+            return Ui.Stack(Ui.Heading(u.Name, 4), Ui.Grid(130,
+                Ui.Input("price_" + u.Id, "Nacht (" + cur + ")", r is null ? "" : B.MoneyField(r.Price)) with { Help = r is null ? "Leer = Grundpreis " + B.Money(u.BasePrice, Cur(ctx)) : null },
                 Ui.Input("min_" + u.Id, "Mindestnächte", B.Num(r?.MinNights ?? u.BaseMinNights), UiInputType.Number),
                 Ui.Select("days_" + u.Id, "Anreise", ArrivalChoices.Any(c => c.Value == days) ? days : "",
                     ArrivalChoices.Select(c => Ui.Option(c.Value, c.Label)).ToArray()),
-                Ui.Input("week_" + u.Id, "Wochenpreis (7 Nächte, " + cur + ")", r is null || r.WeekPrice == 0 ? "" : B.MoneyField(r.WeekPrice)) with { Help = "Leer = 7 × Nachtpreis" },
-                Ui.Input("extra_" + u.Id, "Aufschlag je weitere Person/Nacht", r is null ? (u.ExtraPerson == 0 ? "" : B.MoneyField(u.ExtraPerson)) : r.ExtraPerson == 0 ? "" : B.MoneyField(r.ExtraPerson))
+                Ui.Input("week_" + u.Id, "Woche (" + cur + ")", r is null || r.WeekPrice == 0 ? "" : B.MoneyField(r.WeekPrice)) with { Help = "Leer = 7 × Nacht" },
+                Ui.Input("extra_" + u.Id, "+ Person (" + cur + ")", r is null ? (u.ExtraPerson == 0 ? "" : B.MoneyField(u.ExtraPerson)) : r.ExtraPerson == 0 ? "" : B.MoneyField(r.ExtraPerson))
                     with { Help = "ab der " + (u.GuestsStd + 1) + ". Person" }));
         }
         var form = Ui.Form(
@@ -380,7 +388,7 @@ public static class BookingAdmin
                 Ui.Input("to", "Letzte Nacht", s is null ? "" : B.Iso(s.To), UiInputType.Date),
                 Ui.Input("rank", "Rang", B.Num(s?.Rank ?? 1), UiInputType.Number) with { Help = "Höher gewinnt bei Überschneidung (z. B. Neben 1, Haupt 2, Silvester 5)." },
                 Ui.Input("color", "Farbe", s?.Color ?? "#2563eb", UiInputType.Color)),
-            units.Count == 0 ? Ui.Muted("Noch keine Einheit in diesem Objekt – die Preise kommen hierher, sobald es eine gibt.") : Ui.Heading("Preise je Einheit", 3),
+            units.Count == 0 ? Ui.Empty("Noch keine Einheit in diesem Objekt.") : Ui.Heading("Preise je Einheit", 3),
             Ui.Stack(units.Select(u => (UiNode?)RateRow(u)).ToArray()),
             Ui.FormActions(Ui.Submit("Speichern"), s is null ? null : Ui.Submit("Löschen", UiButtonKind.Danger, "action", "delete", confirm: "Saison mit ihren Preisen löschen?")));
         return PluginResult.Page(Ui.Stack(
@@ -399,7 +407,7 @@ public static class BookingAdmin
         var fees = await store.FeesAsync(house.Id, ct);
         var units = await store.UnitsAsync(ct);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Was zum Übernachtungspreis dazukommt – Endreinigung, Bettwäsche, Haustier – und die Kurtaxe, die eigens ausgewiesen wird", "Gebühren & Kurtaxe"),
+            Ui.PageHead(null, "Gebühren & Kurtaxe"),
             HouseTabs(houses, house, "fees"),
             Ui.Table(new[] { Ui.Column("Gebühr"), Ui.Column("Betrag", right: true), Ui.Column("Gilt für"), Ui.Column("Art") },
                 fees.Select(f => Ui.RowFor(f.Name, Ui.Link(f.Name, Root + "fees/" + f.Id), B.Money(f.Amount, Cur(ctx)) + " " + FeePer.Label(f.Per),
@@ -479,7 +487,7 @@ public static class BookingAdmin
         var cur = Cur(ctx);
 
         var form = Ui.Form(
-            Ui.Grid(160,
+            Ui.Grid(140,
                 Ui.Select("unit", "Einheit", B.Num(unit.Id), units.Select(u => Ui.Option(B.Num(u.Id), u.Name)).ToArray()),
                 Ui.Input("arrival", "Anreise", B.Iso(arrival), UiInputType.Date), Ui.Input("departure", "Abreise", B.Iso(departure), UiInputType.Date),
                 Ui.Input("adults", "Erwachsene", B.Num(adults), UiInputType.Number), Ui.Input("children", "Kinder", B.Num(children), UiInputType.Number)),
@@ -497,7 +505,7 @@ public static class BookingAdmin
                 quote.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : l.Kind == "nights" && l.Quantity > 0 ? Ui.Muted(B.Money(l.Unit, cur) + (l.Text.Contains("Woche") ? " je Woche" : " je Nacht")) : null, B.Money(l.Amount, cur)))
                     .Append(Ui.Row(Ui.Text("Gesamt"), null, Ui.Text(B.Money(quote.Total, cur))))));
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Die Rechnung, die ein Gast für diesen Aufenthalt bekäme – mit dem Grund, wenn er nicht passt", "Preis prüfen"),
+            Ui.PageHead(null, "Preis prüfen"),
             Ui.Card("Aufenthalt", form), Ui.Card(unit.Name, result)), "Preis prüfen");
     }
 }

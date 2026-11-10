@@ -363,3 +363,37 @@ body.login-matui { background: var(--mat-bg); font-family: var(--mat-font); font
 .about-page { max-width: 640px; display: flex; flex-direction: column; gap: var(--mat-space-5); }
 .about-card .about-card__logo { height: 44px; }
 .about-card .mat-card__foot { font-size: var(--mat-fs-sm); }
+
+/* ---- The plugin toolkit (UiRenderer), UI pass 2026-11-10: what the four plugin reviews found in every plugin ---- */
+/* A stack's own gap is the spacing — the margins of a page-head (24) and an alert (20) came on top and made it 16/36/40 px at random. */
+.admin--matui .ui-stack > * { margin-block: 0; }
+/* inside a table cell a stack is a title and its sub-line, not two blocks (16 px put them 35 px apart) */
+.admin--matui td .ui-stack { gap: 2px; }
+/* buttons and badges keep their width in a stack, a flow and a form grid (a "Gästekarte" button 860 px wide) */
+.admin--matui :is(.ui-stack, .ui-flow, .card) > :is(.btn, .badge, .inline-form) { align-self: flex-start; }
+.admin--matui .form-grid > :is(.btn, button, .inline-form, .badge) { justify-self: start; }
+/* fields side by side start on one line, whether or not one of them has a help text, and share the row */
+.admin--matui .ui-inline:has(> .field) { align-items: flex-start; }
+.admin--matui .ui-inline:has(> .field) > .field { flex: 1 1 0; min-width: 0; }
+/* a page head's actions: on the right, never framed like a list toolbar */
+.admin--matui .page-head > .page-actions { display: flex; flex-wrap: wrap; gap: var(--mat-space-2); align-items: center; margin-left: auto; }
+/* a badge never breaks; one without a tone is a neutral pill, not bold loose text */
+.admin--matui .badge { white-space: nowrap; }
+.admin--matui .badge:not(.badge-on):not(.badge-err):not(.badge-warn):not(.badge-new):not(.badge-off) { background: var(--mat-surface-2); color: var(--mat-text-2, var(--mat-text-muted)); }
+/* alerts carry their icon; "neutral" = a state that is simply off */
+.admin--matui .alert { display: flex; align-items: flex-start; gap: var(--mat-space-2); }
+.admin--matui .alert > .alert-icon { font-size: 18px; line-height: 1.3; flex: none; }
+html[data-theme] .admin--matui .alert-neutral { background: var(--mat-surface-2); border-color: var(--mat-border); color: var(--mat-text); }
+/* a checkbox's label is the option, not a field label: normal weight, box on the content edge, its help under the text like the core's */
+.admin--matui :is(.form-field, .field) label.check { font-weight: 400; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 0; }
+.admin--matui .field:has(> label.check) > .help { margin-left: 26px; }
+/* the file field in the toolkit's look */
+.admin--matui input[type=file] { max-width: 100%; font: inherit; font-size: var(--mat-fs-sm); }
+.admin--matui input[type=file]::file-selector-button { font: inherit; margin-right: var(--mat-space-3); padding: 0 var(--mat-space-3); min-height: var(--mat-control-h-sm, 30px); border: 1px solid var(--mat-border); border-radius: var(--mat-radius); background: var(--mat-surface); color: var(--mat-text); cursor: pointer; }
+/* a search box long enough for its placeholder ("Name, E-Mail oder Nummer …" was cut) */
+@media (min-width: 601px) { .admin--matui [data-list] .page-head .list-toolbar .list-search[type=search] { min-width: 280px; } }
+/* a number field does not need the whole row */
+.admin--matui .field .mat-stepper { max-width: 200px; }
+/* a notice inside a table cell (an order's history) wraps — the cell's nowrap ran it under the side column */
+.admin--matui td .alert { white-space: normal; min-width: 0; }
+.admin--matui table.data td:last-child:has(> .alert) { width: 60%; white-space: normal; }   /* the actions column rule (1%, nowrap) is not for a text column */

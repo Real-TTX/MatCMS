@@ -154,7 +154,7 @@ internal static partial class ForumPublic
                 list.Append($"<div class=\"forum-row{(t.Sticky ? " sticky" : "")}\"><span class=\"ico{(isNew ? " new" : "")}\">{icon}</span>")
                     .Append($"<div>{tags}<a class=\"name\" href=\"{E(ForumUrls.Thread(t))}\">{E(t.Title)}</a>{MiniPages(t, perPage)}<p class=\"desc\">{E(ctx.T("forum.by"))} {MemberLink(t.AuthorId, t.AuthorName)} · {TimeTag(ctx, t.CreatedAt)}</p></div>")
                     .Append($"<div class=\"num\"><b>{N(t.ReplyCount)}</b>{E(ctx.T("forum.replies"))}</div><div class=\"num\"><b>{N(t.ViewCount)}</b>{E(ctx.T("forum.views"))}</div>")
-                    .Append($"<div class=\"last\"><a href=\"{E(ForumUrls.Post(t.LastPostId))}\">{TimeTag(ctx, t.LastPostAt)}</a><br>{E(ctx.T("forum.by"))} {MemberLink(t.LastAuthorId, t.LastAuthor)}</div></div>");
+                    .Append($"<div class=\"last\"><span class=\"lbl\">{E(ctx.T("forum.lastPost"))}: </span><a href=\"{E(ForumUrls.Post(t.LastPostId))}\">{TimeTag(ctx, t.LastPostAt)}</a><br>{E(ctx.T("forum.by"))} {MemberLink(t.LastAuthorId, t.LastAuthor)}</div></div>");
             }
             list.Append("</div>");
         }
@@ -321,8 +321,11 @@ internal static partial class ForumPublic
         if (canWrite)
             reply = "<div id=\"antworten\">" + Editor(ctx, ctx.T("forum.reply"), draft, submit: ctx.T("forum.sendReply"), subscribeBox: subsOn && !subscribed,
                 subscribed: true, error: error) + "</div>";
-        else if (!v.SignedIn) reply = Notice(ctx.T("forum.signinToReply")) + $"<p><a class=\"forum-btn\" href=\"{E(ForumUrls.SignIn(ForumUrls.Thread(thread)))}\">{E(ctx.T("forum.signin"))}</a></p>";
+        // a closed thread says so to everybody – inviting a guest to sign in and reply there was a promise the page could not keep
         else if (thread.Closed) reply = Notice(ctx.T("forum.threadClosed"));
+        else if (!v.SignedIn)
+            reply = $"<div class=\"forum-notice info forum-notice-action\" role=\"status\"><span>{E(ctx.T("forum.signinToReply"))}</span>"
+                    + $"<a class=\"forum-btn sm\" href=\"{E(ForumUrls.SignIn(ForumUrls.Thread(thread)))}\">{E(ctx.T("forum.signin"))}</a></div>";
         else reply = Notice(ctx.T(v.Banned ? "forum.err.banned" : "forum.err.noWrite"));
 
         var actions = new StringBuilder("<div class=\"forum-actions\">");

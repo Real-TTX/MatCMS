@@ -182,16 +182,20 @@ public class ShopSidebarTests : IClassFixture<AppFactory>, IAsyncLifetime
         var recently = home[from..home.IndexOf("</table>", from, StringComparison.Ordinal)];
         Assert.DoesNotContain("/admin/p/shop/orders/", recently);
 
-        // "Konditionen" stands for all its pages, which are one screen with a sub-menu of six entries.
-        foreach (var page in new[] { "shipping", "payment", "coupons", "taxes", "legal", "numbers" })
+        // "Konditionen" stands for all its pages, which are one screen with a sub-menu of five entries.
+        foreach (var page in new[] { "shipping", "payment", "taxes", "legal", "numbers" })
         {
             var html = Decode(await admin.GetStringAsync("/admin/p/shop/" + page));
             Assert.Contains("<a class=\"mat-nav__item is-active\" href=\"/admin/p/shop/shipping\"", Sidebar(html));
             var sub = html[html.IndexOf("class=\"ui-subnav\"", StringComparison.Ordinal)..];
             sub = sub[..sub.IndexOf("</nav>", StringComparison.Ordinal)];
-            Assert.Equal(6, Count(sub, "<a href="));
+            Assert.Equal(5, Count(sub, "<a href="));
             Assert.Contains($"<a href=\"/admin/p/shop/{page}\" class=\"active\"", sub);
         }
+        // Coupons are marketing, not conditions: a line of their own in the shop's menu, without the conditions' sub-menu.
+        var coupons = Decode(await admin.GetStringAsync("/admin/p/shop/coupons"));
+        Assert.Contains("<a class=\"mat-nav__item is-active\" href=\"/admin/p/shop/coupons\"", Sidebar(coupons));
+        Assert.DoesNotContain("class=\"ui-subnav\"", coupons);
         foreach (var page in new[] { "products", "categories", "customers" })
         {
             var res = await admin.GetAsync("/admin/p/shop/" + page);

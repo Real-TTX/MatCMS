@@ -16,7 +16,7 @@ namespace MatCMS.Plugin.Bot;
 public sealed class BotPlugin : IPlugin
 {
     /// <summary>The plugin's identity in the list of built-in plugins.</summary>
-    public static BuiltInPlugin Definition { get; } = new("bot", "AI Bot",
+    public static BuiltInPlugin Definition { get; } = new("bot", "KI-Bot",
         "Chat-Assistent für Besucher: antwortet aus den Inhalten der Website und angemeldeten Kunden zu ihren eigenen Bestellungen. Name, Aussehen und Token-Grenzen einstellbar.",
         "1.0", () => new BotPlugin(), EnabledOnNewSite: false);
 

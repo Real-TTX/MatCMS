@@ -79,12 +79,11 @@ internal static class ShopAdminCustomers
                 if (a.IsComplete && seen.Add(OneLine(a))) addresses.Add((ctx.T("shop.adm.cust.earlier") + " · " + o.Number, OneLine(a)));
         var savedRows = saved.Select(a => (a.Label + (a.IsDefault ? " · " + ctx.T("shop.acc.default") : ""), OneLine(a.Address))).ToList();
 
-        var overview = Ui.KeyValue(
-            (ctx.T("shop.adm.orderCount"), orders.Count.ToString(CultureInfo.InvariantCulture)),
-            (ctx.T("shop.adm.spent"), Mo(spent)),
-            (ctx.T("shop.adm.cust.average"), paid.Count > 0 ? Mo(spent / paid.Count) : "—"),
-            (ctx.T("shop.adm.cust.first"), D(orders[^1].CreatedUtc)),
-            (ctx.T("shop.adm.lastOrder"), D(latest.CreatedUtc)));
+        var overview = Ui.Stats(
+            Ui.Stat(ctx.T("shop.adm.orderCount"), orders.Count.ToString(CultureInfo.InvariantCulture)),
+            Ui.Stat(ctx.T("shop.adm.spent"), Mo(spent)),
+            Ui.Stat(ctx.T("shop.adm.cust.average"), paid.Count > 0 ? Mo(spent / paid.Count) : "—"),
+            Ui.Stat(ctx.T("shop.adm.lastOrder"), D(latest.CreatedUtc), ctx.T("shop.adm.cust.first") + " " + D(orders[^1].CreatedUtc)));
 
         var table = Ui.Table(
             new[] { Ui.Column("", actions: true), Ui.Column(ctx.T("shop.adm.number")), Ui.Column(ctx.T("shop.adm.date")), Ui.Column(ctx.T("shop.total"), right: true), Ui.Column(ctx.T("shop.adm.status")), Ui.Column("", actions: true) },
@@ -93,20 +92,18 @@ internal static class ShopAdminCustomers
                 Ui.Link(o.Number, $"{Section}/orders/{o.Id}"),
                 D(o.CreatedUtc), Money.Format(o.TotalCents, o.Currency, "de"), ShopAdmin.StatusBadge(ctx, o.Status),
                 Ui.Button(ctx.T("shop.adm.open"), $"{Section}/orders/{o.Id}", UiButtonKind.Ghost, small: true))),
-            searchPlaceholder: ctx.T("action.search"), pageSize: 15, emptyText: ctx.T("shop.adm.noOrders"));
+            searchPlaceholder: orders.Count >= 10 ? ctx.T("action.search") : null, pageSize: 15, emptyText: ctx.T("shop.adm.noOrders"));
 
         var head = new List<UiNode?>
         {
-            Ui.Button(ctx.T("shop.adm.back"), $"{Section}/customers", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true),
-            Ui.Button(ctx.T("shop.adm.cust.mail"), "mailto:" + email, UiButtonKind.Ghost, icon: "ti-mail", small: true),
-            Ui.Button(ctx.T("shop.adm.cust.allOrders"), $"{Section}/orders?q={Uri.EscapeDataString(email)}", UiButtonKind.Ghost, icon: "ti-receipt", small: true)
+            Ui.Button(ctx.T("shop.adm.cust.mail"), "mailto:" + email, UiButtonKind.Ghost, icon: "ti-mail", small: true)
         };
         var side = new List<UiNode?> { Ui.Card(ctx.T("shop.adm.cust.contact"), Ui.KeyValue(contact.ToArray())), Ui.Card(ctx.T("shop.adm.cust.addresses"), Ui.KeyValue(addresses.ToArray())) };
         if (savedRows.Count > 0) side.Add(Ui.Card(ctx.T("shop.adm.cust.saved"), Ui.KeyValue(savedRows.ToArray())));
 
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(null, string.IsNullOrWhiteSpace(name) ? email : name, head.ToArray()),
-            Ui.Columns(new UiNode?[] { Ui.Card(ctx.T("shop.adm.cust.overview"), overview), Ui.Card(ctx.T("shop.adm.orders"), table) }, side)),
+            Ui.Columns(new UiNode?[] { overview, Ui.Card(ctx.T("shop.adm.orders"), table) }, side)),
             string.IsNullOrWhiteSpace(name) ? email : name);
     }
 }

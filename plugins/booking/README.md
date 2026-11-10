@@ -3,7 +3,26 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.10 — Zeitraum-Picker statt großer Kalender, Knöpfe der Seite
+## Stand: 0.12 — UI-Durchgang
+
+- **0.12**: Erklär-Untertitel und Hinweisabsätze gestrichen (Übersicht, Listen, Kanäle, Meldungen, Reinigung, Verbund, Neue Buchung, Anfrageformular);
+  Einstellungen „Allgemein“ (Währung, „Neue Anfragen an“, Haltezeit, Angebot, Zahlungshinweis, Datenschutz) sind wieder erreichbar (eigene Gruppe);
+  Übersicht mit Anreisen/Abreisen heute und Kachel „Unbezahlt“, „Einrichten“ nur solange etwas fehlt; Buchung: nächste Schritte als Knöpfe oben
+  (Dialoge, Felder unverändert), PDF oben, Verlauf in Ortszeit statt „UTC“; Liste mit eigener Spalte „Zahlung“; Belegungsplan nennt den Monat;
+  Saisonpreise je Einheit als eine Feldzeile mit kurzen Labels (keine Karte je Einheit); „Neue Adressen erzeugen“ mit Text; Seitenleiste:
+  Einheiten, Saisons, Gebühren und Preis prüfen unter „Einrichtung“.
+
+## Stand davor: 0.11 — B7a: Verbund mit Zentrale (lesen)
+
+- **„Kundenverbund“ heißt „Verbund“**, die Rollen „für sich“, **Zentrale** (`lead`), **Haus im Verbund** (`member`) — Werte der Einstellung unverändert.
+- **Die Zentrale** (Buchungen → Verbund): Übersicht mit offenen Anfragen ALLER Häuser, Anreisen/Abreisen heute, Häuser im Verbund; Tab „Alle Buchungen“
+  (offen / kommend / alle, Suche). Eigene Buchungen öffnen sich hier, die eines anderen Hauses in dessen Admin (`origin` aus dem Spiegel, nur https).
+  Antworten aus der Zentrale ist B7b.
+- **Sofort melden**: nach jeder Anfrage, Gast-Antwort und Änderung im Buchungs-Admin schickt ein Haus den Stand gleich (`BookingFederation.Pushing`, höchstens
+  5 s); was nicht durchkommt, holt der Job (Warteschlange wie in B6). Der Spiegel (`remote_stays`) hat jetzt auch Telefon, Personen, Nachricht, Fristen,
+  Eingang und die Adresse des Hauses.
+
+## Stand davor: 0.10 — Zeitraum-Picker statt großer Kalender, Knöpfe der Seite
 
 - **0.10**: Picker-Dateien unter `?v=busy2` — unter busy1 hatten Browser die ALTE Datei behalten, weil 0.7 vor dem Image-Update ausgeliefert wurde.
 - **0.9**: „Unterkünfte“ legt vier Karten in eine Reihe (Spalten ab 230 px, auto-fit) — mit 260 px stand die vierte allein in der zweiten Zeile.

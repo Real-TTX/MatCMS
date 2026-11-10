@@ -41,14 +41,16 @@ internal static class BlogAdmin
                 !p.IsPublished ? Ui.Badge(ctx.T("posts.draft"), UiTone.Muted)
                     : p.PublishedAt > now ? Ui.Badge(ctx.T("posts.scheduled"), UiTone.Info)
                     : Ui.Badge(ctx.T("posts.published"), UiTone.Success),
+                // the URL column already links the post — the row's actions are the core's pair: edit, delete
                 Ui.Inline(
-                    Ui.Button(ctx.T("action.edit"), EditUrl(p.Id), UiButtonKind.Ghost, small: true),
-                    Ui.Button(ctx.T("posts.view"), "/blog/" + p.Slug, UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { IconOnly = true, NewTab = true },
+                    Ui.Button(ctx.T("action.edit"), EditUrl(p.Id), UiButtonKind.Ghost, icon: "ti-pencil", small: true),
                     Ui.Action(ctx.T("action.delete"), "delete", p.Id.ToString(CultureInfo.InvariantCulture), UiButtonKind.Danger, confirm: ctx.T("posts.confirmDelete", p.Title), icon: "ti-trash")))),
-            searchPlaceholder: ctx.T("action.search"), pageSize: 25, emptyText: ctx.T("posts.none"));
-        return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, ctx.T("posts.title"), Ui.Button(ctx.T("posts.new"), EditUrl(0), small: true)),
-            table), ctx.T("posts.title"));
+            searchPlaceholder: ctx.T("action.search"), pageSize: 25, emptyText: ctx.T("posts.none")) with
+        {
+            // "New …" sits below the list, like every list in the admin (Seiten, Formulare …)
+            Below = new UiNode[] { Ui.Button(ctx.T("posts.new"), EditUrl(0)) }
+        };
+        return PluginResult.Page(table, ctx.T("posts.title"));
     }
 
     // ---- editor ----------------------------------------------------------------------------------
@@ -123,37 +125,52 @@ internal static class BlogAdmin
         var tags = await BlogStore.AllTagsAsync(posts, ct);
         var title = ctx.T(isNew ? "posts.newTitle" : "posts.editTitle");
 
-        var fields = new List<UiNode?>();
-        if (error is not null) fields.Add(Ui.Alert(error, UiTone.Error));
-        fields.Add(Ui.Input("title", ctx.T("posts.heading"), p.Title) with { Id = "post-title", Required = true, Placeholder = ctx.T("posts.headingPlaceholder") });
-        fields.Add(Ui.Input("slug", ctx.T("posts.slug"), p.Slug) with { Id = "post-slug", Placeholder = ctx.T("posts.slugExample"), Help = ctx.T("posts.slugHint") });
-        fields.Add(Ui.Image("titleimage", ctx.T("posts.titleImage"), p.TitleImage ?? "") with { Id = "post-titleimage" });
-        fields.Add(Ui.MediaList("gallery", ctx.T("posts.gallery"), p.GalleryJson) with { Id = "post-gallery", Help = ctx.T("posts.galleryHint") });
-        fields.Add(Ui.Select("gallerylayout", ctx.T("posts.galleryLayout"), p.GalleryLayout,
-            Ui.Option("carousel", ctx.T("posts.galleryCarousel")), Ui.Option("single", ctx.T("posts.gallerySingle")), Ui.Option("grid", ctx.T("posts.galleryGrid"))));
-        fields.Add(Ui.TextArea("excerpt", ctx.T("posts.excerpt"), p.Excerpt, 2) with { Id = "post-excerpt", Placeholder = ctx.T("posts.excerptPlaceholder"), Help = ctx.T("posts.excerptHint") });
-        if (ai.Enabled)
-            fields.Add(Ui.Button(ctx.T("editor.aiExcerptButton"), "#", UiButtonKind.Ghost, icon: "ti-sparkles", small: true) with
+        // An editor, not a settings card: what the post SAYS in the main column, how and when it appears at the side (like a shop product).
+        UiNode? aiExcerpt = !ai.Enabled ? null : Ui.Button(ctx.T("editor.aiExcerptButton"), "#", UiButtonKind.Ghost, icon: "ti-sparkles", small: true) with
+        {
+            Href = null, NoSubmit = true,
+            Data = new Dictionary<string, string>
             {
-                Href = null, NoSubmit = true,
-                Data = new Dictionary<string, string>
-                {
-                    ["ai-seo"] = "", ["ai-url"] = $"{Section}/ai-excerpt?id={p.Id}", ["target"] = "post-excerpt",
-                    ["content-from"] = "post-content-editor", ["title-from"] = "post-title", ["title"] = ctx.T("editor.aiExcerptTitle")
-                }
-            });
-        fields.Add(Ui.RichText("content", ctx.T("posts.content"), p.ContentHtml) with { Id = "post-content" });
-        fields.Add(Ui.Tags("tags", ctx.T("media.tags"), p.Tags, tags) with { Id = "post-tags", Help = ctx.T("posts.tagsHint") });
-        fields.Add(Ui.MediaList("attachments", ctx.T("posts.attachments"), p.AttachmentsJson, files: true) with { Id = "post-attachments", Help = ctx.T("posts.attachmentsHint") });
-        fields.Add(Ui.Checkbox("published", ctx.T("posts.publishedLabel"), p.IsPublished));
-        fields.Add(Ui.Input("date", ctx.T("posts.date"), p.PublishedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), UiInputType.Date) with { Id = "post-date" });
-        fields.Add(Ui.Inline(
-            Ui.Input("sourceurl", ctx.T("posts.source"), p.SourceUrl ?? "") with { Id = "post-sourceurl", Placeholder = "https://www.instagram.com/p/…", Help = ctx.T("posts.sourceHint") },
-            Ui.Input("sourcename", ctx.T("posts.sourceNamePlaceholder"), p.SourceName ?? "") with { Id = "post-sourcename" }));
-        fields.Add(Ui.FormActions(
-            Ui.Submit(ctx.T("action.save"), name: "action", value: "save"),
-            isNew ? null : Ui.Button(ctx.T("posts.view"), "/blog/" + p.Slug, UiButtonKind.Ghost, icon: "ti-external-link") with { NewTab = true },
-            Ui.Button(ctx.T("action.back"), Section, UiButtonKind.Ghost)));
+                ["ai-seo"] = "", ["ai-url"] = $"{Section}/ai-excerpt?id={p.Id}", ["target"] = "post-excerpt",
+                ["content-from"] = "post-content-editor", ["title-from"] = "post-title", ["title"] = ctx.T("editor.aiExcerptTitle")
+            }
+        };
+        var main = new List<UiNode?>
+        {
+            Ui.Card(
+                Ui.Input("title", ctx.T("posts.heading"), p.Title) with { Id = "post-title", Required = true, Placeholder = ctx.T("posts.headingPlaceholder") },
+                Ui.Input("slug", ctx.T("posts.slug"), p.Slug) with { Id = "post-slug", Placeholder = ctx.T("posts.slugHint") },
+                Ui.TextArea("excerpt", ctx.T("posts.excerpt"), p.Excerpt, 2) with { Id = "post-excerpt", Placeholder = ctx.T("posts.excerptPlaceholder"), Help = ctx.T("posts.excerptHint") },
+                aiExcerpt,
+                Ui.RichText("content", ctx.T("posts.content"), p.ContentHtml) with { Id = "post-content" }),
+            Ui.Card(
+                Ui.MediaList("gallery", ctx.T("posts.gallery"), p.GalleryJson) with { Id = "post-gallery" },
+                Ui.Select("gallerylayout", ctx.T("posts.galleryLayout"), p.GalleryLayout,
+                    Ui.Option("carousel", ctx.T("posts.galleryCarousel")), Ui.Option("single", ctx.T("posts.gallerySingle")), Ui.Option("grid", ctx.T("posts.galleryGrid"))))
+        };
+        var side = new List<UiNode?>
+        {
+            Ui.Card(
+                Ui.Checkbox("published", ctx.T("posts.publishedLabel"), p.IsPublished),
+                Ui.Input("date", ctx.T("posts.date"), p.PublishedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), UiInputType.Date) with { Id = "post-date" }),
+            Ui.Card(Ui.Image("titleimage", ctx.T("posts.titleImage"), p.TitleImage ?? "") with { Id = "post-titleimage" }),
+            Ui.Card(
+                Ui.Tags("tags", ctx.T("media.tags"), p.Tags, tags) with { Id = "post-tags" },
+                Ui.MediaList("attachments", ctx.T("posts.attachments"), p.AttachmentsJson, files: true) with { Id = "post-attachments" }),
+            // link and its label one above the other: side by side they never lined up (one had a help line, the other not)
+            Ui.Card(
+                Ui.Input("sourceurl", ctx.T("posts.source"), p.SourceUrl ?? "") with { Id = "post-sourceurl", Placeholder = "https://www.instagram.com/p/…" },
+                Ui.Input("sourcename", ctx.T("posts.sourceName"), p.SourceName ?? "") with { Id = "post-sourcename", Placeholder = ctx.T("posts.sourceNamePlaceholder"), Help = ctx.T("posts.sourceHint") })
+        };
+        var fields = new List<UiNode?>
+        {
+            error is null ? null : Ui.Alert(error, UiTone.Error),
+            Ui.Columns(main, side),
+            Ui.FormActions(
+                Ui.Submit(ctx.T("action.save"), name: "action", value: "save"),
+                isNew ? null : Ui.Button(ctx.T("posts.view"), "/blog/" + p.Slug, UiButtonKind.Ghost, icon: "ti-external-link") with { NewTab = true },
+                Ui.Button(ctx.T("action.back"), Section, UiButtonKind.Ghost))
+        };
 
         var importDialog = Ui.Dialog("pi-dialog", ctx.T("posts.import.heading"),
             Ui.Html($"<div id=\"pi-config\" data-url=\"{WebUtility.HtmlEncode($"{Section}/import-link")}\" data-busy=\"{WebUtility.HtmlEncode(ctx.T("posts.import.busy"))}\" " +

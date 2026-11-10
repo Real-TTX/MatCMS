@@ -12,7 +12,7 @@ internal static class ShopParts
     private static TemplatePlaceholder P(string name, bool html = false) => new(name, "shop.ph." + name, html);
 
     public const string CardDefault = """
-        <div class="shop-card"><a href="{{url}}" class="img"{{image_style}} aria-label="{{title}}"></a><div class="body"><a class="title" href="{{url}}">{{title}}</a>{{summary_html}}{{price_html}}{{tags_html}}{{badges_html}}</div></div>
+        <div class="shop-card"><a href="{{url}}" class="img"{{image_style}} aria-label="{{title}}"></a><div class="body"><a class="title" href="{{url}}">{{title}}</a>{{badges_html}}{{summary_html}}{{price_html}}{{tags_html}}</div></div>
         """;
 
     public const string ProductDefault = """

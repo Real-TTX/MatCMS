@@ -24,7 +24,7 @@ public static class BookingFederation
 {
     public const string RoleKey = "federation.role", UrlKey = "federation.url", KeyKey = "federation.key";
     public const string Solo = "solo", Lead = "lead", Member = "member";
-    public const string Group = "Kundenverbund";
+    public const string Group = "Verbund";
     private const string ApiPath = "/api/v1/booking/";
     private const int MaxBytes = 4 * 1024 * 1024, PageSize = 200;
 
@@ -42,16 +42,16 @@ public static class BookingFederation
             Group = Group, Default = Solo,
             Options = new[]
             {
-                new FieldOption(Solo, "für sich – eigene Gästekartei, kein Verbund"),
-                new FieldOption(Lead, "führt die Kartei – andere Seiten hängen an"),
-                new FieldOption(Member, "hängt an – Gäste kommen aus der Kartei einer anderen Seite")
+                new FieldOption(Solo, "für sich"),
+                new FieldOption(Lead, "Zentrale – Gästekartei und Anfragen aller Häuser"),
+                new FieldOption(Member, "Haus im Verbund – meldet an die Zentrale")
             },
-            Help = "Für mehrere Häuser mit denselben Gästen (z. B. zwei Villen eines Gastgebers). Der Verbund ist eine gemeinsame Verarbeitung – beide Datenschutzerklärungen müssen ihn nennen."
+            Help = "Für mehrere Häuser eines Gastgebers. Gemeinsame Verarbeitung – jede Datenschutzerklärung muss den Verbund nennen (Hinweis, keine Rechtsberatung). Meldedaten werden nie geteilt."
         })
-        .Add(new SettingSpec(UrlKey, "Adresse der führenden Seite", SettingKind.Text) { Group = Group, Help = "Nur bei „hängt an“: z. B. https://villa-nika.de" })
-        .Add(new SettingSpec(KeyKey, "API-Schlüssel der führenden Seite", SettingKind.Secret)
+        .Add(new SettingSpec(UrlKey, "Adresse der Zentrale", SettingKind.Text) { Group = Group, Help = "Nur für ein Haus im Verbund, z. B. https://villa-nika.de" })
+        .Add(new SettingSpec(KeyKey, "API-Schlüssel der Zentrale", SettingKind.Secret)
         {
-            Group = Group, Help = "Nur bei „hängt an“: auf der führenden Seite unter Admin → API-Schlüssel angelegt, mit dem Recht „Buchungen: Personendaten“."
+            Group = Group, Help = "In der Zentrale unter Admin → API-Schlüssel angelegt, Recht „Buchungen: Personendaten“."
         });
 
     // ---- stamps and merging (pure) --------------------------------------------------------------------------------
@@ -194,18 +194,18 @@ public static class BookingFederation
         b.Api("GET", "guests", GetGuestsAsync, new ApiRouteOptions
         {
             Access = ApiAccess.PersonalData,
-            Summary = "Kundenverbund: ein Gast (?email=…, mit seinen Aufenthalten auf allen Seiten) oder die seit einem Zeitpunkt geänderten (?since=2026-11-01T00:00:00Z&page=1).",
+            Summary = "Verbund: ein Gast (?email=…, mit seinen Aufenthalten auf allen Seiten) oder die seit einem Zeitpunkt geänderten (?since=2026-11-01T00:00:00Z&page=1).",
         });
         b.Api("PUT", "guests", PutGuestAsync, new ApiRouteOptions
         {
             Access = ApiAccess.PersonalData,
-            Summary = "Kundenverbund: legt einen Gast an oder gleicht ihn ab – je Feld gewinnt der neuere Zeitstempel. Antwort: der Gast, wie er jetzt in der Kartei steht.",
+            Summary = "Verbund: legt einen Gast an oder gleicht ihn ab – je Feld gewinnt der neuere Zeitstempel. Antwort: der Gast, wie er jetzt in der Kartei steht.",
             Example = """{"email":"anna@example.org","fields":{"name":"Anna Muster","phone":"+49 …"},"stamps":{"name":"2026-11-10T09:00:00.000Z"}}"""
         });
         b.Api("POST", "stays", PostStaysAsync, new ApiRouteOptions
         {
             Access = ApiAccess.PersonalData,
-            Summary = "Kundenverbund: die Aufenthalte einer anhängenden Seite als Zusammenfassung (Haus, Einheit, Zeitraum, Status, Betrag – keine Meldedaten), höchstens 500.",
+            Summary = "Verbund: die Aufenthalte eines Hauses im Verbund als Zusammenfassung (Haus, Einheit, Zeitraum, Status, Betrag – keine Meldedaten), höchstens 500.",
         });
         b.Job("federation", JobSchedule.EveryInterval(TimeSpan.FromMinutes(10)), async (ctx, ct) => { if (Role(ctx) == Member) await SyncAsync(ctx, ct); });
     }
@@ -213,10 +213,11 @@ public static class BookingFederation
     public const string TRemote = BookingStore.TRemoteStays;
 
     private static PluginResult Error(string text, int status) => PluginResult.Json(new JsonObject { ["error"] = text }, status);
+    private static long Count(JsonNode? n) => n is JsonValue v && v.TryGetValue<long>(out var x) ? Math.Clamp(x, 0, 50) : 0;
 
     private static async Task<PluginResult?> RefuseAsync(IPluginContext ctx, CancellationToken ct)
     {
-        if (Role(ctx) != Lead) return Error("Diese Seite führt keine Gästekartei (Buchungen → Einstellungen → Kundenverbund).", 409);
+        if (Role(ctx) != Lead) return Error("Diese Seite ist keine Zentrale (Buchungen → Einstellungen → Verbund).", 409);
         // which sites attach, for the admin page — by the NAME of the key they use (the handler never sees the key itself)
         await SetMetaAsync(ctx.Data, "fed.seen." + B.Clip(ctx.Request.ApiCaller, 80), Stamp(DateTime.UtcNow), ct);
         return null;
@@ -273,7 +274,11 @@ public static class BookingFederation
                 ["site"] = site, ["site_name"] = siteName, ["ref"] = reference, ["email"] = Email(S("email", 200)), ["name"] = S("name"), ["number"] = S("number", 40),
                 ["property"] = S("property"), ["unit"] = S("unit"), ["arrival"] = S("arrival", 10), ["departure"] = S("departure", 10),
                 ["status"] = S("status", 20) is var st && BookingStatus.Label(st) != st ? st : "", ["total"] = o["total"] is JsonValue tv && tv.TryGetValue<long>(out var tot) ? Math.Max(0, tot) : 0,
-                ["currency"] = S("currency", 3), ["updated"] = DateTime.UtcNow
+                ["currency"] = S("currency", 3), ["updated"] = DateTime.UtcNow,
+                ["phone"] = S("phone", 60), ["adults"] = Count(o["adults"]), ["children"] = Count(o["children"]), ["message"] = S("message", 3000),
+                ["hold_until"] = S("hold_until", 40), ["offer_until"] = S("offer_until", 40), ["created"] = S("created", 40),
+                // a link into the house's own admin: only an https address (or the test server's http://localhost)
+                ["origin"] = S("origin", 200) is var og && (og.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || og.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase)) && !og.Contains('"') ? og.TrimEnd('/') : ""
             };
             var row = await t.FindAsync(DataQuery.Everything.Eq("site", site).Eq("ref", reference), ct);
             if (row is null) await t.InsertAsync(values, ct); else await t.UpdateAsync(row.Id, values, ct);
@@ -341,18 +346,18 @@ public static class BookingFederation
     private static Uri Base(IPluginContext ctx)
     {
         var url = (ctx.Settings.Get(UrlKey) ?? "").Trim();
-        if (url.Length == 0) throw new HttpRequestException("Die Adresse der führenden Seite fehlt (Einstellungen → Kundenverbund).");
+        if (url.Length == 0) throw new HttpRequestException("Die Adresse der Zentrale fehlt (Einstellungen → Verbund).");
         if (!url.Contains("://", StringComparison.Ordinal)) url = "https://" + url;
         Uri u;
         try { u = BookingIcal.Check(url); }
-        catch (HttpRequestException e) when (e.Message.StartsWith("Nur https", StringComparison.Ordinal)) { throw new HttpRequestException("Die führende Seite muss über https erreichbar sein."); }
+        catch (HttpRequestException e) when (e.Message.StartsWith("Nur https", StringComparison.Ordinal)) { throw new HttpRequestException("Die Zentrale muss über https erreichbar sein."); }
         return new Uri(u.GetLeftPart(UriPartial.Authority) + ApiPath);
     }
 
     private static HttpClient Client(IPluginContext ctx)
     {
         var key = (ctx.Settings.Get(KeyKey) ?? "").Trim();
-        if (key.Length == 0) throw new HttpRequestException("Der API-Schlüssel der führenden Seite fehlt (Einstellungen → Kundenverbund).");
+        if (key.Length == 0) throw new HttpRequestException("Der API-Schlüssel der Zentrale fehlt (Einstellungen → Verbund).");
         var handler = HandlerFactory?.Invoke() ?? new SocketsHttpHandler
         {
             AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.All, PooledConnectionLifetime = TimeSpan.FromMinutes(1),
@@ -379,16 +384,16 @@ public static class BookingFederation
         if (body is not null) req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         if (notFoundIsNull && res.StatusCode == HttpStatusCode.NotFound) return null;
-        if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException("Die Antwort der führenden Seite ist zu groß.");
+        if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException("Die Antwort der Zentrale ist zu groß.");
         var bytes = await res.Content.ReadAsByteArrayAsync(ct);
-        if (bytes.Length > MaxBytes) throw new HttpRequestException("Die Antwort der führenden Seite ist zu groß.");
+        if (bytes.Length > MaxBytes) throw new HttpRequestException("Die Antwort der Zentrale ist zu groß.");
         JsonObject? json = null;
         try { json = JsonNode.Parse(bytes) as JsonObject; } catch { /* not JSON — said below */ }
-        if (res.IsSuccessStatusCode) return json ?? throw new HttpRequestException("Die führende Seite antwortet nicht wie eine MatCMS-Seite mit dem Buchungs-Plugin.");
+        if (res.IsSuccessStatusCode) return json ?? throw new HttpRequestException("Die Zentrale antwortet nicht wie eine MatCMS-Seite mit dem Buchungs-Plugin.");
         var why = json?["error"] is JsonValue v && v.TryGetValue<string>(out var e) ? e : res.ReasonPhrase ?? "";
         throw new HttpRequestException((int)res.StatusCode switch
         {
-            401 => "Der API-Schlüssel wird von der führenden Seite nicht angenommen.",
+            401 => "Der API-Schlüssel wird von der Zentrale nicht angenommen.",
             403 => "Dem API-Schlüssel fehlt das Recht „Buchungen: Personendaten“.",
             404 => "Unter der Adresse gibt es kein Buchungs-Plugin (oder es ist abgeschaltet).",
             _ => "Antwort " + (int)res.StatusCode + (why.Length > 0 ? ": " + why : "")
@@ -404,7 +409,7 @@ public static class BookingFederation
             await SendAsync(c, HttpMethod.Get, new Uri(Base(ctx), "guests?email=probe%40matcms.invalid"), null, ct, notFoundIsNull: true);
             return null;
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return e is TaskCanceledException ? "Die führende Seite antwortet nicht (Zeitüberschreitung)." : e.Message; }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return e is TaskCanceledException ? "Die Zentrale antwortet nicht (Zeitüberschreitung)." : e.Message; }
     }
 
     /// <summary>A guest as the leading site has him, with his stays on the other sites — for the guest card. Null when unknown there or not reachable.</summary>
@@ -415,7 +420,7 @@ public static class BookingFederation
             using var c = Client(ctx);
             return (await SendAsync(c, HttpMethod.Get, new Uri(Base(ctx), "guests?email=" + Uri.EscapeDataString(email)), null, ct, notFoundIsNull: true), null);
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return (null, e is TaskCanceledException ? "Die führende Seite antwortet nicht." : e.Message); }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return (null, e is TaskCanceledException ? "Die Zentrale antwortet nicht." : e.Message); }
     }
 
     /// <summary>
@@ -432,6 +437,71 @@ public static class BookingFederation
         {
             using var c = Client(ctx);
             var api = Base(ctx);
+            (pushed, staysSent) = await PushAsync(ctx, c, api, started, ct);
+            var guests = ctx.Data.Table(BookingStore.TGuests);
+
+            // 3) cards changed there
+            var pulledSince = await MetaTimeAsync(ctx.Data, "fed.pulled", ct);
+            string? now = null;
+            for (var page = 1; page <= 500; page++)
+            {
+                var url = "guests?page=" + page + (pulledSince > DateTime.MinValue ? "&since=" + Uri.EscapeDataString(Stamp(pulledSince.AddSeconds(-2))) : "");
+                var answer = await SendAsync(c, HttpMethod.Get, new Uri(api, url), null, ct) ?? new JsonObject();
+                now ??= answer["now"]?.GetValue<string>();
+                foreach (var g in (answer["guests"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
+                {
+                    var email = Email(g["email"]?.GetValue<string>());
+                    if (email.Length == 0 || await guests.FindAsync(DataQuery.Everything.Eq("email", email), ct) is null) continue;      // only the guests met here
+                    await ApplyAsync(ctx.Data, email, g["fields"] as JsonObject, g["stamps"] as JsonObject, touch: false, ct);
+                    pulled++;
+                }
+                if (answer["more"]?.GetValue<bool>() != true) break;
+            }
+            if (now is not null) await SetMetaAsync(ctx.Data, "fed.pulled", now, ct);
+            await SetMetaAsync(ctx.Data, "fed.last_ok", Stamp(DateTime.UtcNow), ct);
+            await SetMetaAsync(ctx.Data, "fed.last_error", "", ct);
+            return new SyncResult(true, pushed, staysSent, pulled, "");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+        {
+            var why = e is TaskCanceledException ? "Die Zentrale antwortet nicht (Zeitüberschreitung)." : e.Message;
+            await SetMetaAsync(ctx.Data, "fed.last_error", why, ct);
+            return new SyncResult(false, pushed, staysSent, pulled, why);
+        }
+    }
+
+    /// <summary>
+    /// A house hands on at once what just changed (a request, an answer), so the central inbox does not wait for the 10-minute job: the same push as the
+    /// job's, at most 5 seconds; whatever does not get through stays in the queue and goes with the next run. Does nothing on any other role.
+    /// </summary>
+    public static async Task PushNowAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        if (Role(ctx) != Member || (ctx.Settings.Get(UrlKey) ?? "").Trim().Length == 0 || (ctx.Settings.Get(KeyKey) ?? "").Trim().Length == 0) return;
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var c = Client(ctx);
+            await PushAsync(ctx, c, Base(ctx), DateTime.UtcNow, cts.Token);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or OperationCanceledException) { /* the job sends it again */ }
+    }
+
+    /// <summary>A page or route that changes bookings: after a POST, the house hands the change on at once (see <see cref="PushNowAsync"/>).</summary>
+    public static PluginHandler Pushing(PluginHandler handler) => async (ctx, ct) =>
+    {
+        var result = await handler(ctx, ct);
+        if (ctx.Request.IsPost) await PushNowAsync(ctx, ct);
+        return result;
+    };
+
+    private static string Iso(DataRow r, string column) => r.Text(column) is { Length: > 0 } t && DateTime.TryParse(t, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var d) ? Stamp(d) : "";
+
+    /// <summary>Steps 1 and 2 of a run: the cards and the stays changed since the last successful push; moves the watermark only when both went through.</summary>
+    private static async Task<(int Pushed, int Stays)> PushAsync(IPluginContext ctx, HttpClient c, Uri api, DateTime started, CancellationToken ct)
+    {
+        int pushed = 0, staysSent = 0;
+        {
             var pushedUntil = await MetaTimeAsync(ctx.Data, "fed.pushed", ct);
             var since = pushedUntil == DateTime.MinValue ? DateTime.MinValue : pushedUntil.AddSeconds(-2);     // a small overlap; sending twice changes nothing
 
@@ -471,7 +541,9 @@ public static class BookingFederation
                         {
                             ["ref"] = r.Id.ToString(CultureInfo.InvariantCulture), ["number"] = r.Text("number"), ["email"] = r.Text("email"), ["name"] = r.Text("name"),
                             ["property"] = u is null ? "" : houses.GetValueOrDefault(u.PropertyId, ""), ["unit"] = u?.Name ?? "",
-                            ["arrival"] = r.Text("arrival"), ["departure"] = r.Text("departure"), ["status"] = r.Text("status"), ["total"] = r.Int("total"), ["currency"] = cur
+                            ["arrival"] = r.Text("arrival"), ["departure"] = r.Text("departure"), ["status"] = r.Text("status"), ["total"] = r.Int("total"), ["currency"] = cur,
+                            ["phone"] = r.Text("phone"), ["adults"] = r.Int("adults"), ["children"] = r.Int("children"), ["message"] = B.Clip(r.Text("message"), 3000),
+                            ["hold_until"] = Iso(r, "hold_until"), ["offer_until"] = Iso(r, "offer_until"), ["created"] = Iso(r, "created"), ["origin"] = ctx.Site.Origin
                         });
                     }
                     await SendAsync(c, HttpMethod.Post, new Uri(api, "stays"), new JsonObject { ["site"] = ctx.Site.Name, ["stays"] = arr }, ct);
@@ -479,35 +551,8 @@ public static class BookingFederation
                 }
             }
             await SetMetaAsync(ctx.Data, "fed.pushed", Stamp(started), ct);
-
-            // 3) cards changed there
-            var pulledSince = await MetaTimeAsync(ctx.Data, "fed.pulled", ct);
-            string? now = null;
-            for (var page = 1; page <= 500; page++)
-            {
-                var url = "guests?page=" + page + (pulledSince > DateTime.MinValue ? "&since=" + Uri.EscapeDataString(Stamp(pulledSince.AddSeconds(-2))) : "");
-                var answer = await SendAsync(c, HttpMethod.Get, new Uri(api, url), null, ct) ?? new JsonObject();
-                now ??= answer["now"]?.GetValue<string>();
-                foreach (var g in (answer["guests"] as JsonArray ?? new JsonArray()).OfType<JsonObject>())
-                {
-                    var email = Email(g["email"]?.GetValue<string>());
-                    if (email.Length == 0 || await guests.FindAsync(DataQuery.Everything.Eq("email", email), ct) is null) continue;      // only the guests met here
-                    await ApplyAsync(ctx.Data, email, g["fields"] as JsonObject, g["stamps"] as JsonObject, touch: false, ct);
-                    pulled++;
-                }
-                if (answer["more"]?.GetValue<bool>() != true) break;
-            }
-            if (now is not null) await SetMetaAsync(ctx.Data, "fed.pulled", now, ct);
-            await SetMetaAsync(ctx.Data, "fed.last_ok", Stamp(DateTime.UtcNow), ct);
-            await SetMetaAsync(ctx.Data, "fed.last_error", "", ct);
-            return new SyncResult(true, pushed, staysSent, pulled, "");
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-        {
-            var why = e is TaskCanceledException ? "Die führende Seite antwortet nicht (Zeitüberschreitung)." : e.Message;
-            await SetMetaAsync(ctx.Data, "fed.last_error", why, ct);
-            return new SyncResult(false, pushed, staysSent, pulled, why);
-        }
+        return (pushed, staysSent);
     }
 
     /// <summary>What waits to be handed on: cards and stays changed since the last successful run.</summary>

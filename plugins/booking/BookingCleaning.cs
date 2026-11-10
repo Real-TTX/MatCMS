@@ -132,10 +132,10 @@ public static class BookingCleaning
         var token = await TokenAsync(ctx.Data, ct);
         var ics = (ctx.Site.Origin ?? "").TrimEnd('/') + IcsPath + token + ".ics";
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead("Wer reist wann ab, wer kommt danach – die Liste ergibt sich aus den Buchungen und den Portal-Kalendern", "Reinigung",
+            Ui.PageHead(null, "Reinigung",
                 Ui.Button("Als PDF", BookingAdmin.Root + "cleaning/pdf?von=" + B.Iso(from) + "&bis=" + B.Iso(to), UiButtonKind.Ghost, "ti-printer", small: true)),
-            Ui.Card(Ui.Form(Ui.Inline(Ui.Input("von", "Von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "Bis", B.Iso(to), UiInputType.Date), Ui.Submit("Anzeigen", UiButtonKind.Ghost, small: true)))
-                with { Action = BookingAdmin.Root + "cleaning" }),
+            Ui.Form(Ui.Inline(Ui.Input("von", "Von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "Bis", B.Iso(to), UiInputType.Date), Ui.Submit("Anzeigen", UiButtonKind.Ghost)))
+                with { Action = BookingAdmin.Root + "cleaning" },
             Ui.Table(new[] { Ui.Column("Tag"), Ui.Column("Einheit"), Ui.Column("Abreise"), Ui.Column("Danach"), Ui.Column("Zuständig"), Ui.Column("", actions: true) },
                 tasks.Select(t => Ui.Row(
                     Ui.Stack(Ui.Text(B.Weekday(t.Day) + " " + B.Date(t.Day)), t.Turnover ? Ui.Badge("Wechsel" + (house?.CheckIn is { Length: > 0 } ci ? " bis " + ci + " Uhr" : ""), UiTone.Warning) : null),
@@ -145,8 +145,8 @@ public static class BookingCleaning
                 emptyText: "In diesem Zeitraum reist niemand ab."),
             Ui.Card("Kalender für das Reinigungsteam", Ui.Stack(
                 Ui.KeyValue(("Adresse", ics)),
-                Ui.Muted("Jede Reinigung als Termin mit Einheit, Uhrzeiten, Personenzahl der nächsten Gäste und Checkliste – ohne Namen. Zum Abonnieren im Handy-Kalender."),
-                Ui.Action("Neue Adresse erzeugen", "renew", confirm: "Die bisherige Kalender-Adresse geht danach nicht mehr. Fortfahren?", icon: "ti-key")))), "Reinigung");
+                Ui.Muted("Ohne Namen, zum Abonnieren im Handy-Kalender."),
+                Ui.Action("Neue Adresse erzeugen", "renew", confirm: "Die bisherige Kalender-Adresse geht danach nicht mehr. Fortfahren?", icon: "ti-key") with { WithLabel = true }))), "Reinigung");
     }
 
     // ---- the team's calendar and the printout -------------------------------------------------------------------------

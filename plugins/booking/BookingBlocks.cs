@@ -187,8 +187,7 @@ public static class BookingBlocks
           .Append("<label class=\"bk-hp\" aria-hidden=\"true\">Website<input name=\"website\" tabindex=\"-1\" autocomplete=\"off\"></label>")
           .Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"consent\" value=\"1\" required> <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Anfrage gespeichert werden (<a href=\"")
           .Append(B.H(privacy)).Append("\">Datenschutz</a>).</span></label>")
-          .Append("<p><button class=\"btn bk-btn\" type=\"submit\">Unverbindlich anfragen</button></p>")
-          .Append("<p class=\"bk-muted\">Die Anfrage ist noch keine Buchung: wir merken den Zeitraum vor und melden uns mit einer Bestätigung.</p></form>");
+          .Append("<p><button class=\"btn bk-btn\" type=\"submit\">Unverbindlich anfragen</button></p></form>");
         // data for the script: which house each unit belongs to (the optional fees of the chosen unit's house show)
         sb.Append("<script type=\"application/json\" class=\"bk-units-json\">{")
           .Append(string.Join(",", units.Select(u => "\"" + u.Slug + "\":[" + u.PropertyId + "," + u.Id + "]"))).Append("}</script>");

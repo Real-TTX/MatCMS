@@ -281,7 +281,7 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.RemindEnabled, "set.remindEnabled", SettingKind.Bool) { Group = "set.groupReminder", Default = "false", Help = "set.remindEnabledHelp" });
         s.Add(new SettingSpec(Keys.RemindHours, "set.remindHours", SettingKind.Number) { Default = "24", Min = 1, Max = 168, Help = "set.remindHoursHelp" });
         s.Add(new SettingSpec(Keys.CustomCss, "set.customCss", SettingKind.TextArea) { Help = "set.customCssHelp" });
-        s.Add(new SettingSpec(Keys.ShowSearch, "set.showSearch", SettingKind.Bool) { Group = "set.groupCatalog", Default = "true", Help = "set.showSearchHelp" });
+        s.Add(new SettingSpec(Keys.ShowSearch, "set.showSearch", SettingKind.Bool) { Group = "set.groupCatalog", Default = "true" });
         s.Add(new SettingSpec(Keys.SearchFields, "set.searchFields", SettingKind.MultiChoice)
         {
             Default = ShopSearchFields.Default, Help = "set.searchFieldsHelp",

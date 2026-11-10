@@ -168,6 +168,11 @@
                 <nav class="mat-crumbs" aria-label="Breadcrumb">
                     <ol>
                         <li class="mat-hide-sm"><a href="/admin">@Site.SiteName</a></li>
+                        @* a plugin's sub-page names its section between site and page ("KI-Bot / Auftritt", not just "Auftritt") *@
+                        @if (ViewData["CrumbParent"] is string crumbParent && crumbParent.Length > 0 && crumbParent != title)
+                        {
+                            <li class="mat-hide-sm"><a href="@(ViewData["CrumbParentUrl"] as string ?? "/admin")">@crumbParent</a></li>
+                        }
                         <li aria-current="page">@title</li>
                     </ol>
                 </nav>

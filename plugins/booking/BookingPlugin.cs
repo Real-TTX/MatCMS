@@ -23,10 +23,12 @@ public sealed class BookingPlugin : IPlugin
     public void Configure(IPluginBuilder b)
     {
         BookingStore.Declare(b.Data);
-        b.Settings.Choice(CurrencyKey, "Währung", "EUR", new[]
+        // the first setting names the group "Allgemein": settings in front of the first named group were not reachable in the back office
+        b.Settings.Add(new SettingSpec(CurrencyKey, "Währung", SettingKind.Choice)
         {
-            new FieldOption("EUR", "Euro (€)"), new FieldOption("CHF", "Schweizer Franken"), new FieldOption("GBP", "Pfund (£)"), new FieldOption("USD", "US-Dollar ($)")
-        }, "Eine Währung für alle Preise dieser Website.");
+            Group = "Allgemein", Default = "EUR", Help = "Eine Währung für alle Preise dieser Website.",
+            Options = new[] { new FieldOption("EUR", "Euro (€)"), new FieldOption("CHF", "Schweizer Franken"), new FieldOption("GBP", "Pfund (£)"), new FieldOption("USD", "US-Dollar ($)") }
+        });
         b.Settings.Text(NotifyKey, "Neue Anfragen an", "", "E-Mail-Adresse des Gastgebers. Leer = keine Mail, die Anfrage steht trotzdem im Admin.")
             .Number(HoldKey, "Anfrage hält den Zeitraum (Stunden)", 48, 1, 336, "So lange sind die Nächte nach einer Anfrage für den Gast vorgemerkt – danach sind sie wieder frei, wenn nichts passiert ist.")
             .Number(OfferKey, "Angebot gilt (Tage)", 3, 1, 30)

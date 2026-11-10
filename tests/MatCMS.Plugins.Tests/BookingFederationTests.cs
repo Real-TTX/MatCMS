@@ -4,6 +4,8 @@ using System.Runtime.Loader;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using MatCMS.Data;
+using Microsoft.EntityFrameworkCore;
 using MatCMS.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -47,7 +49,7 @@ public sealed class BookingFederationTests(FederationSites sites) : IClassFixtur
     private static async Task SettingsAsync(HttpClient admin, Dictionary<string, string> values)
     {
         values["action"] = "save-settings";
-        var res = await BookingApp.PostAsync(admin, R + "_settings?group=Kundenverbund", values);
+        var res = await BookingApp.PostAsync(admin, R + "_settings?group=Verbund", values);
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
     }
 
@@ -140,14 +142,14 @@ public sealed class BookingFederationTests(FederationSites sites) : IClassFixtur
         var state = await SyncAsync(member);
         Assert.Contains("Zuletzt abgeglichen", state);
         Assert.DoesNotContain("ging nicht", state);
-        Assert.Contains("warten auf Abgleich: 0 Gäste, 0 Aufenthalte", state);
+        Assert.Contains("0 Gäste, 0 Buchungen", state);
 
         // the card index has Bob now, and Anna's stay at Sogi; her name is the later one (Sogi's), her note stayed
         annaAtLead = await GuestPageAsync(lead, "anna@example.org");
         Assert.Equal("Anna M.", Field(annaAtLead, "name"));
         Assert.Equal("kommt mit Hund", Note(annaAtLead));
         var leadText = Text(annaAtLead);
-        Assert.Contains("Auf anderen Seiten", leadText);
+        Assert.Contains("In anderen Häusern", leadText);
         Assert.Contains("10.07.2031 – 17.07.2031", leadText);
         await GuestPageAsync(lead, "bob@example.org");
 
@@ -175,14 +177,47 @@ public sealed class BookingFederationTests(FederationSites sites) : IClassFixtur
         Route(() => new Down());
         await PhoneAsync(member, "2031-09-01", "2031-09-04", "Clara Spät", "clara@example.org");      // the booking itself goes through
         var state = await SyncAsync(member);
-        Assert.Contains("Der letzte Abgleich ging nicht", state);
-        Assert.Contains("warten auf Abgleich: 1 Gast, 1 Aufenthalt", state);
+        Assert.Contains("Letzter Abgleich ging nicht", state);
+        Assert.Contains("1 Gast, 1 Buchung", state);
         Assert.DoesNotContain("clara@example.org", await lead.GetStringAsync(R + "guests"));
 
         ToLead();
         state = await SyncAsync(member);
         Assert.DoesNotContain("ging nicht", state);
         await GuestPageAsync(lead, "clara@example.org");
+    }
+
+    [Fact]
+    public async Task A_request_on_a_house_is_in_the_central_inbox_at_once()
+    {
+        var (lead, member) = await SetUpAsync();
+        await SyncAsync(member);
+        // a guest asks on the HOUSE's website — no run of the job, no "Jetzt abgleichen"
+        await sites.Member.AdminAsync();
+        var ask = await sites.Member.App.Browser().PostAsync("/buchung/anfrage", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["einheit"] = "apartment-meerblick", ["zeitraum"] = "2031-10-03..2031-10-07", ["erwachsene"] = "2", ["kinder"] = "1",
+            ["name"] = "Emil Eilig", ["email"] = "emil@example.org", ["telefon"] = "+49 1", ["nachricht"] = "Mit Kinderbett bitte.", ["consent"] = "1"
+        }));
+        Assert.True(ask.StatusCode == HttpStatusCode.Redirect, Text(await ask.Content.ReadAsStringAsync()));
+
+        var overview = await lead.GetStringAsync(R + "federation");
+        var text = Text(overview);
+        Assert.Contains("Offene Anfragen aller Häuser", text);
+        Assert.Contains("Emil Eilig", text);
+        Assert.Contains("03.10.2031 – 07.10.2031 (4)", text);
+        Assert.Matches(@"href=""http://localhost/admin/p/booking/bookings/\d+""", overview);   // opens in the house's own admin
+        var all = Text(await lead.GetStringAsync(R + "federation/bookings?tab=alle"));
+        Assert.Contains("Emil Eilig", all);
+
+        // the mirror keeps what the inbox needs, never the people of a stay
+        using var scope = sites.Lead.App.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var row = db.Database.SqlQueryRaw<string>("SELECT message || '|' || adults || '|' || children AS Value FROM p_booking_remote_stays WHERE email = 'emil@example.org'").ToList();
+        Assert.Equal("Mit Kinderbett bitte.|2|1", Assert.Single(row));
+
+        // a house that is not the central site redirects its "all houses" page away
+        Assert.Equal(HttpStatusCode.Redirect, (await member.GetAsync(R + "federation/bookings")).StatusCode);
     }
 
     [Fact]

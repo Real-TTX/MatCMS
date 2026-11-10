@@ -15,8 +15,8 @@ public static partial class BookingPublic
     public static void Configure(IPluginBuilder b)
     {
         // an anonymous form with nothing to forge: no token (a block cannot carry one), rate-limited by the host (20 a minute per address, like a contact form) and with a honeypot
-        b.Route(RequestPath, RequestAsync, new PublicRouteOptions { Methods = PluginMethod.Post });
-        b.Route(BookingFlow.GuestPath + "{key}", GuestAsync, new PublicRouteOptions { Antiforgery = true });
+        b.Route(RequestPath, BookingFederation.Pushing(RequestAsync), new PublicRouteOptions { Methods = PluginMethod.Post });   // a request reaches the central inbox at once
+        b.Route(BookingFlow.GuestPath + "{key}", BookingFederation.Pushing(GuestAsync), new PublicRouteOptions { Antiforgery = true });
         b.Route(BookingFlow.GuestPath + "{key}/pdf", GuestPdfAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
         b.Route(BookingFlow.GuestPath + "{key}/checkin", CheckinAsync, new PublicRouteOptions { Antiforgery = true });
     }
@@ -257,7 +257,7 @@ public static class BookingCss
 .bk-form{display:grid;gap:18px;max-width:880px;margin:0 auto}.bk-form .form-field{margin:0}
 .bk-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
 .bk-row-stay{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr)}
-@media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}}
+@media(max-width:640px){.bk-row-stay{grid-template-columns:1fr 1fr}.bk-row-stay .bk-dates{grid-column:1/-1}.bk-form button.bk-btn{width:100%}}
 .bk-form .bk-check{display:flex;gap:10px;align-items:flex-start;font-size:.95em}.bk-form .bk-check input{width:auto;margin-top:4px;accent-color:var(--bk-accent)}
 
 .bk-hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;overflow:hidden}

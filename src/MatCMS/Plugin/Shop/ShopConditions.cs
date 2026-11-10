@@ -19,10 +19,10 @@ internal static class ShopConditions
     private static UiNode State(IPluginContext ctx, bool on, bool complete = true) =>
         on && complete ? Ui.Badge(ctx.T("shop.adm.active"), UiTone.Success) : on ? Ui.Badge(ctx.T("shop.cond.incomplete"), UiTone.Warning) : Ui.Badge(ctx.T("shop.cond.off"), UiTone.Muted);
 
-    /// <summary>The areas of "Konditionen", in the order of the sub-menu: each a list of its own (shipping and coupons have their own editors, the rest overviews that lead to the settings).</summary>
+    /// <summary>The areas of "Konditionen", in the order of the sub-menu: each a list of its own (shipping has its own editor, the rest are overviews that lead to the settings). Coupons are not conditions: they have a line of their own in the shop's menu.</summary>
     private static readonly (string Area, string Page, string Label, string Icon)[] Areas =
     {
-        ("shipping", "shipping", "shop.tab.shipping", "ti-truck-delivery"), ("payment", "payment", "shop.tab.payment", "ti-credit-card"), ("coupons", "coupons", "shop.tab.coupons", "ti-ticket"),
+        ("shipping", "shipping", "shop.tab.shipping", "ti-truck-delivery"), ("payment", "payment", "shop.tab.payment", "ti-credit-card"),
         ("taxes", "taxes", "shop.tab.taxes", "ti-percentage"), ("legal", "legal", "shop.tab.legal", "ti-scale"), ("numbers", "numbers", "shop.tab.numbers", "ti-123")
     };
 
@@ -30,9 +30,9 @@ internal static class ShopConditions
     public static UiNode Frame(IPluginContext ctx, string area, params UiNode?[] body) =>
         Ui.Split(Areas.Select(a => Ui.NavItem(ctx.T(a.Label), $"{Section}/{a.Page}", a.Icon, a.Area == area)), body);
 
-    private static PluginResult Page(IPluginContext ctx, string area, string title, string help, UiNode? action, params UiNode[] body)
+    private static PluginResult Page(IPluginContext ctx, string area, string title, UiNode? action, params UiNode[] body)
     {
-        var card = new List<UiNode?> { Ui.Muted(help) };
+        var card = new List<UiNode?>();
         card.AddRange(body);
         return PluginResult.Page(Frame(ctx, area, Ui.PageHead(null, title, action), Ui.Card(card.ToArray())), title);
     }
@@ -61,14 +61,18 @@ internal static class ShopConditions
             else if (method == "paypal") result = ShopConnectionCheck.Render(ctx, ctx.T("shop.cond.paypal"), await ShopConnectionCheck.PayPalAsync(ctx, cfg, ct));
         }
         UiNode Check(string method, string label) => Ui.Action(label, new Dictionary<string, string> { ["action"] = "check", ["method"] = method }, UiButtonKind.Ghost);
-        var tools = Ui.Card(ctx.T("shop.chk.title"), Ui.Muted(ctx.T("shop.chk.help")),
+        var tools = Ui.Card(ctx.T("shop.chk.title"),
             Ui.Inline(Check("stripe", ctx.T("shop.chk.checkStripe")), Check("paypal", ctx.T("shop.chk.checkPayPal"))),
             Ui.KeyValue((ctx.T("shop.chk.urlStripe"), ShopConnectionCheck.StripeWebhookUrl(ctx.Site.Origin)), (ctx.T("shop.chk.eventsStripe"), string.Join(", ", ShopConnectionCheck.StripeEvents)),
                 (ctx.T("shop.chk.urlPayPal"), ShopConnectionCheck.PayPalWebhookUrl(ctx.Site.Origin)), (ctx.T("shop.chk.eventsPayPal"), string.Join(", ", ShopConnectionCheck.PayPalEvents))),
-            Ui.Heading(ctx.T("shop.chk.listTitle"), 3), Ui.Text(ctx.T("shop.chk.list")) with { Muted = true });
-        return result is null ? PluginResult.Page(Frame(ctx, "payment", Ui.PageHead(null, ctx.T("shop.tab.payment")), Ui.Card(Ui.Muted(ctx.T("shop.cond.paymentHelp")), table), tools), ctx.T("shop.tab.payment"))
-            : PluginResult.Page(Frame(ctx, "payment", Ui.PageHead(null, ctx.T("shop.tab.payment")), result, Ui.Card(Ui.Muted(ctx.T("shop.cond.paymentHelp")), table), tools), ctx.T("shop.tab.payment"));
+            Ui.Heading(ctx.T("shop.chk.listTitle"), 3), Checklist(ctx.T("shop.chk.list")));
+        return result is null ? PluginResult.Page(Frame(ctx, "payment", Ui.PageHead(null, ctx.T("shop.tab.payment")), Ui.Card(table), tools), ctx.T("shop.tab.payment"))
+            : PluginResult.Page(Frame(ctx, "payment", Ui.PageHead(null, ctx.T("shop.tab.payment")), result, Ui.Card(table), tools), ctx.T("shop.tab.payment"));
     }
+
+    /// <summary>The checklist's text ("1) … 2) …") as one line per step instead of one block of prose.</summary>
+    private static UiNode Checklist(string text) =>
+        Ui.Stack(System.Text.RegularExpressions.Regex.Split(text, @"\s+(?=\d\)\s)").Select(s => (UiNode?)(Ui.Text(s.Trim()) with { Muted = true })).ToArray());
 
     // ---- taxes -------------------------------------------------------------------------------------------
 
@@ -84,7 +88,7 @@ internal static class ShopConditions
                 kv.Key == cfg.HomeCountry ? Ui.Badge(ctx.T("shop.cond.home"), UiTone.Info) : own ? Ui.Badge(ctx.T("shop.cond.ownRate"), UiTone.Warning) : Ui.Badge(ctx.T("shop.cond.builtIn"), UiTone.Muted));
         });
         var mode = cfg.SmallBusiness ? ctx.T("shop.cond.modeSmall") : cfg.Oss ? ctx.T("shop.cond.modeOss") : ctx.T("shop.cond.modeProduct");
-        return Task.FromResult(Page(ctx, "taxes", ctx.T("shop.tab.taxes"), ctx.T(cfg.Oss ? "shop.cond.taxesHelpOss" : "shop.cond.taxesHelp"), Edit(ctx, "set.groupMoney", ctx.T("shop.cond.editTax")),
+        return Task.FromResult(Page(ctx, "taxes", ctx.T("shop.tab.taxes"), Edit(ctx, "set.groupMoney", ctx.T("shop.cond.editTax")),
             Ui.KeyValue((ctx.T("shop.cond.taxMode"), mode), (ctx.T("shop.cond.defaultTax"), Money.Percent(cfg.DefaultTaxBp) + " %"), (ctx.T("shop.cond.shippingTax"), Money.Percent(cfg.ShippingTaxBp) + " %"), (ctx.T("shop.cond.currency"), cfg.Currency)),
             Ui.Table(new[] { Ui.Column(ctx.T("shop.country")), Ui.Column(ctx.T("shop.cond.code")), Ui.Column(ctx.T("shop.cond.standard"), right: true), Ui.Column(ctx.T("shop.cond.reduced"), right: true), Ui.Column(ctx.T("shop.cond.origin")) },
                 rows, searchPlaceholder: ctx.T("action.search"), pageSize: 30, emptyText: "—")));
@@ -102,7 +106,7 @@ internal static class ShopConditions
                 Row(ctx.T("shop.terms"), cfg.TermsUrl), Row(ctx.T("shop.withdrawal"), cfg.WithdrawalUrl), Row(ctx.T("shop.privacy"), cfg.PrivacyUrl),
                 Ui.Row(Name(ctx.T("shop.cond.version")), cfg.TermsVersion, Ui.Badge(ctx.T("shop.cond.versionKept"), UiTone.Info), Edit(ctx, "set.groupLegal"))
             }, emptyText: "—");
-        return Task.FromResult(Page(ctx, "legal", ctx.T("shop.tab.legal"), ctx.T("shop.cond.legalHelp"), null, table));
+        return Task.FromResult(Page(ctx, "legal", ctx.T("shop.tab.legal"), null, table));
     }
 
     // ---- number ranges -----------------------------------------------------------------------------------
@@ -120,6 +124,6 @@ internal static class ShopConditions
                 Row(ctx.T("shop.invoice"), cfg.InvoicePrefix, ShopInvoice.InvoiceNumber(cfg, invoice + 1)),
                 Row(ctx.T("shop.creditNote"), cfg.CreditPrefix, ShopInvoice.CreditNumber(cfg, credit + 1))
             }, emptyText: "—");
-        return Page(ctx, "numbers", ctx.T("shop.tab.numbers"), ctx.T("shop.cond.numbersHelp"), null, table);
+        return Page(ctx, "numbers", ctx.T("shop.tab.numbers"), null, table);
     }
 }

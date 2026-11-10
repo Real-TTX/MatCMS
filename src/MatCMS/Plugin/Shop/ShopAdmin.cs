@@ -19,6 +19,9 @@ internal static class ShopAdmin
 
     public static UiBadge StatusBadge(IPluginContext ctx, string status) => Ui.Badge(ctx.T("shop.status." + status), ToneOf(status));
 
+    /// <summary>The status in a LIST of orders: a paid order is what waits for the operator ("to ship", in the red of its row's light), every other its plain status.</summary>
+    public static UiBadge ListBadge(IPluginContext ctx, string status) => status == OrderStatus.Paid ? Ui.Badge(ctx.T("shop.adm.dash.toShip"), UiTone.Error) : StatusBadge(ctx, status);
+
     // ---- dashboard (the shop's start page: what the sidebar's "Shop" opens) -------------------------------
 
     public static async Task<PluginResult> DashboardAsync(IPluginContext ctx, CancellationToken ct)
@@ -46,7 +49,7 @@ internal static class ShopAdmin
             new[] { Ui.Column(ctx.T("shop.adm.number")), Ui.Column(ctx.T("shop.adm.customer")), Ui.Column(ctx.T("shop.total"), right: true), Ui.Column(ctx.T("shop.adm.status")), Ui.Column("", actions: true) },
             latest.Select(o => Ui.Row(Ui.Text(o.Number) with { Inline = true, Strong = true },
                 Ui.Text(string.IsNullOrWhiteSpace(o.Name) ? o.Email : o.Name) with { Inline = true },
-                Money.Format(o.TotalCents, o.Currency, "de"), StatusBadge(ctx, o.Status),
+                Money.Format(o.TotalCents, o.Currency, "de"), ListBadge(ctx, o.Status),
                 Ui.Button(ctx.T("shop.adm.open"), OrderUrl(o.Id), UiButtonKind.Ghost, small: true))),
             emptyText: ctx.T("shop.adm.noOrders"));
 
@@ -55,17 +58,18 @@ internal static class ShopAdmin
             ? new UiNode?[] { Ui.Muted(ctx.T("shop.adm.dash.allGood")) }
             : notes.Take(6).Select(n => (UiNode?)Ui.Alert(n.Title + (string.IsNullOrWhiteSpace(n.Text) ? "" : " — " + n.Text), n.Tone)).ToArray();
 
-        var topIds = await store.TopSellerIdsAsync(5, ct);
+        var topSold = await store.TopSellersAsync(5, ct);
+        var topIds = topSold.Select(t => t.Id).ToList();
         var top = topIds.Count == 0 ? Array.Empty<Product>() : (await store.ProductsByIdsAsync(topIds, ct)).OrderBy(p => topIds.IndexOf(p.Id)).ToArray();
         var side = new List<UiNode?> { Ui.Card(ctx.T("shop.adm.dash.attention"), attention) };
         if (top.Length > 0)
-            side.Add(Ui.Card(ctx.T("shop.adm.dash.top"), Ui.Table(new[] { Ui.Column(ctx.T("shop.item")), Ui.Column(ctx.T("shop.price"), right: true) },
-                top.Select(p => Ui.Row(Ui.Link(p.Title, $"{Section}/products/{p.Id}"), Money.Format(p.PriceCents, cfg.Currency, "de"))))));
+            side.Add(Ui.Card(ctx.T("shop.adm.dash.top"), Ui.Table(new[] { Ui.Column(ctx.T("shop.item")), Ui.Column(ctx.T("shop.adm.sold"), right: true) },
+                top.Select(p => Ui.Row(Ui.Link(p.Title, $"{Section}/products/{p.Id}"), Intl(topSold.First(t => t.Id == p.Id).Qty))))));
 
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(null, ctx.T("shop.nav"),
                 Ui.Button(ctx.T("shop.adm.dash.openShop"), "/shop", UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true },
-                Ui.Button(ctx.T("shop.adm.newProduct"), $"{Section}/products/0", UiButtonKind.Primary, icon: "ti-plus", small: true)),
+                Ui.Button(ctx.T("shop.adm.newProduct"), $"{Section}/products/0", products.Total == 0 ? UiButtonKind.Primary : UiButtonKind.Ghost, icon: "ti-plus", small: true)),
             tiles,
             Ui.Columns(new UiNode?[] { Ui.Card(ctx.T("shop.adm.dash.latest"), latestTable, Ui.Inline(Ui.Button(ctx.T("shop.adm.dash.allOrders"), $"{Section}/orders", UiButtonKind.Ghost, small: true))) }, side)),
             ctx.T("shop.nav"));
@@ -111,7 +115,7 @@ internal static class ShopAdmin
                 o.Email.Length > 0 ? Ui.Link(string.IsNullOrWhiteSpace(o.Name) ? o.Email : o.Name + " · " + o.Email, ShopAdminCustomers.Url(o.Email)) : Ui.Text("—") with { Inline = true },
                 ctx.T("shop.pay." + (o.PaymentProvider.Length == 0 ? "none" : o.PaymentProvider)),
                 Money.Format(o.TotalCents, o.Currency, "de"),
-                StatusBadge(ctx, o.Status),
+                ListBadge(ctx, o.Status),
                 Ui.Button(ctx.T("shop.adm.open"), OrderUrl(o.Id), UiButtonKind.Ghost, small: true)) with { Tags = o.Status + (o.Status == OrderStatus.Paid ? " todo" : "") }),
             searchPlaceholder: ctx.T("action.search"), pageSize: 25, emptyText: ctx.T("shop.adm.noOrders")) with
         {
@@ -200,17 +204,18 @@ internal static class ShopAdmin
         string Mo(long c) => Money.Format(c, order.Currency, "de");
         string D(DateTime? d) => d is null ? "—" : d.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
 
-        var head = new List<UiNode?> { Ui.Button(ctx.T("shop.adm.back"), $"{Section}/orders", UiButtonKind.Ghost, icon: "ti-arrow-left", small: true) };
+        var head = new List<UiNode?>();
+        var docs = new List<UiNode?>();   // invoice, credit notes, packing slip, the customer's view: a card in the side column, so the head keeps only what moves the order on
         var credits = await store.CreditNotesOfOrderAsync(id, ct);
         if (invoice is not null)
         {
-            head.Add(Ui.Button(ctx.T("shop.invoice") + " " + invoice.Number, $"/shop/invoice/{Uri.EscapeDataString(order.Number)}", UiButtonKind.Ghost, icon: "ti-file-invoice", small: true) with { NewTab = true });
-            head.Add(Ui.Button(ctx.T("shop.pdf"), $"/shop/invoice/{Uri.EscapeDataString(order.Number)}?pdf=1", UiButtonKind.Ghost, icon: "ti-file-type-pdf", small: true) with { NewTab = true });
+            docs.Add(Ui.Button(ctx.T("shop.invoice") + " " + invoice.Number, $"/shop/invoice/{Uri.EscapeDataString(order.Number)}", UiButtonKind.Ghost, icon: "ti-file-invoice", small: true) with { NewTab = true });
+            docs.Add(Ui.Button(ctx.T("shop.pdf"), $"/shop/invoice/{Uri.EscapeDataString(order.Number)}?pdf=1", UiButtonKind.Ghost, icon: "ti-file-type-pdf", small: true) with { NewTab = true });
         }
         foreach (var c in credits)
-            head.Add(Ui.Button(ctx.T("shop.creditNote") + " " + c.Number, $"/shop/invoice/{Uri.EscapeDataString(order.Number)}?doc={Uri.EscapeDataString(c.Number)}&pdf=1", UiButtonKind.Ghost, icon: "ti-file-type-pdf", small: true) with { NewTab = true });
-        head.Add(Ui.Button(ctx.T("shop.slip"), OrderUrl(id) + "?slip=1", UiButtonKind.Ghost, icon: "ti-package-export", small: true) with { NewTab = true });
-        head.Add(Ui.Button(ctx.T("shop.adm.customerView"), $"/shop/order/{Uri.EscapeDataString(order.Number)}", UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true });
+            docs.Add(Ui.Button(ctx.T("shop.creditNote") + " " + c.Number, $"/shop/invoice/{Uri.EscapeDataString(order.Number)}?doc={Uri.EscapeDataString(c.Number)}&pdf=1", UiButtonKind.Ghost, icon: "ti-file-type-pdf", small: true) with { NewTab = true });
+        docs.Add(Ui.Button(ctx.T("shop.slip"), OrderUrl(id) + "?slip=1", UiButtonKind.Ghost, icon: "ti-package-export", small: true) with { NewTab = true });
+        docs.Add(Ui.Button(ctx.T("shop.adm.customerView"), $"/shop/order/{Uri.EscapeDataString(order.Number)}", UiButtonKind.Ghost, icon: "ti-external-link", small: true) with { NewTab = true });
 
         // Two small cards for the side column: what the order IS (status, payment, terms) and who it is FOR (customer, addresses, delivery).
         var info = Ui.KeyValue(
@@ -220,8 +225,8 @@ internal static class ShopAdmin
             (ctx.T("shop.adm.terms"), order.TermsVersion + " · " + D(order.TermsAcceptedUtc) + (order.WithdrawalWaiver ? " · " + ctx.T("shop.adm.waiverGiven") : "")));
         var customer = Ui.KeyValue(
             (ctx.T("shop.adm.customer"), (string.IsNullOrWhiteSpace(order.Name) ? "" : order.Name + " · ") + order.Email + (order.Phone.Length > 0 ? " · " + order.Phone : "") + (order.MemberId > 0 ? " · " + ctx.T("shop.adm.hasAccount") : " · " + ctx.T("shop.adm.guest"))),
-            (ctx.T("shop.billingAddress"), order.Billing.Lines().Replace("\n", ", ")),
-            (ctx.T("shop.shippingAddress"), order.Shipping.IsComplete ? order.Shipping.Lines().Replace("\n", ", ") : "—"),
+            (ctx.T("shop.billingAddress"), order.Billing.Lines().Replace("\r", "").Replace("\n", ", ")),
+            (ctx.T("shop.shippingAddress"), order.Shipping.IsComplete ? order.Shipping.Lines().Replace("\r", "").Replace("\n", ", ") : "—"),
             (ctx.T("shop.shippingMethod"), order.ShippingMethod.Length > 0 ? order.ShippingMethod : "—"),
             (ctx.T("shop.tracking"), order.Tracking.Length > 0 ? (ShopTracking.NameOf(cfg, order) is { Length: > 0 } cn ? cn + " · " : "") + order.Tracking : "—"),
             (ctx.T("shop.adm.customerNote"), order.Note.Length > 0 ? order.Note : "—"));
@@ -230,12 +235,15 @@ internal static class ShopAdmin
             new[] { Ui.Column(ctx.T("shop.item")), Ui.Column(ctx.T("shop.adm.sku")), Ui.Column(ctx.T("shop.qty"), right: true), Ui.Column(ctx.T("shop.price"), right: true), Ui.Column(ctx.T("shop.adm.vat"), right: true), Ui.Column(ctx.T("shop.total"), right: true) },
             items2.Select(i => Ui.Row(i.DisplayTitle + (i.Kind == ProductKind.Digital ? " · " + ctx.T("shop.digital") : ""), i.Sku, i.Qty, Mo(i.UnitCents), Money.Percent(i.TaxBp) + " %", Mo(i.LineCents))), emptyText: "—");
 
-        var totals = Ui.KeyValue(
+        var totalRows = new List<(string, string)> {
             (ctx.T("shop.subtotal"), Mo(order.SubtotalCents)),
-            (ctx.T("shop.adm.coupon"), order.DiscountCents > 0 || order.CouponCode.Length > 0 ? $"{order.CouponCode} (−{Mo(order.DiscountCents)})" : "—"),
             (ctx.T("shop.shipping"), Mo(order.ShippingCents)),
             (ctx.T("shop.adm.vatIncluded"), order.SmallBusiness ? ctx.T("shop.adm.smallBusiness") : Mo(order.TaxCents) + (order.TaxNote.Length > 0 ? " · " + ctx.T("shop.adm.taxNote." + order.TaxNote) : "")),
-            (ctx.T("shop.total"), Mo(order.TotalCents)), (ctx.T("shop.refunded"), order.RefundedCents > 0 ? Mo(order.RefundedCents) : "—"));
+            (ctx.T("shop.total"), Mo(order.TotalCents)) };
+        // Coupon and refund only when there is one: a row of "—" is a line to read past.
+        if (order.DiscountCents > 0 || order.CouponCode.Length > 0) totalRows.Insert(1, (ctx.T("shop.adm.coupon"), $"{order.CouponCode} (−{Mo(order.DiscountCents)})"));
+        if (order.RefundedCents > 0) totalRows.Add((ctx.T("shop.refunded"), Mo(order.RefundedCents)));
+        var totals = Ui.KeyValue(totalRows.ToArray());
 
         // What moves the order on (mark paid, ship, complete, cancel) are plain buttons in the page's head, where one looks first: "paid" and "complete" ask once, "shipped" opens a dialog for the
         // tracking number, "cancel" one for whether the customer is told. The rarer things (refund, resend a mail, a note) sit in the side column.
@@ -261,7 +269,7 @@ internal static class ShopAdmin
         }
         if (order.Status is OrderStatus.Shipped or OrderStatus.Paid)
             steps.Add(Ui.Action(ctx.T("shop.adm.complete"), "complete", null, order.Status == OrderStatus.Shipped ? UiButtonKind.Primary : UiButtonKind.Ghost, confirm: ctx.T("shop.adm.completeConfirm"), icon: "ti-circle-check") with { WithLabel = true });
-        head.InsertRange(1, steps);
+        head.InsertRange(0, steps);
         if (OrderStatus.IsPaid(order.Status) && order.RefundableCents > 0)
         {
             var stripe = order.PaymentIntent.Length > 0 && (order.PaymentProvider == Payments.Stripe && cfg.StripeReady || order.PaymentProvider == Payments.PayPal && cfg.PayPalReady);
@@ -285,10 +293,10 @@ internal static class ShopAdmin
         var history = Ui.Table(
             new[] { Ui.Column(ctx.T("shop.adm.date")), Ui.Column(ctx.T("shop.adm.by")), Ui.Column(ctx.T("shop.adm.what")) },
             events.Select(e => Ui.Row(e.CreatedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture), e.Actor,
-                e.Kind is "warning" or "mail-failed" or "payment-failed" ? Ui.Badge(e.Text, UiTone.Warning) : Ui.Text(e.Text) with { Inline = true })), emptyText: "—");
+                e.Kind is "warning" or "mail-failed" or "payment-failed" ? (UiNode)Ui.Alert(e.Text, UiTone.Warning) : Ui.Text(e.Text) with { Inline = true })), emptyText: "—");
 
         // Main column: what was bought and what happened to it. Side column: the order's facts, the customer, and what can be done now.
-        var side = new List<UiNode?> { Ui.Card(ctx.T("shop.adm.details"), info), Ui.Card(ctx.T("shop.adm.customer"), customer, order.Email.Length > 0 ? Ui.Link(ctx.T("shop.adm.cust.page"), ShopAdminCustomers.Url(order.Email)) : null) };
+        var side = new List<UiNode?> { Ui.Card(ctx.T("shop.adm.details"), info), Ui.Card(ctx.T("shop.adm.customer"), customer, order.Email.Length > 0 ? Ui.Link(ctx.T("shop.adm.cust.page"), ShopAdminCustomers.Url(order.Email)) : null), Ui.Card(ctx.T("shop.adm.documents"), Ui.Inline(docs.ToArray())) };
         side.AddRange(actions);
         var page = new List<UiNode?> { Ui.PageHead(null, ctx.T("shop.orderNo", order.Number), head.ToArray()) };
         page.AddRange(dialogs);
@@ -332,7 +340,7 @@ internal static class ShopAdmin
         if (await store.CountWithdrawalsAsync(ShopWithdrawals.Received, ct) is var wdNew and > 0)
             notes.Add(new AttentionNote(ctx.T("shop.wd.att", wdNew), ctx.T("shop.wd.attText"), $"{Section}/withdrawals") { Tone = UiTone.Error, Icon = "ti-arrow-back-up" });
         var stale = await store.OrdersWhereAsync(DataQuery.Everything.Eq("status", OrderStatus.Paid).Where("paid", DataOp.Lt, DateTime.UtcNow.AddDays(-3)), ct);
-        if (stale.Count > 0) notes.Add(new AttentionNote(ctx.T("shop.adm.attStale", stale.Count), ctx.T("shop.adm.attStaleText"), $"{Section}/orders?status={OrderStatus.Paid}") { Tone = UiTone.Warning, Icon = "ti-package" });
+        if (stale.Count > 0) notes.Add(new AttentionNote(ctx.T("shop.adm.attStale", stale.Count), "", $"{Section}/orders?status={OrderStatus.Paid}") { Tone = UiTone.Warning, Icon = "ti-package" });
 
         var waiting = await store.OrdersWhereAsync(DataQuery.Everything.Eq("status", OrderStatus.AwaitingPayment).Eq("payment_provider", Payments.Bank).Where("created", DataOp.Lt, DateTime.UtcNow.AddDays(-Math.Max(2, cfg.BankHoldDays / 2))), ct);
         if (waiting.Count > 0) notes.Add(new AttentionNote(ctx.T("shop.adm.attBank", waiting.Count), ctx.T("shop.adm.attBankText"), $"{Section}/orders?status={OrderStatus.AwaitingPayment}") { Tone = UiTone.Info, Icon = "ti-building-bank" });

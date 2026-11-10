@@ -92,7 +92,20 @@ public static class BookingMail
     {
         if (utc is null) return "";
         try { return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " Uhr"; }
-        catch (TimeZoneNotFoundException) { return utc.Value.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " UTC"; }
+        // no time zone data (invariant globalization, no tzdata): Central European time by the EU rule, never "UTC" in front of a host
+        catch (TimeZoneNotFoundException) { return CentralEurope(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc)).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " Uhr"; }
+    }
+
+    /// <summary>CET/CEST without time zone data: summer time from the last Sunday of March to the last Sunday of October, 01:00 UTC each.</summary>
+    private static DateTime CentralEurope(DateTime utc)
+    {
+        static DateTime LastSunday(int year, int month)
+        {
+            var d = new DateTime(year, month, DateTime.DaysInMonth(year, month), 1, 0, 0, DateTimeKind.Utc);
+            return d.AddDays(-(int)d.DayOfWeek);
+        }
+        var summer = utc >= LastSunday(utc.Year, 3) && utc < LastSunday(utc.Year, 10);
+        return utc.AddHours(summer ? 2 : 1);
     }
 
     /// <summary>Sends one mail and says how it went (the caller writes it into the history). Never throws.</summary>

@@ -383,6 +383,14 @@ public interface IPluginSite
     /// <summary>The site's own logo (a local <c>/uploads/…</c> path or an https address), or "" while the site shows MatCMS's default logo —
     /// what a plugin puts on paper (a letterhead) when it has no picture of its own.</summary>
     string LogoUrl => "";
+    /// <summary>The site's default language (<c>de</c>, …) — what an untranslated text is written in. A default member: on an older host it
+    /// is the first of <see cref="Locales"/>.</summary>
+    string DefaultCulture => Locales.Count > 0 ? Locales[0] : "de";
+    /// <summary>Rich text cleaned by the CMS's own allow-list — the one the page editor's rich text fields go through (formatting, lists,
+    /// links to safe addresses; no script, no event handlers, no styles that run). What a plugin stores from an editor's rich text field
+    /// or an outside source must pass here before it is ever drawn raw. A default member: an older host encodes the text instead
+    /// (safe, only plainer).</summary>
+    string SanitizeHtml(string? html) => System.Net.WebUtility.HtmlEncode(html ?? "");
     /// <summary>Draws one of the CMS's own content blocks (<c>gallery</c>, <c>text</c>, …) with the given field values, as the page editor would.</summary>
     Task<string> RenderBlockAsync(string blockType, JsonNode values, CancellationToken ct = default);
     /// <summary>The HTML of a layout part of the active template with its <c>{{token}}</c> placeholders still in it — to see which

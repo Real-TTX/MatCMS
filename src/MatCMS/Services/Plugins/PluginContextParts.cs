@@ -195,6 +195,10 @@ internal sealed class PluginSiteFacade : IPluginSite
 
     public string LogoUrl => Site.UsesDefaultLogo ? "" : Site.LogoUrl;
 
+    public string DefaultCulture => Localizer.DefaultCulture;
+
+    public string SanitizeHtml(string? html) => SafeHtml.Sanitize(html);
+
     public string ImageUrl(string url, int width) => ThumbnailService.Url(url, width);
 
     // MediaFocus is per request (it loads the few pictures with a focal point once); outside a request there is none to ask.

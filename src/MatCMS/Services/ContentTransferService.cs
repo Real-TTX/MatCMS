@@ -443,7 +443,7 @@ public class ContentTransferService
                     Version = p.Version, DataVersion = p.DataVersion,
                     Code = p.Code, FilesJson = p.FilesJson, MappingJson = p.MappingJson,
                     ConfigJson = p.ConfigJson,
-                    Kind = PluginKind.Normalize(p.Kind), Entry = p.Entry, Sha256 = p.Sha256, Api = p.Api,
+                    Kind = PluginKind.Normalize(p.Kind), Entry = p.Entry, Sha256 = p.Sha256, Api = p.Api, CodeSignature = p.CodeSignature,
                     Enabled = p.Enabled, CreatedAt = p.CreatedAt
                 }).ToList();
         }
@@ -1282,7 +1282,11 @@ public class ContentTransferService
                 var row = existingPlugins.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase));
                 // A plugin that ships with the CMS: a restore brings back whether it was on and its configuration, never its
                 // identity — name, kind and code come from this image. (An operator's own plugin under that key is left alone.)
-                if (MatCMS.Services.Plugins.BuiltInPlugins.Find(key) is { } builtIn)
+                // ... unless the backup comes from a site where the MatCMS Store's signed package had already taken the built-in's
+                // place: then it is restored as the native plugin it was (its files follow below; the loader checks the signature
+                // against them, so a row that only CLAIMS to be signed does not run without "Native Plugins erlauben").
+                var signedNative = PluginKind.Normalize(p.Kind) == PluginKind.Native && !string.IsNullOrWhiteSpace(p.CodeSignature);
+                if (!signedNative && MatCMS.Services.Plugins.BuiltInPlugins.Find(key) is { } builtIn)
                 {
                     if (row is not null && PluginKind.Normalize(row.Kind) != PluginKind.BuiltIn) continue;
                     if (row is null)
@@ -1320,6 +1324,7 @@ public class ContentTransferService
                 row.Entry = row.Kind == PluginKind.Native ? (p.Entry ?? "") : "";
                 row.Sha256 = row.Kind == PluginKind.Native ? (p.Sha256 ?? "") : "";
                 row.Api = row.Kind == PluginKind.Native ? p.Api : 0;
+                row.CodeSignature = row.Kind == PluginKind.Native ? (p.CodeSignature ?? "").Trim() : "";
                 if (row.Kind == PluginKind.Native) row.FilesJson = "{}";
                 n++;
             }
@@ -1683,6 +1688,8 @@ public class ContentTransferService
         public string? Entry { get; set; }
         public string? Sha256 { get; set; }
         public int Api { get; set; }
+        /// <summary>Native: the MatCMS Store's code signature as the package brought it (checked against the files at every load, never trusted as stored).</summary>
+        public string? CodeSignature { get; set; }
         /// <summary>State at the time of the backup — restored as it was. Nullable on purpose: a file
         /// without the field (hand-built) says nothing, and must not read as "off".</summary>
         public bool? Enabled { get; set; }

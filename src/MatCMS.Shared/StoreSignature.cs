@@ -60,6 +60,63 @@ public static class StoreSignature
         }
     }
 
+    // ---- Code signature: what makes a native plugin trusted wherever its files came from ----
+    // The package signature above is checked once, when a site fetches a package, and leaves nothing behind. A code signature is
+    // carried IN the package (plugin.json "CodeSignature") and covers the files that are actually loaded, so a site can check it
+    // on every load — after a hand import, a cloud rollout or a restore just the same. It covers EVERY file under src/, not only
+    // the entry assembly: the loader resolves dependencies from that folder, and a swapped side DLL would otherwise run along.
+
+    /// <summary>The prefix of the signed text of a code signature (a different text than a package signature, so one can never stand in for the other).</summary>
+    public const string CodePrefix = "matcms-store-code-v1";
+
+    /// <summary>The text a code signature covers.</summary>
+    public static string CodeText(string key, string version, string treeHex) =>
+        $"{CodePrefix}\n{(key ?? "").Trim().ToLowerInvariant()}\n{(version ?? "").Trim()}\n{(treeHex ?? "").Trim().ToLowerInvariant()}";
+
+    /// <summary>The tree hash of a set of files: SHA-256 over "{path}\n{sha256}\n" for every file, ordered by path (ordinal).
+    /// Paths use "/" and are relative to src/.</summary>
+    public static string TreeHash(IEnumerable<(string Path, string Sha256Hex)> files)
+    {
+        var sb = new StringBuilder();
+        foreach (var (path, sha) in files.OrderBy(f => f.Path, StringComparer.Ordinal))
+            sb.Append(path).Append('\n').Append(sha.ToLowerInvariant()).Append('\n');
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
+    }
+
+    /// <summary>The tree hash of a folder on disk (every file below it).</summary>
+    public static string TreeHash(string dir)
+    {
+        var root = Path.GetFullPath(dir);
+        var files = new List<(string, string)>();
+        foreach (var f in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+        {
+            using var s = File.OpenRead(f);
+            files.Add((Path.GetRelativePath(root, f).Replace('\\', '/'), Sha256Hex(s)));
+        }
+        return TreeHash(files);
+    }
+
+    /// <summary>A code signature in its stored form <c>keyid:signature</c>.</summary>
+    public static string SignCode(string key, string version, string treeHex, ECDsa privateKey, string keyId) =>
+        keyId + ":" + Sign(CodeText(key, version, treeHex), privateKey);
+
+    /// <summary>True when <paramref name="token"/> (<c>keyid:signature</c>) signs exactly this key, version and file tree. Never throws.</summary>
+    public static bool VerifyCode(string key, string version, string treeHex, string? token, IReadOnlyDictionary<string, string>? keys = null)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        var colon = token.IndexOf(':');
+        if (colon <= 0) return false;
+        return Verify(CodeText(key, version, treeHex), token[(colon + 1)..], token[..colon], keys);
+    }
+
+    /// <summary>Checks a code signature against the files of a folder on disk. Never throws (a missing folder is "not signed").</summary>
+    public static bool VerifyCodeDir(string key, string version, string srcDir, string? token, IReadOnlyDictionary<string, string>? keys = null)
+    {
+        if (string.IsNullOrWhiteSpace(token) || !Directory.Exists(srcDir)) return false;
+        try { return VerifyCode(key, version, TreeHash(srcDir), token, keys); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+    }
+
     /// <summary>Checks a package against its catalogue entry: the hash must match and the signature must be valid for exactly these values.</summary>
     public static bool VerifyPackage(byte[] package, string kind, string key, string version, string? sha256Hex, string? signature, string? keyId,
         IReadOnlyDictionary<string, string>? keys = null)

@@ -54,6 +54,9 @@ public static class BuiltInPlugins
                     Enabled = b.EnabledOnNewSite, ConfigJson = "{}", FilesJson = "{}"
                 });
             }
+            // The MatCMS Store's signed package took this plugin's place (only a signed one can: PluginPackager): it runs as a native
+            // plugin now, the built-in stays out of its way — that is the move out of the image, not a conflict.
+            else if (Models.PluginKind.Normalize(row.Kind) == Models.PluginKind.Native) continue;
             else if (Models.PluginKind.Normalize(row.Kind) != Models.PluginKind.BuiltIn) conflicts.Add(b.Key);
             else
             {

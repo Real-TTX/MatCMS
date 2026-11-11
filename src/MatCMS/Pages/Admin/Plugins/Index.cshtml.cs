@@ -46,6 +46,8 @@ public class IndexModel : PageModel
     public Dictionary<string, string> DeleteConfirm { get; } = new();
     /// <summary>The keys of the loaded plugins that declared settings (they get a settings button).</summary>
     public HashSet<string> WithSettings { get; } = new();
+    /// <summary>Keys of native plugins whose installed files carry a valid MatCMS Store code signature (they run without "Native Plugins erlauben").</summary>
+    public HashSet<string> Signed { get; } = new();
     /// <summary>The scheduled jobs of the loaded plugins.</summary>
     public IReadOnlyList<MatCMS.Services.Plugins.PluginJobService.JobStatus> Jobs { get; private set; } = Array.Empty<MatCMS.Services.Plugins.PluginJobService.JobStatus>();
 
@@ -176,6 +178,7 @@ public class IndexModel : PageModel
         {
             DeleteConfirm[p.Key] = await MatCMS.Services.Plugins.PluginUninstall.ConfirmTextAsync(_db, data, t, p.Key);
             if (_registry.SliceOf(p.Key) is { Settings.Count: > 0 }) WithSettings.Add(p.Key);
+            if (MatCMS.Services.Plugins.NativeTrust.IsSigned(HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>(), p)) Signed.Add(p.Key);
         }
         Jobs = HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginJobService>().Status();
         NativeAllowed = await IsNativeAllowedAsync();

@@ -33,6 +33,11 @@ public class Plugin
     /// what runs with what a store published. Empty for scripts.</summary>
     public string Sha256 { get; set; } = "";
 
+    /// <summary>Native only: the code signature of the MatCMS Store (<c>keyid:signature</c>, <see cref="MatCMS.Shared.StoreSignature.VerifyCode"/>),
+    /// as the package brought it. Stored, never trusted as stored: the loader checks it against the files on disk at every load. Valid = the
+    /// plugin runs without "Native Plugins erlauben" and may take over a built-in key. Empty = not signed.</summary>
+    public string CodeSignature { get; set; } = "";
+
     /// <summary>The plugin API major version this plugin was built against. <c>0</c> = a plugin written before the
     /// versioned API existed (treated as API 1, the <c>PluginContext</c> members).</summary>
     public int Api { get; set; }

@@ -183,6 +183,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   Never as a free settings row (still refused), never by a backup. Imported plugins stay disabled, as always. The DLL's SHA-256 is checked at import
   AND at every load. Backups carry native plugins with their files (`plugins-native/{key}/{version}/`), put down BEFORE
   the plugins are started.
+- **Signed store code runs without the switch** (decision 2026-11-11, `docs/builtin-extraction.md`): a native package may carry `CodeSignature` (`keyid:signature`, made by `tools/StoreSign sign-code` with the store key) over `matcms-store-code-v1`, key, version and the TREE hash of EVERY file under `src/`. Stored on the row (`Plugin.CodeSignature`, backup field), never trusted as stored: `NativeTrust.IsSigned` re-hashes the files at EVERY load. Signed = loads without `plugins.allowNative`, may `Adopt` a core table, and may take the key of a built-in (`shop`/`bot`/`blog`: the row becomes native, on/off and settings stay; anything unsigned under those keys is refused). Admin shows "Signiert".
 - **Unloading is real but depends on the plugin.** `NativePluginHost` releases the `AssemblyLoadContext` and checks with a
   `WeakReference`; a plugin that cannot be freed shows "Neustart nötig" instead of leaking silently. Known holders:
   reflection-based `System.Text.Json` over a plugin's own types (use a source-generated context or `JsonNode`) and EF —

@@ -57,11 +57,12 @@ public sealed class NativePluginHost
     /// <param name="registry">The registry to publish to.</param>
     /// <param name="beforePublish">Runs once the plugin is configured and BEFORE it is published (tables, installers); if it throws,
     /// nothing is published and the previous version stays.</param>
-    public void Load(Models.Plugin p, PluginInfo info, string srcDir, PluginRegistry registry, Action<PluginRegistry.Slice>? beforePublish = null)
+    /// <param name="trusted">The MatCMS Store's signed code (<see cref="NativeTrust"/>): may do what a built-in plugin may (adopt a core table).</param>
+    public void Load(Models.Plugin p, PluginInfo info, string srcDir, PluginRegistry registry, Action<PluginRegistry.Slice>? beforePublish = null, bool trusted = false)
     {
         // An update: the previous version is detached INSIDE LoadInto (after the new one is live) and only its
         // weak reference comes back, so no frame up here keeps the old context alive through the collection.
-        var previous = LoadInto(p, info, srcDir, registry, beforePublish);
+        var previous = LoadInto(p, info, srcDir, registry, beforePublish, trusted);
         if (previous is not null) Collect(previous, p.Key, registry);
     }
 
@@ -85,7 +86,7 @@ public sealed class NativePluginHost
     // The two steps below are NOT inlined, on purpose: a local that still points at the context in the frame
     // of the caller keeps it alive through the very collection that is meant to prove it can be freed.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private WeakReference? LoadInto(Models.Plugin p, PluginInfo info, string srcDir, PluginRegistry registry, Action<PluginRegistry.Slice>? beforePublish)
+    private WeakReference? LoadInto(Models.Plugin p, PluginInfo info, string srcDir, PluginRegistry registry, Action<PluginRegistry.Slice>? beforePublish, bool trusted)
     {
         var path = Path.Combine(srcDir, p.Entry);
         if (string.IsNullOrWhiteSpace(p.Entry) || !File.Exists(path))
@@ -108,7 +109,7 @@ public sealed class NativePluginHost
             var plugin = (IPlugin)Activator.CreateInstance(types[0])!;
             var slice = registry.Begin(p.Key, p.Id);
             PluginStringFiles.FromDirectory(slice, srcDir, msg => registry.AddLog(p.Key, "Sprachdatei: " + msg));
-            plugin.Configure(new PluginBuilder(registry, slice, info));
+            plugin.Configure(new PluginBuilder(registry, slice, info, builtIn: trusted));
             beforePublish?.Invoke(slice);
             registry.Publish(slice);
         }

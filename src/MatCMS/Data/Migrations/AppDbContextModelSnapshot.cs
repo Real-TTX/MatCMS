@@ -617,6 +617,10 @@ namespace MatCMS.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CodeSignature")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConfigJson")
                         .IsRequired()
                         .HasColumnType("TEXT");

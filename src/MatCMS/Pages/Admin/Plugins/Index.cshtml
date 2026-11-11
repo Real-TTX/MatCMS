@@ -54,6 +54,7 @@
                         else if (kind == MatCMS.Models.PluginKind.Native)
                         {
                             <span class="badge badge-new">@T["plugins.kind.native"]</span>
+                            @if (Model.Signed.Contains(p.Key)) { <span class="badge badge-new" title="@T["plugins.native.signedHelp"]"><i class="ti ti-rosette-discount-check"></i> @T["plugins.native.signed"]</span> }
                             @if (Model.Lingering(p.Key)) { <span class="badge badge-warn">@T["plugins.native.restart"]</span> }
                         }
                         else

@@ -55,6 +55,8 @@ public static class PluginPackager
         [JsonConverter(typeof(LenientString))] public string Entry { get; set; } = "";
         /// <summary>Native: SHA-256 (hex) of the main assembly. Checked on import.</summary>
         [JsonConverter(typeof(LenientString))] public string Sha256 { get; set; } = "";
+        /// <summary>Native only: the MatCMS Store's code signature over every file in src/ (<c>keyid:signature</c>); see <c>docs/builtin-extraction.md</c>.</summary>
+        [JsonConverter(typeof(LenientString))] public string CodeSignature { get; set; } = "";
     }
 
     /// <summary>Reads a JSON string — or a number or boolean, as its text — into a string property.</summary>
@@ -102,7 +104,7 @@ public static class PluginPackager
             // A native plugin's "entry file" is the line that tells an OLDER reader why it cannot run it.
             Code = native ? MatCMS.Shared.PluginBundle.NativeGuardCode : p.Code, Mapping = p.MappingJson ?? "",
             Kind = native ? MatCMS.Shared.PluginBundle.KindNative : "",
-            Api = native ? p.Api.ToString() : "", Entry = native ? p.Entry : "", Sha256 = native ? p.Sha256 : ""
+            Api = native ? p.Api.ToString() : "", Entry = native ? p.Entry : "", Sha256 = native ? p.Sha256 : "", CodeSignature = native ? p.CodeSignature : ""
         };
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
@@ -197,10 +199,13 @@ public static class PluginPackager
             // The bundle Key is the package identity. Re-slugify (never trust input).
             var wantKey = PagesIndex.Slugify(!string.IsNullOrWhiteSpace(meta.Key) ? meta.Key : meta.Name);
             if (string.IsNullOrEmpty(wantKey)) wantKey = "plugin";
-            // A plugin that is part of the CMS is updated with the CMS, never by a bundle — not by an import, not by a cloud
-            // rollout, not by a store entry that happens to carry its key.
-            if (BuiltInPlugins.IsBuiltInKey(wantKey))
-                return (null, false, $"„{wantKey}“ gehört zum Lieferumfang von MatCMS und lässt sich nicht durch ein Paket ersetzen.");
+            // The key of a plugin that ships (or shipped) with the CMS is taken only by the MatCMS Store's SIGNED native package of
+            // it — checked below, once its files are staged. Anything else under that key (a script, an unsigned DLL, a store entry
+            // of somebody else) is refused: nobody may pose as "shop".
+            var builtInKey = BuiltInPlugins.IsBuiltInKey(wantKey);
+            const string BuiltInRefusal = "gehört zum Lieferumfang von MatCMS und lässt sich nur durch das signierte Paket aus dem MatCMS Store ersetzen.";
+            if (builtInKey && !string.Equals((meta.Kind ?? "").Trim(), MatCMS.Shared.PluginBundle.KindNative, StringComparison.OrdinalIgnoreCase))
+                return (null, false, $"„{wantKey}“ {BuiltInRefusal}");
 
             // The further script files. Read BEFORE anything is written, so a bundle whose file map is
             // unusable is refused as a whole instead of half-importing a plugin that then fails to run.
@@ -216,6 +221,11 @@ public static class PluginPackager
             {
                 (stage, var nativeError) = await StageNativeAsync(zip, env, wantKey, meta);
                 if (nativeError is not null) return (null, false, nativeError);
+                if (builtInKey && !NativeTrust.IsSigned(wantKey, (meta.Version ?? "").Trim(), Path.Combine(stage!.StagingRoot, "src"), meta.CodeSignature))
+                {
+                    try { Directory.Delete(stage.StagingRoot, true); } catch { /* ignore */ }
+                    return (null, false, $"„{wantKey}“ {BuiltInRefusal}");
+                }
             }
 
             var dir = StoragePaths.PluginAssetDir(env, wantKey);
@@ -280,7 +290,9 @@ public static class PluginPackager
                     existing.MappingJson = meta.Mapping ?? "";
                     existing.Version = (meta.Version ?? "").Trim();
                     ApplyKind(existing, isNative, stage, meta);
-                    existing.Enabled = false;
+                    // Imported code is untrusted and waits for the operator — except when the store's signed package takes the place of
+                    // the built-in plugin it replaces: for the site nothing changes, so on stays on (the operator chose that already).
+                    if (previousKind != Models.PluginKind.BuiltIn) existing.Enabled = false;
                     plugin = existing;
                     updated = true;
                 }
@@ -378,9 +390,11 @@ public static class PluginPackager
             plugin.Api = stage.Api;
             plugin.FilesJson = "{}";            // a native plugin has no editable files
             plugin.Code = MatCMS.Shared.PluginBundle.NativeGuardCode;
+            plugin.CodeSignature = (meta.CodeSignature ?? "").Trim();
         }
         else
         {
+            plugin.CodeSignature = "";
             plugin.Kind = Models.PluginKind.Script;
             plugin.Entry = "";
             plugin.Sha256 = "";

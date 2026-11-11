@@ -411,7 +411,11 @@ public class PluginRunner
         {
             // Compiled code from outside runs with every right of this process. Whoever operates the site
             // switches that on — an import or a cloud rollout can bring the files, never the permission.
-            var allowed = await _db.SiteSettings.AsNoTracking()
+            // The one exception is the MatCMS Store's own signed code (decision 2026-11-11): its signature is checked
+            // against the files on disk right here, at every load, so it cannot be carried over to other files.
+            var src = StoragePaths.PluginSrc(_env, p.Key, p.Version);
+            var signed = NativeTrust.IsSigned(p.Key, p.Version, src, p.CodeSignature);
+            var allowed = signed || await _db.SiteSettings.AsNoTracking()
                 .AnyAsync(s => s.Key == SettingKeys.AllowNativePlugins && (s.Value == "1" || s.Value == "true"));
             if (!allowed)
             {
@@ -425,10 +429,9 @@ public class PluginRunner
             if (p.Api != api)
                 throw new InvalidOperationException($"Das Plugin wurde für Plugin-API {p.Api} gebaut, dieses MatCMS bietet API {api}.");
             var info = new PluginInfo(p.Key, p.Name, p.Version, p.Description, p.Api);
-            var src = StoragePaths.PluginSrc(_env, p.Key, p.Version);
             // Tables and install/update handlers run between "configured" and "published": a plugin whose tables cannot be
             // made, or whose installer throws, is never visible half-done.
-            _native.Load(p, info, src, _registry, slice => ActivateAsync(p, info, slice).GetAwaiter().GetResult());
+            _native.Load(p, info, src, _registry, slice => ActivateAsync(p, info, slice).GetAwaiter().GetResult(), trusted: signed);
             _registry.ClearError(p.Id);
         }
         catch (Exception ex)

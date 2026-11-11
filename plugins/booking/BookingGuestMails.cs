@@ -41,11 +41,11 @@ public static class BookingGuestMails
     };
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(OnCheckin, "Mail mit Check-in-Link", SettingKind.Bool) { Default = "1" })
-        .Add(new SettingSpec(OnArrival, "Mail mit Zugang am Tag vor der Anreise", SettingKind.Bool) { Default = "1" })
-        .Add(new SettingSpec(OnDeparture, "Mail am Abreisetag", SettingKind.Bool) { Default = "1" })
-        .Add(new SettingSpec(OnThanks, "Danke-Mail nach der Abreise", SettingKind.Bool) { Default = "1" })
-        .Add(new SettingSpec(ReviewKey, "Link zur Bewertung", SettingKind.Text) { Help = "z. B. Ihr Google-Profil. Steht in der Danke-Mail; leer = ohne Bitte um Bewertung." });
+        .Add(new SettingSpec(OnCheckin, "booking.gm.set.checkin", SettingKind.Bool) { Default = "1" })
+        .Add(new SettingSpec(OnArrival, "booking.gm.set.arrival", SettingKind.Bool) { Default = "1" })
+        .Add(new SettingSpec(OnDeparture, "booking.gm.set.departure", SettingKind.Bool) { Default = "1" })
+        .Add(new SettingSpec(OnThanks, "booking.gm.set.thanks", SettingKind.Bool) { Default = "1" })
+        .Add(new SettingSpec(ReviewKey, "booking.gm.set.review", SettingKind.Text) { Help = "booking.gm.set.reviewHelp" });
 
     private static bool On(IPluginContext ctx, string key) => ctx.Settings.Get(key) is not ("0" or "false");
 

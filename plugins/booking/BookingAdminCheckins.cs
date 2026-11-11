@@ -38,18 +38,18 @@ public static class BookingAdminCheckins
         var stays = await StaysAsync(ctx, from, to, ct);
         var q = "?von=" + B.Iso(from) + "&bis=" + B.Iso(to);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Meldungen",
-                Ui.Button("Alle als CSV", R + "checkins/csv" + q, UiButtonKind.Ghost, "ti-table-down", small: true)),
+            Ui.PageHead(null, ctx.T("booking.admin.navCheckins"),
+                Ui.Button(ctx.T("booking.admin.allCsv"), R + "checkins/csv" + q, UiButtonKind.Ghost, "ti-table-down", small: true)),
             // the range filter sits right above its list, without a card of its own; the button has the fields' height
-            Ui.Form(Ui.Inline(Ui.Input("von", "Anreise von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "bis", B.Iso(to), UiInputType.Date),
-                Ui.Submit("Anzeigen", UiButtonKind.Ghost))) with { Action = R + "checkins" },
-            Ui.Table(new[] { Ui.Column("Anreise"), Ui.Column("Unterkunft"), Ui.Column("Gast"), Ui.Column("Personen", right: true), Ui.Column("Check-in"), Ui.Column("", actions: true) },
-                stays.Select(s => Ui.Row(B.Weekday(s.B.Arrival) + " " + B.Date(s.B.Arrival), s.Unit, Ui.Link(s.B.Name, R + "bookings/" + s.B.Id),
+            Ui.Form(Ui.Inline(Ui.Input("von", ctx.T("booking.admin.arrivalFrom"), B.Iso(from), UiInputType.Date), Ui.Input("bis", ctx.T("booking.admin.until"), B.Iso(to), UiInputType.Date),
+                Ui.Submit(ctx.T("booking.admin.show"), UiButtonKind.Ghost))) with { Action = R + "checkins" },
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.arrival")), Ui.Column(ctx.T("booking.admin.colStay")), Ui.Column(ctx.T("booking.admin.colGuest")), Ui.Column(ctx.T("booking.admin.colPersons"), right: true), Ui.Column(ctx.T("booking.admin.colCheckin")), Ui.Column("", actions: true) },
+                stays.Select(s => Ui.Row(B.Weekday(ctx.T, s.B.Arrival) + " " + B.Date(s.B.Arrival), s.Unit, Ui.Link(s.B.Name, R + "bookings/" + s.B.Id),
                     B.Num(s.B.Adults + s.B.Children),
-                    s.People.Count > 0 ? Ui.Badge("ausgefüllt (" + s.People.Count + ")", UiTone.Success) : Ui.Badge("offen", UiTone.Warning),
+                    s.People.Count > 0 ? Ui.Badge(ctx.T("booking.admin.filledN", s.People.Count), UiTone.Success) : Ui.Badge(ctx.T("booking.admin.open"), UiTone.Warning),
                     s.People.Count == 0 ? null : Ui.Inline(Ui.Button("CSV", R + "bookings/" + s.B.Id + "/travellers.csv", UiButtonKind.Ghost, "ti-table-down", small: true),
-                        Ui.Button("Meldeschein", R + "bookings/" + s.B.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)))),
-                emptyText: "Keine Anreisen in diesem Zeitraum.")), "Meldungen");
+                        Ui.Button(ctx.T("booking.admin.regForm"), R + "bookings/" + s.B.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)))),
+                emptyText: ctx.T("booking.admin.noArrivals"))), ctx.T("booking.admin.navCheckins"));
     }
 
     private static PluginResult Csv(string text, string name) =>
@@ -58,14 +58,14 @@ public static class BookingAdminCheckins
     private static async Task<PluginResult> RangeCsvAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (from, to) = Range(ctx);
-        return Csv(BookingCheckin.Csv((await StaysAsync(ctx, from, to, ct)).Where(s => s.People.Count > 0)), "meldungen-" + B.Iso(from) + "-" + B.Iso(to) + ".csv");
+        return Csv(BookingCheckin.Csv((await StaysAsync(ctx, from, to, ct)).Where(s => s.People.Count > 0), ctx.T), "meldungen-" + B.Iso(from) + "-" + B.Iso(to) + ".csv");
     }
 
     private static async Task<PluginResult> BookingCsvAsync(IPluginContext ctx, CancellationToken ct)
     {
         if (!long.TryParse(ctx.Request.R("id"), out var id) || await BookingFlow.GetAsync(ctx.Data, id, ct) is not { } b) return PluginResult.NotFound();
         var unit = await new BookingStore(ctx.Data).UnitAsync(b.UnitId, ct);
-        return Csv(BookingCheckin.Csv(new[] { (b, unit?.Name ?? "", (IReadOnlyList<Traveller>)await BookingCheckin.TravellersAsync(ctx.Data, b.Id, ct)) }), "meldung-" + b.Number + ".csv");
+        return Csv(BookingCheckin.Csv(new[] { (b, unit?.Name ?? "", (IReadOnlyList<Traveller>)await BookingCheckin.TravellersAsync(ctx.Data, b.Id, ct)) }, ctx.T), "meldung-" + b.Number + ".csv");
     }
 
     private static async Task<PluginResult> PdfAsync(IPluginContext ctx, CancellationToken ct)
@@ -75,8 +75,8 @@ public static class BookingAdminCheckins
         var unit = await store.UnitAsync(b.UnitId, ct);
         var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);
         var people = await BookingCheckin.TravellersAsync(ctx.Data, b.Id, ct);
-        var pdf = BookingCheckin.Pdf(await BookingPrint.LetterheadAsync(ctx, ct), b, unit, house, BookingCheckin.ProfileFor(ctx, house), people);
-        return BookingPrint.Result(pdf, "Meldeschein " + b.Number);
+        var pdf = BookingCheckin.Pdf(await BookingPrint.LetterheadAsync(ctx, ct), b, unit, house, BookingCheckin.ProfileFor(ctx, house), people, ctx.T);
+        return BookingPrint.Result(pdf, ctx.T("booking.admin.regFormN", b.Number));
     }
 
     /// <summary>The check-in card on a booking's page.</summary>
@@ -90,14 +90,14 @@ public static class BookingAdminCheckins
         var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);
         var profile = BookingCheckin.ProfileFor(ctx, house);
         var cols = BookingCheckin.Profiles[profile].All.Where(k => k is not ("first" or "last")).Take(4).ToList();
-        return Ui.Card("Online-Check-in", Ui.Stack(
-            Ui.Inline(people.Count == 0 ? Ui.Badge("noch nicht ausgefüllt", UiTone.Warning) : Ui.Badge("ausgefüllt " + BookingMail.Local(row?.Timestamp("checkin_at")), UiTone.Success)),
-            row?.Text("arrival_time") is { Length: > 0 } at ? Ui.Text("Ankunft: " + at) : null,
-            row?.Text("travel") is { Length: > 0 } tr ? Ui.Text("Anreise mit: " + tr) : null,
-            people.Count == 0 ? null : Ui.Table(new[] { Ui.Column("Name") }.Concat(cols.Select(c => Ui.Column(BookingCheckin.Label(c)))),
+        return Ui.Card(ctx.T("booking.admin.onlineCheckin"), Ui.Stack(
+            Ui.Inline(people.Count == 0 ? Ui.Badge(ctx.T("booking.admin.notFilled"), UiTone.Warning) : Ui.Badge(ctx.T("booking.admin.filledAt", BookingMail.Local(row?.Timestamp("checkin_at"))), UiTone.Success)),
+            row?.Text("arrival_time") is { Length: > 0 } at ? Ui.Text(ctx.T("booking.admin.arrivalTime", at)) : null,
+            row?.Text("travel") is { Length: > 0 } tr ? Ui.Text(ctx.T("booking.admin.travelBy", tr)) : null,
+            people.Count == 0 ? null : Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.name")) }.Concat(cols.Select(c => Ui.Column(BookingCheckin.Label(ctx.T, c)))),
                 people.Select(t => Ui.Row(new object?[] { t.Name }.Concat(cols.Select(c => (object?)(c == "born" ? B.Date(t.Get(c)) : t.Get(c)))).ToArray()))),
             people.Count == 0 ? null : Ui.Inline(Ui.Button("CSV", R + "bookings/" + b.Id + "/travellers.csv", UiButtonKind.Ghost, "ti-table-down", small: true),
-                Ui.Button("Meldeschein (PDF)", R + "bookings/" + b.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)),
-            Ui.Muted("Gesendet: " + (row?.Text("mails") is { Length: > 0 } m ? string.Join(", ", m.Split(',').Select(x => x.Replace("booking.", ""))) : "noch keine Gästemail"))));
+                Ui.Button(ctx.T("booking.admin.regFormPdf"), R + "bookings/" + b.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)),
+            Ui.Muted(ctx.T("booking.admin.sent", row?.Text("mails") is { Length: > 0 } m ? string.Join(", ", m.Split(',').Select(x => x.Replace("booking.", ""))) : ctx.T("booking.admin.noGuestMail")))));
     }
 }

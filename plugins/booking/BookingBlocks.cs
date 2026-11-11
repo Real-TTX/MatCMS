@@ -20,43 +20,43 @@ public static class BookingBlocks
         b.OptionsSource("units", async (ctx, ct) =>
             (await new BookingStore(ctx.Data).UnitsAsync(ct)).Where(u => u.Active).Select(u => new FieldOption(u.Slug, u.Name)).ToList());
 
-        b.Block(new BlockSpec(RequestBlock, "Buchungsanfrage", "Das Anfrageformular: Unterkunft, Zeitraum, Personen – der Preis erscheint sofort, die Anfrage merkt den Zeitraum vor.")
+        b.Block(new BlockSpec(RequestBlock, "booking.block.request", "booking.block.requestDesc")
         {
             Category = "content",
             IconSvg = "<rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18\"/><path d=\"M8 2v4\"/><path d=\"M16 2v4\"/><path d=\"M9 15l2 2 4-4\"/>",
             Fields = new[]
             {
-                new FieldSpec("heading", "Überschrift") { Placeholder = "Jetzt anfragen" },
-                new FieldSpec("intro", "Einleitung", FieldKind.Textarea),
-                new FieldSpec("unit", "Unterkunft", FieldKind.Select) { OptionsSource = "units", Help = "Leer = der Gast wählt im Formular." }
+                new FieldSpec("heading", "booking.block.heading") { Placeholder = "Jetzt anfragen" },
+                new FieldSpec("intro", "booking.block.intro", FieldKind.Textarea),
+                new FieldSpec("unit", "booking.block.unit", FieldKind.Select) { OptionsSource = "units", Help = "booking.block.unitHelp" }
             }
         }, RequestBlockAsync);
 
-        b.Block(new BlockSpec(CalendarBlock, "Belegungskalender", "Freie und belegte Nächte einer Unterkunft, zwei Monate zum Blättern. Steht das Anfrageformular auf derselben Seite, füllen zwei Klicks An- und Abreise.")
+        b.Block(new BlockSpec(CalendarBlock, "booking.block.calendar", "booking.block.calendarDesc")
         {
             Category = "content",
             IconSvg = "<rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18\"/><path d=\"M8 13h2\"/><path d=\"M14 13h2\"/><path d=\"M8 17h2\"/>",
             Fields = new[]
             {
-                new FieldSpec("heading", "Überschrift") { Placeholder = "Belegung" },
-                new FieldSpec("unit", "Unterkunft", FieldKind.Select) { OptionsSource = "units" },
-                new FieldSpec("months", "Monate zum Blättern", FieldKind.Select)
+                new FieldSpec("heading", "booking.block.heading") { Placeholder = "Belegung" },
+                new FieldSpec("unit", "booking.block.unit", FieldKind.Select) { OptionsSource = "units" },
+                new FieldSpec("months", "booking.block.months", FieldKind.Select)
                 {
-                    Default = "12", Help = "Zu sehen sind zwei Monate nebeneinander (auf dem Handy einer), die Pfeile blättern weiter.", Options = new[] { new FieldOption("2", "2"), new FieldOption("3", "3"), new FieldOption("6", "6"), new FieldOption("12", "12") }
+                    Default = "12", Help = "booking.block.monthsHelp", Options = new[] { new FieldOption("2", "2"), new FieldOption("3", "3"), new FieldOption("6", "6"), new FieldOption("12", "12") }
                 }
             }
         }, CalendarBlockAsync);
 
-        b.Block(new BlockSpec(UnitsBlock, "Unterkünfte", "Alle buchbaren Unterkünfte als Karten mit Bild, Personen und „ab … € / Nacht“.")
+        b.Block(new BlockSpec(UnitsBlock, "booking.block.units", "booking.block.unitsDesc")
         {
             Category = "content",
             IconSvg = "<path d=\"M3 21h18\"/><path d=\"M5 21V8l7-5 7 5v13\"/><path d=\"M9 21v-6h6v6\"/>",
             Fields = new[]
             {
-                new FieldSpec("heading", "Überschrift") { Placeholder = "Unsere Unterkünfte" },
-                new FieldSpec("intro", "Einleitung", FieldKind.Textarea),
-                new FieldSpec("link", "Ziel des Knopfs") { Default = "#anfrage", Help = "Die Seite mit dem Anfrageformular, z. B. „/anfrage“ oder „#anfrage“ auf derselben Seite. Die Unterkunft wird vorausgewählt." },
-                new FieldSpec("button", "Text des Knopfs") { Placeholder = "Anfragen" }
+                new FieldSpec("heading", "booking.block.heading") { Placeholder = "Unsere Unterkünfte" },
+                new FieldSpec("intro", "booking.block.intro", FieldKind.Textarea),
+                new FieldSpec("link", "booking.block.link") { Default = "#anfrage", Help = "booking.block.linkHelp" },
+                new FieldSpec("button", "booking.block.button") { Placeholder = "Anfragen" }
             }
         }, UnitsBlockAsync);
     }
@@ -90,7 +90,7 @@ public static class BookingBlocks
         var key = ctx.Request.Q("einheit").Trim();
         var units = await store.UnitsAsync(ct);
         var unit = units.FirstOrDefault(u => u.Slug == B.Slug(key));
-        if (unit is null || !unit.Active) return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = "Unbekannte Einheit." }, 404);
+        if (unit is null || !unit.Active) return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = ctx.T("booking.err.unknownUnit") }, 404);
         var today = B.Today;
         var from = B.Day(ctx.Request.Q("von")) is { } f && f > today ? f : today;
         var to = B.Day(ctx.Request.Q("bis")) is { } t && t > from ? t : from.AddMonths(3);
@@ -142,8 +142,8 @@ public static class BookingBlocks
         var store = new BookingStore(ctx.Data);
         var units = (await store.UnitsAsync(ct)).Where(u => u.Active).ToList();
         var sb = new StringBuilder();
-        Head(sb, "bk-request-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : "Jetzt anfragen", F(ctx, "intro").Trim());
-        if (units.Count == 0) return PluginResult.Fragment(sb.Append("<p class=\"bk-muted\">Noch keine Unterkunft eingerichtet.</p></div></section>").ToString());
+        Head(sb, "bk-request-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : ctx.T("booking.block.requestHeading"), F(ctx, "intro").Trim());
+        if (units.Count == 0) return PluginResult.Fragment(sb.Append("<p class=\"bk-muted\">").Append(ctx.T("booking.block.noUnits")).Append("</p></div></section>").ToString());
         var fixedUnit = units.FirstOrDefault(u => u.Slug == F(ctx, "unit"));
         var chosen = fixedUnit ?? units.FirstOrDefault(u => u.Slug == B.Slug(Q(ctx, "einheit"))) ?? units[0];
         var fees = new List<Fee>();
@@ -156,38 +156,42 @@ public static class BookingBlocks
 
         sb.Append(PickerAssets);
         sb.Append("<form id=\"anfrage\" class=\"bk-form\" method=\"post\" action=\"").Append(BookingPublic.RequestPath).Append("\" data-price=\"").Append(BookingPlugin.PricePath)
-          .Append("\" data-busy=\"").Append(BusyPath).Append("\">");
+          .Append("\" data-busy=\"").Append(BusyPath).Append('"');
+        // the script's own words, in the page's language (read back as dataset values — attribute-encoded, never markup)
+        foreach (var (attr, k) in new[] { ("taken", "booking.block.takenNote"), ("total", "booking.public.total"), ("night", "booking.block.night"), ("nights", "booking.block.nights") })
+            sb.Append(" data-t-").Append(attr).Append("=\"").Append(B.H(ctx.T(k))).Append('"');
+        sb.Append('>');
         if (fixedUnit is not null) sb.Append("<input type=\"hidden\" name=\"einheit\" value=\"").Append(B.H(fixedUnit.Slug)).Append("\">");
         else
         {
             var opts = new StringBuilder("<select name=\"einheit\" required>");
             foreach (var u in units)
                 opts.Append("<option value=\"").Append(B.H(u.Slug)).Append('"').Append(u.Id == chosen.Id ? " selected" : "").Append('>').Append(B.H(u.Name))
-                    .Append(" (bis ").Append(u.GuestsMax).Append(" Personen)</option>");
-            sb.Append(Field("Unterkunft", opts.Append("</select>").ToString()));
+                    .Append(' ').Append(ctx.T("booking.block.upTo", u.GuestsMax)).Append("</option>");
+            sb.Append(Field(ctx.T("booking.block.unit"), opts.Append("</select>").ToString()));
         }
         sb.Append("<div class=\"bk-row bk-row-stay\">");
-        Picker(sb, "zeitraum", "Anreise – Abreise", chosen.Slug, range, "Zeitraum wählen");
+        Picker(sb, "zeitraum", ctx.T("booking.block.dates"), chosen.Slug, range, ctx.T("booking.block.pickDates"));
         // without script the picker cannot open: two plain date fields instead (the request takes either)
         sb.Append("<noscript><div class=\"bk-row\">")
-          .Append(Field("Anreise", "<input type=\"date\" name=\"anreise\" min=\"" + today + "\" value=\"" + B.H(Val("anreise")) + "\">"))
-          .Append(Field("Abreise", "<input type=\"date\" name=\"abreise\" min=\"" + today + "\" value=\"" + B.H(Val("abreise")) + "\">")).Append("</div></noscript>");
-        sb.Append(Field("Erwachsene", "<input type=\"number\" name=\"erwachsene\" min=\"1\" max=\"50\" value=\"2\" required>"))
-          .Append(Field("Kinder", "<input type=\"number\" name=\"kinder\" min=\"0\" max=\"50\" value=\"0\">")).Append("</div>");
+          .Append(Field(ctx.T("booking.public.arrival"), "<input type=\"date\" name=\"anreise\" min=\"" + today + "\" value=\"" + B.H(Val("anreise")) + "\">"))
+          .Append(Field(ctx.T("booking.public.departure"), "<input type=\"date\" name=\"abreise\" min=\"" + today + "\" value=\"" + B.H(Val("abreise")) + "\">")).Append("</div></noscript>");
+        sb.Append(Field(ctx.T("booking.block.adults"), "<input type=\"number\" name=\"erwachsene\" min=\"1\" max=\"50\" value=\"2\" required>"))
+          .Append(Field(ctx.T("booking.block.children"), "<input type=\"number\" name=\"kinder\" min=\"0\" max=\"50\" value=\"0\">")).Append("</div>");
         foreach (var f in fees)
             sb.Append("<label class=\"bk-check\" data-house=\"").Append(f.PropertyId).Append("\" data-unit=\"").Append(f.UnitId).Append("\"><input type=\"checkbox\" name=\"extra_").Append(f.Id)
               .Append("\" value=\"1\" data-fee=\"").Append(f.Id).Append("\"> ").Append(B.H(f.Name)).Append(" (").Append(B.H(B.Money(f.Amount, BookingPlugin.Currency(ctx)))).Append(' ')
-              .Append(B.H(FeePer.Label(f.Per))).Append(")</label>");
+              .Append(B.H(FeePer.Label(ctx.T, f.Per))).Append(")</label>");
         sb.Append("<div class=\"bk-price\" aria-live=\"polite\"></div>");
         sb.Append("<div class=\"bk-row\">")
-          .Append(Field("Name", "<input name=\"name\" autocomplete=\"name\" required maxlength=\"120\">"))
-          .Append(Field("E-Mail", "<input type=\"email\" name=\"email\" autocomplete=\"email\" required maxlength=\"200\">"))
-          .Append(Field("Telefon", "<input type=\"tel\" name=\"telefon\" autocomplete=\"tel\" maxlength=\"60\">")).Append("</div>")
-          .Append(Field("Nachricht (freiwillig)", "<textarea name=\"nachricht\" rows=\"4\" maxlength=\"3000\"></textarea>"))
+          .Append(Field(ctx.T("booking.block.name"), "<input name=\"name\" autocomplete=\"name\" required maxlength=\"120\">"))
+          .Append(Field(ctx.T("booking.block.email"), "<input type=\"email\" name=\"email\" autocomplete=\"email\" required maxlength=\"200\">"))
+          .Append(Field(ctx.T("booking.block.phone"), "<input type=\"tel\" name=\"telefon\" autocomplete=\"tel\" maxlength=\"60\">")).Append("</div>")
+          .Append(Field(ctx.T("booking.block.message"), "<textarea name=\"nachricht\" rows=\"4\" maxlength=\"3000\"></textarea>"))
           .Append("<label class=\"bk-hp\" aria-hidden=\"true\">Website<input name=\"website\" tabindex=\"-1\" autocomplete=\"off\"></label>")
-          .Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"consent\" value=\"1\" required> <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Anfrage gespeichert werden (<a href=\"")
-          .Append(B.H(privacy)).Append("\">Datenschutz</a>).</span></label>")
-          .Append("<p><button class=\"btn bk-btn\" type=\"submit\">Unverbindlich anfragen</button></p></form>");
+          .Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"consent\" value=\"1\" required> <span>").Append(ctx.T("booking.block.consent")).Append(" (<a href=\"")
+          .Append(B.H(privacy)).Append("\">").Append(ctx.T("booking.block.privacy")).Append("</a>).</span></label>")
+          .Append("<p><button class=\"btn bk-btn\" type=\"submit\">").Append(ctx.T("booking.block.submit")).Append("</button></p></form>");
         // data for the script: which house each unit belongs to (the optional fees of the chosen unit's house show)
         sb.Append("<script type=\"application/json\" class=\"bk-units-json\">{")
           .Append(string.Join(",", units.Select(u => "\"" + u.Slug + "\":[" + u.PropertyId + "," + u.Id + "]"))).Append("}</script>");
@@ -214,10 +218,10 @@ var ex=[].map.call(f.querySelectorAll('[data-fee]:checked'),function(c){return c
 var q='?einheit='+encodeURIComponent(unit())+'&anreise='+a+'&abreise='+d+'&erwachsene='+(f.elements.erwachsene.value||1)+'&kinder='+(f.elements.kinder.value||0)+'&extras='+ex;
 fetch(f.dataset.price+q,{headers:{Accept:'application/json'}}).then(function(r){return r.json()}).then(function(j){box.textContent='';
 if(j.error){box.appendChild(el('p','bk-no',j.error));return}
-if(!j.available)box.appendChild(el('p','bk-no','In diesem Zeitraum ist die Unterkunft leider belegt.'));
+if(!j.available)box.appendChild(el('p','bk-no',f.dataset.tTaken));
 (j.problems||[]).forEach(function(p){box.appendChild(el('p','bk-no',p))});
 var t=el('table','bk-bill'),b=el('tbody');(j.lines||[]).forEach(function(l){var r=el('tr'),c=el('td',null,l.text);if(l.detail)c.appendChild(el('small',null,l.detail));r.appendChild(c);r.appendChild(el('td',null,l.amountText));b.appendChild(r)});
-t.appendChild(b);var ft=el('tfoot'),fr=el('tr');fr.appendChild(el('td',null,'Gesamt ('+j.nights+(j.nights==1?' Nacht)':' Nächte)')));fr.appendChild(el('td','bk-total',j.totalText));ft.appendChild(fr);t.appendChild(ft);
+t.appendChild(b);var ft=el('tfoot'),fr=el('tr');fr.appendChild(el('td',null,f.dataset.tTotal+' ('+j.nights+' '+(j.nights==1?f.dataset.tNight:f.dataset.tNights)+')'));fr.appendChild(el('td','bk-total',j.totalText));ft.appendChild(fr);t.appendChild(ft);
 if((j.lines||[]).length)box.appendChild(t);f.querySelector('button[type=submit]').disabled=!j.ok;}).catch(function(){})}
 f.addEventListener('input',price);f.addEventListener('change',function(e){if(e.target.name=='einheit'){fees();busy()}price()});
 document.addEventListener('bk-dates',function(e){if(e.detail.unit&&f.elements.einheit.tagName=='SELECT'){f.elements.einheit.value=e.detail.unit;busy()}
@@ -233,20 +237,21 @@ fees();price();})();
         var units = (await store.UnitsAsync(ct)).Where(u => u.Active).ToList();
         var unit = units.FirstOrDefault(u => u.Slug == F(ctx, "unit")) ?? units.FirstOrDefault();
         var sb = new StringBuilder();
-        Head(sb, "bk-calendar-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : unit is null ? "Belegung" : "Belegung – " + unit.Name, "");
-        if (unit is null) return PluginResult.Fragment(sb.Append("<p class=\"bk-muted\">Noch keine Unterkunft eingerichtet.</p></div></section>").ToString());
+        var takenWord = ctx.T("booking.block.taken");
+        Head(sb, "bk-calendar-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : unit is null ? ctx.T("booking.block.occupancy") : ctx.T("booking.block.occupancyOf", unit.Name), "");
+        if (unit is null) return PluginResult.Fragment(sb.Append("<p class=\"bk-muted\">").Append(ctx.T("booking.block.noUnits")).Append("</p></div></section>").ToString());
         var months = int.TryParse(F(ctx, "months"), out var m) ? Math.Clamp(m, 1, 12) : 12;
         var today = B.Today;
         var first = new DateOnly(today.Year, today.Month, 1);
         var end = first.AddMonths(months);
         var taken = (await store.NightsAsync(BookingStore.Occupies(unit, units), first, end, ct)).Select(n => n.Day).ToHashSet();
-        sb.Append("<div class=\"bk-cal-wrap\"><div class=\"bk-cal-nav\" hidden><button type=\"button\" class=\"bk-cal-prev\" aria-label=\"Vorheriger Monat\">‹</button>")
-          .Append("<button type=\"button\" class=\"bk-cal-next\" aria-label=\"Nächster Monat\">›</button></div>");
+        sb.Append("<div class=\"bk-cal-wrap\"><div class=\"bk-cal-nav\" hidden><button type=\"button\" class=\"bk-cal-prev\" aria-label=\"").Append(ctx.T("booking.block.prevMonth")).Append("\">‹</button>")
+          .Append("<button type=\"button\" class=\"bk-cal-next\" aria-label=\"").Append(ctx.T("booking.block.nextMonth")).Append("\">›</button></div>");
         sb.Append("<div class=\"bk-cal\" data-unit=\"").Append(B.H(unit.Slug)).Append("\">");
         for (var mo = first; mo < end; mo = mo.AddMonths(1))
         {
-            sb.Append("<div class=\"bk-month\"><h3>").Append(B.H(B.Month(mo))).Append("</h3><table><thead><tr>");
-            foreach (var d in B.DayNames) sb.Append("<th>").Append(d).Append("</th>");
+            sb.Append("<div class=\"bk-month\"><h3>").Append(B.H(B.Month(ctx.T, mo))).Append("</h3><table><thead><tr>");
+            for (var wd = 1; wd <= 7; wd++) sb.Append("<th>").Append(B.H(B.DayName(ctx.T, wd))).Append("</th>");
             sb.Append("</tr></thead><tbody><tr>");
             var lead = B.IsoDay(mo.DayOfWeek) - 1;
             for (var i = 0; i < lead; i++) sb.Append("<td class=\"bk-empty\"></td>");
@@ -256,14 +261,14 @@ fees();price();})();
                 if (col == 7) { sb.Append("</tr><tr>"); col = 0; }
                 var css = d < today ? "bk-past" : taken.Contains(d) ? "bk-taken" : "bk-free";
                 sb.Append("<td class=\"").Append(css).Append('"').Append(css == "bk-past" ? "" : " data-day=\"" + B.Iso(d) + "\"")
-                  .Append(css == "bk-taken" ? " title=\"belegt\"" : "").Append('>').Append(d.Day).Append("</td>");
+                  .Append(css == "bk-taken" ? " title=\"" + B.H(takenWord) + "\"" : "").Append('>').Append(d.Day).Append("</td>");
                 col++;
             }
             while (col++ < 7) sb.Append("<td class=\"bk-empty\"></td>");
             sb.Append("</tr></tbody></table></div>");
         }
-        sb.Append("</div></div><p class=\"bk-legend\"><span><i style=\"background:color-mix(in srgb,#16a34a 25%,transparent)\"></i>frei</span>")
-          .Append("<span><i style=\"background:color-mix(in srgb,#dc2626 30%,transparent)\"></i>belegt</span><span>Ein Tag steht für die Nacht ab diesem Tag – zwei Klicks wählen An- und Abreise.</span></p>");
+        sb.Append("</div></div><p class=\"bk-legend\"><span><i style=\"background:color-mix(in srgb,#16a34a 25%,transparent)\"></i>").Append(ctx.T("booking.block.free")).Append("</span>")
+          .Append("<span><i style=\"background:color-mix(in srgb,#dc2626 30%,transparent)\"></i>").Append(takenWord).Append("</span><span>").Append(ctx.T("booking.block.legend")).Append("</span></p>");
         sb.Append("<script>").Append(CalendarScript).Append("</script></div></section>");
         return PluginResult.Fragment(sb.ToString());
     }
@@ -299,9 +304,9 @@ var form=document.getElementById('anfrage');if(form)form.scrollIntoView({behavio
         var rates = await store.RatesAsync(units.Select(u => u.Id), ct);
         var cur = BookingPlugin.Currency(ctx);
         var sb = new StringBuilder();
-        Head(sb, "bk-units-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : "Unsere Unterkünfte", F(ctx, "intro").Trim());
+        Head(sb, "bk-units-block", F(ctx, "heading").Trim() is { Length: > 0 } h ? h : ctx.T("booking.block.unitsHeading"), F(ctx, "intro").Trim());
         var link = F(ctx, "link").Trim() is { Length: > 0 } l && (l.StartsWith('/') || l.StartsWith('#')) && !l.StartsWith("//") ? l : "#anfrage";
-        var button = F(ctx, "button").Trim() is { Length: > 0 } bt ? bt : "Anfragen";
+        var button = F(ctx, "button").Trim() is { Length: > 0 } bt ? bt : ctx.T("booking.block.enquire");
         sb.Append("<div class=\"bk-units\">");
         foreach (var u in units)
         {
@@ -311,10 +316,10 @@ var form=document.getElementById('anfrage');if(form)form.scrollIntoView({behavio
             sb.Append("<article class=\"bk-unit\">");
             if (u.Image.Length > 0) sb.Append("<img src=\"").Append(B.H(ctx.Site.ImageUrl(u.Image, 640))).Append("\" alt=\"").Append(B.H(u.Name)).Append("\" loading=\"lazy\">");
             sb.Append("<div class=\"bk-unit-body\"><h3>").Append(B.H(u.Name)).Append("</h3><p class=\"bk-muted\">")
-              .Append(u.GuestsMax == u.GuestsStd ? u.GuestsMax + " Personen" : u.GuestsStd + "–" + u.GuestsMax + " Personen")
-              .Append(u.Bedrooms > 0 ? " · " + u.Bedrooms + (u.Bedrooms == 1 ? " Schlafzimmer" : " Schlafzimmer") : "").Append("</p>");
+              .Append(u.GuestsMax == u.GuestsStd ? ctx.T("booking.block.persons", u.GuestsMax) : ctx.T("booking.block.personsRange", u.GuestsStd, u.GuestsMax))
+              .Append(u.Bedrooms > 0 ? " · " + (u.Bedrooms == 1 ? ctx.T("booking.block.bedroom") : ctx.T("booking.block.bedrooms", u.Bedrooms)) : "").Append("</p>");
             if (u.Description.Length > 0) sb.Append("<p>").Append(B.H(u.Description.Length > 220 ? u.Description[..220].TrimEnd() + " …" : u.Description)).Append("</p>");
-            if (from > 0) sb.Append("<p class=\"bk-from\">ab ").Append(B.H(B.Money(from, cur))).Append(" / Nacht</p>");
+            if (from > 0) sb.Append("<p class=\"bk-from\">").Append(ctx.T("booking.block.fromPerNight", B.H(B.Money(from, cur)))).Append("</p>");
             sb.Append("<a class=\"btn bk-btn\" href=\"").Append(B.H(href)).Append("\">").Append(B.H(button)).Append("</a></div></article>");
         }
         sb.Append("</div></div></section>");

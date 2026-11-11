@@ -49,7 +49,7 @@ public sealed class BookingFederationTests(FederationSites sites) : IClassFixtur
     private static async Task SettingsAsync(HttpClient admin, Dictionary<string, string> values)
     {
         values["action"] = "save-settings";
-        var res = await BookingApp.PostAsync(admin, R + "_settings?group=Verbund", values);
+        var res = await BookingApp.PostAsync(admin, R + "_settings?group=booking.fed.group", values);
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
     }
 

@@ -15,56 +15,55 @@ public static class MomentsSettings
     public const string DownloadOriginal = "original", DownloadView = "view", DownloadOff = "off";
     public const string ModeCode = "code", ModePassword = "password", ModeBoth = "both";
 
+    // Labels, help and option texts are keys of the plugin's string tables (MomentsStrings); the host looks them up in the admin's language.
+    // The defaults of the text settings stay German: they are the operator's own content once saved, not texts of the plugin.
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(EventName, "Name des Anlasses") { Group = "Allgemein", Help = "Z. B. „Hochzeit von Grit & Steffen“. Erscheint über der Galerie und auf den Zugangskarten. Leer = Name der Website." })
-        .Text(Title, "Überschrift der Galerie", "Unsere Momente")
-        .Text(HostName, "Name der Gastgeber", "", "So erscheinen Fotos und Kommentare, die ihr im Admin hochladet oder schreibt (z. B. „Grit & Steffen“). Leer = Name des Anlasses.")
-        .TextArea(Welcome, "Begrüßung in der Galerie", "Schön, dass ihr da seid! Hier findet ihr die Fotos von unserem Tag – und hier könnt ihr eure eigenen Bilder hochladen.")
-        .TextArea(LoginIntro, "Text auf der Anmeldeseite", "Gebt den persönlichen Zugang ein, den ihr von uns bekommen habt.",
-            "Steht über dem Anmeldefeld. Wie der QR-Code auf der Karte funktioniert, erklärt die Seite selbst darunter.")
-        .Text(MenuLabel, "Menüpunkt für angemeldete Gäste", "Fotos", "Erscheint im Hauptmenü der Website, sobald ein Gast angemeldet ist (mit Alle Fotos, Hochladen und Meine Fotos darunter; „Abmelden“ steht ganz rechts daneben).")
-        .Add(new SettingSpec(LoginMode, "Anmeldung mit", SettingKind.Choice)
+        .Add(new SettingSpec(EventName, "moments.set.eventName") { Group = "moments.set.groupGeneral", Help = "moments.set.eventNameHelp" })
+        .Text(Title, "moments.set.title", "Unsere Momente")
+        .Text(HostName, "moments.set.hostName", "", "moments.set.hostNameHelp")
+        .TextArea(Welcome, "moments.set.welcome", "Schön, dass ihr da seid! Hier findet ihr die Fotos von unserem Tag – und hier könnt ihr eure eigenen Bilder hochladen.")
+        .TextArea(LoginIntro, "moments.set.loginIntro", "Gebt den persönlichen Zugang ein, den ihr von uns bekommen habt.", "moments.set.loginIntroHelp")
+        .Text(MenuLabel, "moments.set.menuLabel", "Fotos", "moments.set.menuLabelHelp")
+        .Add(new SettingSpec(LoginMode, "moments.set.loginMode", SettingKind.Choice)
         {
-            Group = "Anmeldung", Default = ModeCode,
+            Group = "moments.set.groupLogin", Default = ModeCode,
             Options = new[]
             {
-                new FieldOption(ModeCode, "persönlichem Code (mit Link und QR-Code)"),
-                new FieldOption(ModePassword, "Benutzername und Passwort"),
-                new FieldOption(ModeBoth, "beidem – Code oder Benutzername und Passwort")
+                new FieldOption(ModeCode, "moments.set.modeCode"),
+                new FieldOption(ModePassword, "moments.set.modePassword"),
+                new FieldOption(ModeBoth, "moments.set.modeBoth")
             },
-            Help = "Code: Jeder Haushalt bekommt einen Code, die Karte trägt ihn mit QR-Code (scannen = angemeldet). Benutzername und Passwort vergebt ihr je Haushalt unter Gäste; " +
-                   "das Passwort wird nur verschlüsselt gespeichert – ihr könnt es neu setzen, aber nicht mehr ablesen."
+            Help = "moments.set.loginModeHelp"
         })
-        .Choice(CodeChars, "Neue Codes bestehen aus", Codes.Mixed, new[]
+        .Choice(CodeChars, "moments.set.codeChars", Codes.Mixed, new[]
         {
-            new FieldOption(Codes.Mixed, "Buchstaben und Ziffern (z. B. K7XM-4QPA)"),
-            new FieldOption(Codes.Digits, "nur Ziffern (z. B. 4829-1736)"),
-            new FieldOption(Codes.Letters, "nur Buchstaben (z. B. KXMQ-PARW)")
-        }, "Mit Buchstaben ohne die Zeichen, die man verwechselt (0/O, 1/I/L). Gilt für neu erzeugte Codes – vorhandene bleiben gültig. Einen eigenen Code könnt ihr je Haushalt unter Gäste eintippen.")
-        .Number(CodeLength, "Länge neuer Codes", 8, Codes.MinLength, 12,
-            "6 bis 12 Zeichen. Kürzer ist leichter zu tippen, aber auch leichter zu erraten – nach " + Throttle.Limit + " Fehlversuchen ist eine Adresse 10 Minuten gesperrt.")
-        .Add(new SettingSpec(UploadApproval, "Fotos der Gäste erst nach Freigabe zeigen", SettingKind.Bool)
+            new FieldOption(Codes.Mixed, "moments.set.charsMixed"),
+            new FieldOption(Codes.Digits, "moments.set.charsDigits"),
+            new FieldOption(Codes.Letters, "moments.set.charsLetters")
+        }, "moments.set.codeCharsHelp")
+        // the help names the failure limit (Throttle.Limit = 12) in its text
+        .Number(CodeLength, "moments.set.codeLength", 8, Codes.MinLength, 12, "moments.set.codeLengthHelp")
+        .Add(new SettingSpec(UploadApproval, "moments.set.uploadApproval", SettingKind.Bool)
         {
-            Group = "Freigabe & Moderation", Default = "true",
-            Help = "An: Ein hochgeladenes Foto sehen erst ihr (Admin → Moments → Freigabe) und der Gast selbst; alle anderen erst, wenn ihr es freigegeben habt."
+            Group = "moments.set.groupModeration", Default = "true", Help = "moments.set.uploadApprovalHelp"
         })
-        .Bool(CommentApproval, "Kommentare erst nach Freigabe zeigen", false, "Aus: Kommentare erscheinen sofort; ihr könnt sie jederzeit ausblenden oder löschen.")
-        .Bool(GuestTags, "Gäste dürfen Fotos markieren", true, "Personen und Stichworte an Fotos setzen. Ihr könnt jede Markierung wieder entfernen.")
-        .Bool(NewTags, "Gäste dürfen neue Stichworte anlegen", true, "Aus: Gäste wählen nur aus den Personen der Gästeliste und den Stichworten, die es schon gibt.")
-        .Bool(ShowTable, "Tisch der Gäste im Gästebereich zeigen", false, "An: Bei der Begrüßung steht, an welchem Tisch der Haushalt sitzt (Feld „Tisch“ in der Gästeliste).")
-        .Add(new SettingSpec(GuestUpload, "Gäste dürfen Fotos hochladen", SettingKind.Bool) { Group = "Hochladen & Herunterladen", Default = "true", Help = "Aus: Die Galerie ist nur noch zum Ansehen (z. B. nach dem Fest)." })
-        .Number(MaxUploadMb, "Größtes Foto beim Hochladen (MB)", 25, 1, 25, "Das Original. Die Ansicht und die Kachel macht das Handy des Gastes vor dem Hochladen selbst (klein und schnell).")
-        .Choice(Downloads, "Herunterladen", DownloadOriginal, new[]
+        .Bool(CommentApproval, "moments.set.commentApproval", false, "moments.set.commentApprovalHelp")
+        .Bool(GuestTags, "moments.set.guestTags", true, "moments.set.guestTagsHelp")
+        .Bool(NewTags, "moments.set.newTags", true, "moments.set.newTagsHelp")
+        .Bool(ShowTable, "moments.set.showTable", false, "moments.set.showTableHelp")
+        .Add(new SettingSpec(GuestUpload, "moments.set.guestUpload", SettingKind.Bool) { Group = "moments.set.groupFiles", Default = "true", Help = "moments.set.guestUploadHelp" })
+        .Number(MaxUploadMb, "moments.set.maxUpload", 25, 1, 25, "moments.set.maxUploadHelp")
+        .Choice(Downloads, "moments.set.downloads", DownloadOriginal, new[]
         {
-            new FieldOption(DownloadOriginal, "Originalfotos (Standortdaten entfernt)"),
-            new FieldOption(DownloadView, "nur die große Ansicht (max. 2048 Pixel)"),
-            new FieldOption(DownloadOff, "kein Herunterladen")
-        }, "Was Gäste über „Herunterladen“ bekommen.");
+            new FieldOption(DownloadOriginal, "moments.set.dlOriginal"),
+            new FieldOption(DownloadView, "moments.set.dlView"),
+            new FieldOption(DownloadOff, "moments.set.dlOff")
+        }, "moments.set.downloadsHelp");
 
     public static string Event(IPluginContext ctx) => ctx.Settings.Get(EventName) is { Length: > 0 } n ? n.Trim() : ctx.Site.Name;
     public static string Hosts(IPluginContext ctx) => ctx.Settings.Get(HostName) is { Length: > 0 } n ? n.Trim() : Event(ctx);
-    public static string GalleryTitle(IPluginContext ctx) => ctx.Settings.Get(Title) is { Length: > 0 } n ? n.Trim() : "Unsere Momente";
-    public static string Menu(IPluginContext ctx) => ctx.Settings.Get(MenuLabel) is { Length: > 0 } n ? n.Trim() : "Fotos";
+    public static string GalleryTitle(IPluginContext ctx) => ctx.Settings.Get(Title) is { Length: > 0 } n ? n.Trim() : ctx.T("moments.galleryTitle");
+    public static string Menu(IPluginContext ctx) => ctx.Settings.Get(MenuLabel) is { Length: > 0 } n ? n.Trim() : ctx.T("moments.photos");
     public static long MaxBytes(IPluginContext ctx) => (long)Math.Clamp(ctx.Settings.GetNumber(MaxUploadMb, 25), 1, 25) * 1024 * 1024;
     public static string DownloadMode(IPluginContext ctx) => ctx.Settings.Get(Downloads) is DownloadView or DownloadOff ? ctx.Settings.Get(Downloads) : DownloadOriginal;
 
@@ -109,12 +108,12 @@ public static class Codes
     }
 
     /// <summary>Why a code the hosts typed cannot be used (null = fine): only letters A–Z and digits, at least <see cref="MinLength"/>.</summary>
-    public static string? Problem(string? typed)
+    public static string? Problem(IPluginContext ctx, string? typed)
     {
         var raw = (typed ?? "").Trim();
-        if (raw.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is ' ' or '-'))) return "Ein Code besteht nur aus Buchstaben A–Z und Ziffern (Leerzeichen und Bindestriche werden ignoriert).";
+        if (raw.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is ' ' or '-'))) return ctx.T("moments.code.onlyLetters");
         var s = Normalize(raw);
-        if (s.Length < MinLength) return "Ein Code braucht mindestens " + MinLength + " Zeichen.";
+        if (s.Length < MinLength) return ctx.T("moments.code.tooShort", M.N(MinLength));
         return null;
     }
 
@@ -193,7 +192,7 @@ public static class Throttle
     public static void Reset() => Misses.Clear();
 }
 
-/// <summary>Small helpers: encoding, German dates (the host runs with invariant globalization).</summary>
+/// <summary>Small helpers: encoding, dates in the request's language (the host runs with invariant globalization).</summary>
 public static class M
 {
     public static string H(string? s) => WebUtility.HtmlEncode(s ?? "");
@@ -211,9 +210,11 @@ public static class M
     /// <summary>Plain text with its line breaks: nothing a person typed ever becomes markup.</summary>
     public static string Text(string? text) => H(text).Replace("\r\n", "\n").Replace("\n", "<br>");
 
-    public static readonly string[] Months = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
-    private static readonly string[] Days = { "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag" };
-    private static readonly string[] ShortDays = { "So", "Mo", "Di", "Mi", "Do", "Fr", "Sa" };
+    // Month and day names come from the string tables (moments.month.1–12, moments.day.0–6, moments.dayShort.0–6): the host runs with invariant
+    // globalization, so a culture's own names are not available, and the language is the request's.
+    private static string Month(IPluginContext ctx, int month) => ctx.T("moments.month." + M.N(month));
+    private static string Day(IPluginContext ctx, DayOfWeek d) => ctx.T("moments.day." + M.N((int)d));
+    private static string ShortDay(IPluginContext ctx, DayOfWeek d) => ctx.T("moments.dayShort." + M.N((int)d));
 
     private static TimeZoneInfo? _tz;
     /// <summary>Germany's time; UTC if the zone is missing on the machine.</summary>
@@ -236,30 +237,32 @@ public static class M
     public static bool TryTaken(string? s, out DateTime d) =>
         DateTime.TryParseExact((s ?? "").Trim(), new[] { "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm", "yyyy-MM-dd" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out d);
 
-    /// <summary>When a photo was taken, as "Fr, 9. Okt. 2026, 16:42".</summary>
-    public static string Taken(string? s) => TryTaken(s, out var d)
-        ? ShortDays[(int)d.DayOfWeek] + ", " + d.Day + ". " + Months[d.Month - 1] + " " + d.Year + ", " + d.ToString("HH:mm", CultureInfo.InvariantCulture) + " Uhr"
+    /// <summary>When a photo was taken, as "Fr, 9. Oktober 2026, 16:42 Uhr" ("Fri, October 9, 2026, 16:42").</summary>
+    public static string Taken(IPluginContext ctx, string? s) => TryTaken(s, out var d)
+        ? ctx.T("moments.date.taken", ShortDay(ctx, d.DayOfWeek), N(d.Day), Month(ctx, d.Month), N(d.Year), d.ToString("HH:mm", CultureInfo.InvariantCulture))
         : "";
 
     /// <summary>The heading of an hour in the chronological gallery: "Freitag, 9. Oktober · 15 Uhr" (the day only when the photos span several).</summary>
-    public static string Hour(DateTime d, bool withDay) =>
-        (withDay ? Days[(int)d.DayOfWeek] + ", " + d.Day + ". " + Months[d.Month - 1] + " · " : "") + d.Hour.ToString(CultureInfo.InvariantCulture) + " Uhr";
+    public static string Hour(IPluginContext ctx, DateTime d, bool withDay) => withDay
+        ? ctx.T("moments.date.dayHour", Day(ctx, d.DayOfWeek), N(d.Day), Month(ctx, d.Month), N(d.Hour))
+        : ctx.T("moments.date.hour", N(d.Hour));
 
     /// <summary>"vor 5 Minuten" for a comment.</summary>
-    public static string Ago(DateTime? utc)
+    public static string Ago(IPluginContext ctx, DateTime? utc)
     {
         if (utc is not DateTime d) return "";
         var span = DateTime.UtcNow - d;
-        if (span.TotalMinutes < 1) return "gerade eben";
-        if (span.TotalMinutes < 60) return "vor " + (int)span.TotalMinutes + (span.TotalMinutes < 2 ? " Minute" : " Minuten");
-        if (span.TotalHours < 24) return "vor " + (int)span.TotalHours + (span.TotalHours < 2 ? " Stunde" : " Stunden");
-        if (span.TotalDays < 7) return "vor " + (int)span.TotalDays + (span.TotalDays < 2 ? " Tag" : " Tagen");
+        if (span.TotalMinutes < 1) return ctx.T("moments.ago.now");
+        if (span.TotalMinutes < 60) return ctx.T(span.TotalMinutes < 2 ? "moments.ago.minute" : "moments.ago.minutes", N((int)span.TotalMinutes));
+        if (span.TotalHours < 24) return ctx.T(span.TotalHours < 2 ? "moments.ago.hour" : "moments.ago.hours", N((int)span.TotalHours));
+        if (span.TotalDays < 7) return ctx.T(span.TotalDays < 2 ? "moments.ago.day" : "moments.ago.days", N((int)span.TotalDays));
         return Stamp(d)[..10];
     }
 
-    public static string Size(long bytes) => bytes >= 1024 * 1024 && bytes % (1024 * 1024) == 0 ? (bytes / 1024 / 1024).ToString(CultureInfo.InvariantCulture) + " MB"
+    /// <summary>A file size, "2,5 MB" (the decimal mark is the language's: moments.decimalMark).</summary>
+    public static string Size(IPluginContext ctx, long bytes) => bytes >= 1024 * 1024 && bytes % (1024 * 1024) == 0 ? (bytes / 1024 / 1024).ToString(CultureInfo.InvariantCulture) + " MB"
         : bytes >= 1024 * 1024
-        ? (bytes / 1024d / 1024d).ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',') + " MB"
+        ? (bytes / 1024d / 1024d).ToString("0.0", CultureInfo.InvariantCulture).Replace(".", ctx.T("moments.decimalMark")) + " MB"
         : Math.Max(1, bytes / 1024).ToString(CultureInfo.InvariantCulture) + " KB";
 
     public static string Initials(string name)
@@ -274,4 +277,7 @@ public static class M
     public static string N(long n) => n.ToString(CultureInfo.InvariantCulture);
 
     public static string Plural(long n, string one, string many) => N(n) + " " + (n == 1 ? one : many);
+
+    /// <summary>"1 Foto" / "3 Fotos": the two keys <paramref name="prefix"/> + "1" and + "n" of the string tables, with the number as {0}.</summary>
+    public static string Count(IPluginContext ctx, long n, string prefix) => ctx.T(prefix + (n == 1 ? "1" : "n"), N(n));
 }

@@ -67,6 +67,10 @@ public static class BookingMail
     public static string Persons(int adults, int children) =>
         adults + (adults == 1 ? " Erwachsener" : " Erwachsene") + (children > 0 ? ", " + children + (children == 1 ? " Kind" : " Kinder") : "");
 
+    /// <summary>The same in the language of a request ("2 adults, 1 child").</summary>
+    public static string Persons(Tr t, int adults, int children) =>
+        (adults == 1 ? t("booking.mail.adult") : t("booking.mail.adults", adults)) + (children > 0 ? ", " + (children == 1 ? t("booking.price.child") : t("booking.price.children", children)) : "");
+
     /// <summary>The values every booking mail knows.</summary>
     public static Dictionary<string, string> Values(IPluginContext ctx, Booking b, Unit? unit, Property? house, string? key)
     {
@@ -88,12 +92,16 @@ public static class BookingMail
     }
 
     /// <summary>A UTC moment as the site's local date and time — Central European for now (all houses so far are in CET/CEST countries).</summary>
-    public static string Local(DateTime? utc)
+    public static string Local(DateTime? utc) => utc is null ? "" : Bare(utc.Value) + " Uhr";
+
+    /// <summary>The same in the language of a request ("12.05.2026 14:30" in English, without "Uhr").</summary>
+    public static string Local(Tr t, DateTime? utc) => utc is null ? "" : t("booking.mail.time", Bare(utc.Value));
+
+    private static string Bare(DateTime utc)
     {
-        if (utc is null) return "";
-        try { return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " Uhr"; }
+        try { return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture); }
         // no time zone data (invariant globalization, no tzdata): Central European time by the EU rule, never "UTC" in front of a host
-        catch (TimeZoneNotFoundException) { return CentralEurope(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc)).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " Uhr"; }
+        catch (TimeZoneNotFoundException) { return CentralEurope(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture); }
     }
 
     /// <summary>CET/CEST without time zone data: summer time from the last Sunday of March to the last Sunday of October, 01:00 UTC each.</summary>

@@ -13,7 +13,7 @@ public static class BookingAdminFederation
 
     public static IAdminSection Register(IAdminSection s) => s.Page("federation", null, PageAsync).Page("federation/bookings", null, AllAsync);
 
-    private static string When(DateTime d) => d == DateTime.MinValue ? "noch nie" : BookingMail.Local(d);
+    private static string When(IPluginContext ctx, DateTime d) => d == DateTime.MinValue ? ctx.T("booking.fed.never") : BookingMail.Local(d);
 
     /// <summary>A booking as the central site lists it — its own or the mirror of another house's.</summary>
     private sealed record Entry(string House, string Number, string Guest, string Email, string Unit, DateOnly? Arrival, DateOnly? Departure, int Persons,
@@ -41,16 +41,21 @@ public static class BookingAdminFederation
 
     private static UiNode Open(Entry e) => e.Href.Length == 0 ? Ui.Text(e.Number) : Ui.Link(e.Number, e.Href, newTab: e.External);
     private static string Period(Entry e) => e.Arrival is { } a && e.Departure is { } d ? B.Date(a) + " – " + B.Date(d) + " (" + (d.DayNumber - a.DayNumber) + ")" : "–";
-    private static UiNode StatusBadge(string s) => Ui.Badge(BookingStatus.Label(s), BookingStatus.Tone(s));
+    private static UiNode StatusBadge(IPluginContext ctx, string s) => Ui.Badge(BookingStatus.Label(ctx.T, s), BookingStatus.Tone(s));
+    private static UiColumn[] Columns(IPluginContext ctx) => new[]
+    {
+        Ui.Column(ctx.T("booking.bookings.colNumber")), Ui.Column(ctx.T("booking.bookings.colHouse")), Ui.Column(ctx.T("booking.bookings.colGuest")), Ui.Column(ctx.T("booking.bookings.colUnit")),
+        Ui.Column(ctx.T("booking.bookings.colPeriod")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column(ctx.T("booking.bookings.colStatus"))
+    };
     private static bool IsOpen(Entry e) => e.Status is BookingStatus.Request or BookingStatus.Offer;
 
-    private static UiNode Tabs(string active) => Ui.Tabs(Ui.Tab("Übersicht", R + "federation", active == "overview"), Ui.Tab("Alle Buchungen", R + "federation/bookings", active == "all"));
+    private static UiNode Tabs(IPluginContext ctx, string active) => Ui.Tabs(Ui.Tab(ctx.T("booking.fed.tabOverview"), R + "federation", active == "overview"), Ui.Tab(ctx.T("booking.bookings.all"), R + "federation/bookings", active == "all"));
 
     private static async Task<PluginResult> PageAsync(IPluginContext ctx, CancellationToken ct)
     {
         var role = BookingFederation.Role(ctx);
         var self = R + "federation";
-        var settings = Ui.Button("Einstellungen", R + "_settings?group=" + Uri.EscapeDataString(BookingFederation.Group), UiButtonKind.Ghost, "ti-settings", small: true);
+        var settings = Ui.Button(ctx.T("booking.fed.settings"), R + "_settings?group=" + Uri.EscapeDataString(BookingFederation.Group), UiButtonKind.Ghost, "ti-settings", small: true);
 
         if (role == BookingFederation.Member)
         {
@@ -58,33 +63,33 @@ public static class BookingAdminFederation
             {
                 if (ctx.Request.Action == "probe")
                     return await BookingFederation.ProbeAsync(ctx, ct) is { } why
-                        ? PluginResult.Redirect(self, "Keine Verbindung: " + why, true)
-                        : PluginResult.Redirect(self, "Verbindung steht.");
+                        ? PluginResult.Redirect(self, ctx.T("booking.fed.noConnection", why), true)
+                        : PluginResult.Redirect(self, ctx.T("booking.fed.connected"));
                 var r = await BookingFederation.SyncAsync(ctx, ct);
                 return r.Ok
-                    ? PluginResult.Redirect(self, "Abgeglichen: " + r.Pushed + " Gäste und " + r.Stays + " Buchungen gesendet, " + r.Pulled + " Gäste übernommen.")
-                    : PluginResult.Redirect(self, "Abgleich nicht möglich: " + r.Error + " Die Änderungen bleiben in der Warteschlange.", true);
+                    ? PluginResult.Redirect(self, ctx.T("booking.fed.synced", r.Pushed, r.Stays, r.Pulled))
+                    : PluginResult.Redirect(self, ctx.T("booking.fed.syncFailed", r.Error), true);
             }
             var (g, s) = await BookingFederation.PendingAsync(ctx.Data, ct);
             var error = await BookingFederation.MetaAsync(ctx.Data, "fed.last_error", ct);
             var ok = await BookingFederation.MetaTimeAsync(ctx.Data, "fed.last_ok", ct);
             return PluginResult.Page(Ui.Stack(
-                Ui.PageHead(null, "Verbund", settings),
-                error.Length > 0 ? Ui.Alert("Letzter Abgleich ging nicht: " + error + " Anfragen gehen trotzdem und werden nachgereicht.", UiTone.Warning) : null,
-                Ui.Card("Haus im Verbund", Ui.Stack(
+                Ui.PageHead(null, ctx.T("booking.fed.title"), settings),
+                error.Length > 0 ? Ui.Alert(ctx.T("booking.fed.lastFailed", error), UiTone.Warning) : null,
+                Ui.Card(ctx.T("booking.fed.memberCard"), Ui.Stack(
                     Ui.Stats(
-                        Ui.Stat("Zentrale", ctx.Settings.Get(BookingFederation.UrlKey) is { Length: > 0 } u ? u : "nicht eingetragen"),
-                        Ui.Stat("Zuletzt abgeglichen", When(ok)),
-                        Ui.Stat("Wartet", g + (g == 1 ? " Gast" : " Gäste") + ", " + s + (s == 1 ? " Buchung" : " Buchungen"))),
-                    Ui.Form(Ui.FormActions(Ui.Submit("Jetzt abgleichen", UiButtonKind.Primary, "action", "sync"), Ui.Submit("Verbindung prüfen", UiButtonKind.Ghost, "action", "probe")))))), "Verbund");
+                        Ui.Stat(ctx.T("booking.fed.central"), ctx.Settings.Get(BookingFederation.UrlKey) is { Length: > 0 } u ? u : ctx.T("booking.fed.notSet")),
+                        Ui.Stat(ctx.T("booking.fed.lastSynced"), When(ctx, ok)),
+                        Ui.Stat(ctx.T("booking.fed.waiting"), (g == 1 ? ctx.T("booking.fed.oneGuest") : ctx.T("booking.fed.guests", g)) + ", " + (s == 1 ? ctx.T("booking.fed.oneBooking") : ctx.T("booking.fed.bookings", s)))),
+                    Ui.Form(Ui.FormActions(Ui.Submit(ctx.T("booking.fed.syncNow"), UiButtonKind.Primary, "action", "sync"), Ui.Submit(ctx.T("booking.fed.probe"), UiButtonKind.Ghost, "action", "probe")))))), ctx.T("booking.fed.title"));
         }
 
         if (role != BookingFederation.Lead)
             return PluginResult.Page(Ui.Stack(
-                Ui.PageHead(null, "Verbund"),
-                Ui.Card("Diese Seite arbeitet für sich", Ui.Stack(
-                    Ui.Text("Mehrere Häuser verbinden: eine Seite wird Zentrale, die anderen melden an sie."),
-                    Ui.Button("Rolle einstellen", R + "_settings?group=" + Uri.EscapeDataString(BookingFederation.Group), UiButtonKind.Primary, "ti-affiliate")))), "Verbund");
+                Ui.PageHead(null, ctx.T("booking.fed.title")),
+                Ui.Card(ctx.T("booking.fed.solo"), Ui.Stack(
+                    Ui.Text(ctx.T("booking.fed.soloText")),
+                    Ui.Button(ctx.T("booking.fed.setRole"), R + "_settings?group=" + Uri.EscapeDataString(BookingFederation.Group), UiButtonKind.Primary, "ti-affiliate")))), ctx.T("booking.fed.title"));
 
         // ---- the central site ----
         var all = await EntriesAsync(ctx, ct);
@@ -95,28 +100,27 @@ public static class BookingAdminFederation
         var seen = await BookingFederation.SeenAsync(ctx.Data, ct);
         var houses = all.Select(e => e.House).Distinct().Count();
 
-        var inbox = Ui.Table(new[] { Ui.Column("Nr."), Ui.Column("Haus"), Ui.Column("Gast"), Ui.Column("Unterkunft"), Ui.Column("Zeitraum"), Ui.Column("Betrag", right: true), Ui.Column("Status") },
-            open.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(e.Status))),
-            emptyText: "Keine offenen Anfragen.");
-        UiNode Today(string title, List<Entry> list) => Ui.Card(title, Ui.Table(new[] { Ui.Column("Haus"), Ui.Column("Gast"), Ui.Column("Unterkunft"), Ui.Column("Personen", right: true) },
-            list.Select(e => Ui.Row(e.House, e.Guest, e.Unit, B.Num(e.Persons))), emptyText: "Niemand."));
+        var inbox = Ui.Table(Columns(ctx),
+            open.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(ctx, e.Status))),
+            emptyText: ctx.T("booking.bookings.noOpen"));
+        UiNode Today(string title, List<Entry> list) => Ui.Card(title, Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colHouse")), Ui.Column(ctx.T("booking.bookings.colGuest")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPersons"), right: true) },
+            list.Select(e => Ui.Row(e.House, e.Guest, e.Unit, B.Num(e.Persons))), emptyText: ctx.T("booking.fed.nobody")));
 
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Verbund", settings),
-            Tabs("overview"),
+            Ui.PageHead(null, ctx.T("booking.fed.title"), settings),
+            Tabs(ctx, "overview"),
             Ui.Stats(
-                Ui.Stat("Offene Anfragen", B.Num(open.Count), tone: open.Count > 0 ? UiTone.Warning : UiTone.Default),
-                Ui.Stat("Anreisen heute", B.Num(arriving.Count)),
-                Ui.Stat("Abreisen heute", B.Num(leaving.Count)),
-                Ui.Stat("Häuser", B.Num(Math.Max(houses, seen.Count + 1)))),
-            Ui.Card("Offene Anfragen aller Häuser", inbox),
-            Ui.Grid(320, Today("Anreisen heute", arriving), Today("Abreisen heute", leaving)),
+                Ui.Stat(ctx.T("booking.fed.openRequests"), B.Num(open.Count), tone: open.Count > 0 ? UiTone.Warning : UiTone.Default),
+                Ui.Stat(ctx.T("booking.fed.arrivalsToday"), B.Num(arriving.Count)),
+                Ui.Stat(ctx.T("booking.fed.departuresToday"), B.Num(leaving.Count)),
+                Ui.Stat(ctx.T("booking.fed.houses"), B.Num(Math.Max(houses, seen.Count + 1)))),
+            Ui.Card(ctx.T("booking.fed.openAll"), inbox),
+            Ui.Grid(320, Today(ctx.T("booking.fed.arrivalsToday"), arriving), Today(ctx.T("booking.fed.departuresToday"), leaving)),
             // how to connect a house is said only while none is connected
-            Ui.Card("Häuser im Verbund", Ui.Stack(
-                Ui.Table(new[] { Ui.Column("Schlüssel"), Ui.Column("Zuletzt gemeldet") },
+            Ui.Card(ctx.T("booking.fed.housesIn"), Ui.Stack(
+                Ui.Table(new[] { Ui.Column(ctx.T("booking.fed.colKey")), Ui.Column(ctx.T("booking.fed.colLastReport")) },
                     seen.Select(x => Ui.Row(x.Site, x.At is { } at ? BookingMail.Local(at) : "–")),
-                    emptyText: "Noch kein Haus verbunden. Ein Haus verbinden: hier unter Admin → API-Schlüssel einen Schlüssel mit „Buchungen: Personendaten“ anlegen; im Haus Rolle „Haus im Verbund“, " +
-                        "Adresse " + ctx.Site.Origin + " und Schlüssel eintragen.")))), "Verbund");
+                    emptyText: ctx.T("booking.fed.noHouse", ctx.Site.Origin))))), ctx.T("booking.fed.title"));
     }
 
     private static async Task<PluginResult> AllAsync(IPluginContext ctx, CancellationToken ct)
@@ -134,13 +138,13 @@ public static class BookingAdminFederation
         var houses = all.Select(e => e.House).Distinct().OrderBy(h => h).ToList();
         var self = R + "federation/bookings";
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Verbund"),
-            Tabs("all"),
-            Ui.Tabs(Ui.Tab("Offen", self, tab == "offen"), Ui.Tab("Kommend", self + "?tab=kommend", tab == "kommend"), Ui.Tab("Alle", self + "?tab=alle", tab == "alle")),
-            Ui.Table(new[] { Ui.Column("Nr."), Ui.Column("Haus"), Ui.Column("Gast"), Ui.Column("Unterkunft"), Ui.Column("Zeitraum"), Ui.Column("Betrag", right: true), Ui.Column("Status") },
-                list.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(e.Status))),
-                searchPlaceholder: "Haus, Gast, E-Mail oder Nummer …",
-                emptyText: tab == "offen" ? "Keine offenen Anfragen." : "Keine Buchungen.")), "Verbund");
+            Ui.PageHead(null, ctx.T("booking.fed.title")),
+            Tabs(ctx, "all"),
+            Ui.Tabs(Ui.Tab(ctx.T("booking.bookings.tabOpen"), self, tab == "offen"), Ui.Tab(ctx.T("booking.bookings.tabComing"), self + "?tab=kommend", tab == "kommend"), Ui.Tab(ctx.T("booking.bookings.tabAll"), self + "?tab=alle", tab == "alle")),
+            Ui.Table(Columns(ctx),
+                list.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(ctx, e.Status))),
+                searchPlaceholder: ctx.T("booking.fed.search"),
+                emptyText: tab == "offen" ? ctx.T("booking.bookings.noOpen") : ctx.T("booking.bookings.none"))), ctx.T("booking.fed.title"));
     }
 
     /// <summary>The federation's card on a guest's page: on the central site the stays the houses reported, on a house what the central card index knows.</summary>
@@ -155,14 +159,14 @@ public static class BookingAdminFederation
         {
             var (g, error) = await BookingFederation.LookupAsync(ctx, email, ct);
             stays = (g?["stays"] as System.Text.Json.Nodes.JsonArray ?? new()).OfType<System.Text.Json.Nodes.JsonObject>().Select(BookingFederation.RemoteStay.From).ToList();
-            note = error is not null ? "Die Zentrale ist gerade nicht erreichbar: " + error : g is null ? "In der Zentrale noch nicht bekannt – kommt mit dem nächsten Abgleich." : null;
+            note = error is not null ? ctx.T("booking.fed.unreachable", error) : g is null ? ctx.T("booking.fed.unknownThere") : null;
         }
-        return Ui.Card("In anderen Häusern", Ui.Stack(
+        return Ui.Card(ctx.T("booking.fed.otherHouses"), Ui.Stack(
             note is null ? null : Ui.Muted(note),
-            Ui.Table(new[] { Ui.Column("Haus"), Ui.Column("Unterkunft"), Ui.Column("Zeitraum"), Ui.Column("Betrag", right: true), Ui.Column("Status") },
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colHouse")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPeriod")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column(ctx.T("booking.bookings.colStatus")) },
                 stays.Select(x => Ui.Row(x.Site, (x.Property.Length > 0 ? x.Property + " · " : "") + x.Unit,
                     x.Arrival is { } a && x.Departure is { } d ? B.Date(a) + " – " + B.Date(d) : "–", B.Money(x.Total, x.Currency.Length == 3 ? x.Currency : "EUR"),
-                    Ui.Badge(BookingStatus.Label(x.Status), BookingStatus.Tone(x.Status)))),
-                emptyText: "Keine Aufenthalte in anderen Häusern.")));
+                    Ui.Badge(BookingStatus.Label(ctx.T, x.Status), BookingStatus.Tone(x.Status)))),
+                emptyText: ctx.T("booking.fed.noOtherStays"))));
     }
 }

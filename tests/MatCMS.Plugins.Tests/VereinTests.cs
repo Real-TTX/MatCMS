@@ -59,7 +59,8 @@ public sealed class VereinApp : IDisposable
         {
             if (_clients.TryGetValue(who, out var known)) return known;
             var c = App.Browser();
-            if (who == "admin") await AppFactory.LoginAsync(c);
+            // the back office follows the admin's language cookie (English without one); these tests read the German texts
+            if (who == "admin") { await AppFactory.LoginAsync(c); await c.PostAsync("/set-language?culture=de", new StringContent("")); }
             else if (who != "guest")
             {
                 var email = who + "@verein.example";
@@ -952,10 +953,10 @@ public class VereinTests : IClassFixture<VereinApp>
         var before = _app.Db(db => db.Plugins.First(p => p.Key == "verein").ConfigJson);
         try
         {
-            var page = await admin.GetStringAsync("/admin/p/verein/_settings?group=" + Uri.EscapeDataString("Rollen & Felder"));
+            var page = await admin.GetStringAsync("/admin/p/verein/_settings?group=" + Uri.EscapeDataString("verein.set.groupRoles"));
             Assert.Contains("data-ui-rows", page);                                         // a row editor, not a text area
             Assert.Contains("Kassierer/in", page);
-            var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/_settings?group=" + Uri.EscapeDataString("Rollen & Felder"), new()
+            var res = await VereinApp.PostFormAsync(admin, "/admin/p/verein/_settings?group=" + Uri.EscapeDataString("verein.set.groupRoles"), new()
             {
                 ["action"] = "save-settings",
                 ["s_roles.count"] = "3", ["s_roles.0.name"] = "Kapitän", ["s_roles.0.board"] = "true", ["s_roles.1.name"] = "Spieler|in", ["s_roles.2.name"] = "  ",

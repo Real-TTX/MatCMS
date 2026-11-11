@@ -23,17 +23,18 @@ public sealed class BookingPlugin : IPlugin
     public void Configure(IPluginBuilder b)
     {
         BookingStore.Declare(b.Data);
+        BookingStrings.Register(b);
         // the first setting names the group "Allgemein": settings in front of the first named group were not reachable in the back office
-        b.Settings.Add(new SettingSpec(CurrencyKey, "Währung", SettingKind.Choice)
+        b.Settings.Add(new SettingSpec(CurrencyKey, "booking.set.currency", SettingKind.Choice)
         {
-            Group = "Allgemein", Default = "EUR", Help = "Eine Währung für alle Preise dieser Website.",
-            Options = new[] { new FieldOption("EUR", "Euro (€)"), new FieldOption("CHF", "Schweizer Franken"), new FieldOption("GBP", "Pfund (£)"), new FieldOption("USD", "US-Dollar ($)") }
+            Group = "booking.set.groupGeneral", Default = "EUR", Help = "booking.set.currencyHelp",
+            Options = new[] { new FieldOption("EUR", "booking.set.eur"), new FieldOption("CHF", "booking.set.chf"), new FieldOption("GBP", "booking.set.gbp"), new FieldOption("USD", "booking.set.usd") }
         });
-        b.Settings.Text(NotifyKey, "Neue Anfragen an", "", "E-Mail-Adresse des Gastgebers. Leer = keine Mail, die Anfrage steht trotzdem im Admin.")
-            .Number(HoldKey, "Anfrage hält den Zeitraum (Stunden)", 48, 1, 336, "So lange sind die Nächte nach einer Anfrage für den Gast vorgemerkt – danach sind sie wieder frei, wenn nichts passiert ist.")
-            .Number(OfferKey, "Angebot gilt (Tage)", 3, 1, 30)
-            .TextArea(PaymentInfoKey, "Zahlungshinweis", "", "Steht in der Buchungsbestätigung und auf der Seite des Gastes, z. B. Bankverbindung, Anzahlung und bis wann.")
-            .Text(PrivacyKey, "Datenschutzerklärung", "/datenschutz", "Die Seite, auf die das Anfrageformular verweist.");
+        b.Settings.Text(NotifyKey, "booking.set.notify", "", "booking.set.notifyHelp")
+            .Number(HoldKey, "booking.set.hold", 48, 1, 336, "booking.set.holdHelp")
+            .Number(OfferKey, "booking.set.offer", 3, 1, 30)
+            .TextArea(PaymentInfoKey, "booking.set.paymentInfo", "", "booking.set.paymentInfoHelp")
+            .Text(PrivacyKey, "booking.set.privacy", "/datenschutz", "booking.set.privacyHelp");
         BookingPayments.Declare(b.Settings);
         BookingPrint.Declare(b.Settings);
         BookingCheckin.Declare(b.Settings);
@@ -67,15 +68,15 @@ public sealed class BookingPlugin : IPlugin
             var notes = new List<AttentionNote>();
             var open = (await BookingFlow.ListAsync(ctx.Data, new[] { BookingStatus.Request }, ct)).Count;
             if (open > 0)
-                notes.Add(new AttentionNote(open == 1 ? "1 neue Buchungsanfrage" : open + " neue Buchungsanfragen", "Annehmen, Angebot schicken oder ablehnen – sonst läuft die Vormerkung ab.", BookingAdmin.Root + "bookings")
+                notes.Add(new AttentionNote(open == 1 ? ctx.T("booking.attn.oneRequest") : ctx.T("booking.attn.requests", open), ctx.T("booking.attn.requestsText"), BookingAdmin.Root + "bookings")
                 { Tone = UiTone.Warning, Icon = "ti-calendar-question" });
             foreach (var f in await BookingIcal.FeedsAsync(ctx.Data, ct))
             {
                 if (f.Conflicts.Length > 0)
-                    notes.Add(new AttentionNote("Doppelbuchung über " + f.Name, f.Conflicts.Replace("\n", " · "), BookingAdmin.Root + "channels") { Tone = UiTone.Error, Icon = "ti-calendar-x" });
+                    notes.Add(new AttentionNote(ctx.T("booking.attn.doubleBooking", f.Name), f.Conflicts.Replace("\n", " · "), BookingAdmin.Root + "channels") { Tone = UiTone.Error, Icon = "ti-calendar-x" });
                 // an error that lasts: the portal's calendar has not been read for over two hours
                 else if (f.LastError.Length > 0 && f.Url.Length > 0 && (f.LastOk is null || f.LastOk < DateTime.UtcNow.AddHours(-2)))
-                    notes.Add(new AttentionNote("Kalender von " + f.Name + " wird nicht gelesen", f.LastError, BookingAdmin.Root + "channels") { Tone = UiTone.Warning, Icon = "ti-calendar-off" });
+                    notes.Add(new AttentionNote(ctx.T("booking.attn.feedNotRead", f.Name), f.LastError, BookingAdmin.Root + "channels") { Tone = UiTone.Warning, Icon = "ti-calendar-off" });
             }
             return notes;
         });
@@ -100,13 +101,13 @@ public sealed class BookingPlugin : IPlugin
         var store = new BookingStore(ctx.Data);
         var key = q.Q("einheit").Trim();
         var unit = long.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out var id) ? await store.UnitAsync(id, ct) : await store.UnitBySlugAsync(B.Slug(key), ct);
-        if (unit is null || !unit.Active) return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = "Unbekannte Einheit." }, 404);
+        if (unit is null || !unit.Active) return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = ctx.T("booking.err.unknownUnit") }, 404);
         if (B.Day(q.Q("anreise")) is not { } arrival || B.Day(q.Q("abreise")) is not { } departure)
-            return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = "Bitte An- und Abreise angeben (JJJJ-MM-TT)." }, 400);
+            return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = ctx.T("booking.err.datesNeeded") }, 400);
         int N(string k, int def) => int.TryParse(q.Q(k), NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, 0, 50) : def;
         var extras = q.Q("extras").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => long.TryParse(x, out var e) ? e : 0).Where(e => e > 0).ToHashSet();
         var stay = new Stay(arrival, departure, N("erwachsene", 2), N("kinder", 0), extras);
-        var quote = (await store.QuoteAsync(unit.Id, stay, Currency(ctx), ct))!;
+        var quote = (await store.QuoteAsync(unit.Id, stay, Currency(ctx), ct, ctx.T))!;
         var free = stay.Nights is > 0 and <= Pricing.MaxNights && await store.IsFreeAsync(unit, arrival, departure, ct);
         var cur = Currency(ctx);
         var lines = new JsonArray();

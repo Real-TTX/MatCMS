@@ -13,7 +13,11 @@ public sealed record Block(long Id, long UnitId, DateOnly From, DateOnly To, str
 }
 
 /// <summary>Thrown when a night of a stay is taken (also when a parallel write took it first) — nothing of the stay was written.</summary>
-public sealed class UnavailableException(string message) : Exception(message);
+public sealed class UnavailableException(string key, params object[] args) : Exception(BookingStrings.German(key, args))
+{
+    /// <summary>The refusal in the language of the request of <paramref name="ctx"/>.</summary>
+    public string Text(IPluginContext ctx) => BookingStrings.Has(key) ? ctx.T(key, args) : Message;
+}
 
 /// <summary>The plugin's tables and everything that reads or writes them.</summary>
 public sealed class BookingStore(IPluginData data)
@@ -138,11 +142,11 @@ public sealed class BookingStore(IPluginData data)
     }
 
     /// <summary>The bill of a stay in a unit — everything read here, computed by <see cref="Pricing"/>.</summary>
-    public async Task<Quote?> QuoteAsync(long unitId, Stay stay, string currency = "EUR", CancellationToken ct = default)
+    public async Task<Quote?> QuoteAsync(long unitId, Stay stay, string currency = "EUR", CancellationToken ct = default, Tr? tr = null)
     {
         var unit = await UnitAsync(unitId, ct);
         if (unit is null || !unit.Active) return null;
-        return Pricing.Calculate(unit, stay, await SeasonsAsync(unit.PropertyId, ct), await RatesAsync(new[] { unit.Id }, ct), await FeesAsync(unit.PropertyId, ct), currency);
+        return Pricing.Calculate(unit, stay, await SeasonsAsync(unit.PropertyId, ct), await RatesAsync(new[] { unit.Id }, ct), await FeesAsync(unit.PropertyId, ct), currency, tr);
     }
 
     // ---- availability -------------------------------------------------------------------------------------------
@@ -182,7 +186,7 @@ public sealed class BookingStore(IPluginData data)
                 await tx.Table(TMeta).UpdateWhereAsync(DataQuery.Everything.Eq("name", "__lock"), new Dictionary<string, object?> { ["value"] = "" }, ct);
                 var (from, to) = Needed(unit, arrival, departure);
                 var taken = await NightsIn(tx, units, from, to, ct);
-                if (taken.Count > 0) throw new UnavailableException("Belegt: " + string.Join(", ", taken.Select(n => n.Day).Distinct().OrderBy(d => d).Take(5).Select(B.Date)) + (taken.Count > 5 ? " …" : ""));
+                if (taken.Count > 0) throw new UnavailableException("booking.err.taken", string.Join(", ", taken.Select(n => n.Day).Distinct().OrderBy(d => d).Take(5).Select(B.Date)) + (taken.Count > 5 ? " …" : ""));
                 var (bookingId, blockId) = await owner(tx);
                 for (var d = arrival; d < departure; d = d.AddDays(1))
                     foreach (var u in units)
@@ -196,7 +200,7 @@ public sealed class BookingStore(IPluginData data)
         catch (UnavailableException) { throw; }
         catch (Exception ex) when (ex is not OperationCanceledException && ex.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase))
         {
-            throw new UnavailableException("Belegt – gerade eben von einer anderen Buchung.");
+            throw new UnavailableException("booking.err.takenJustNow");
         }
     }
 

@@ -39,7 +39,7 @@ public static partial class BookingPublic
         if (ctx.Request.IsPost && ctx.Request.Action == "checkin")
         {
             if (b.Arrival < B.Today) return PluginResult.Redirect(back);                       // after arrival the host has the list; no more changes
-            var (people, err) = BookingCheckin.Read(ctx.Request, profile, count);
+            var (people, err) = BookingCheckin.Read(ctx.Request, profile, count, ctx.T);
             if (err is null)
             {
                 await BookingCheckin.SaveAsync(ctx.Data, b, people, BookingCheckin.ArrivalTimes.Contains(ctx.Request.F("arrival_time")) ? ctx.Request.F("arrival_time") : "",
@@ -52,12 +52,11 @@ public static partial class BookingPublic
         if (prefill.Count == 0) prefill = await BookingCheckin.RememberedAsync(ctx.Data, b.GuestId, ct);
         if (problem is not null) prefill = Enumerable.Range(0, count).Select(i => new Traveller(i,
             BookingCheckin.FieldsOf(profile, i).ToDictionary(k => k, k => ctx.Request.F("t" + i + "_" + k)))).ToList();
-        var body = "<p class=\"bk-kicker\">" + B.H(house?.Name ?? ctx.Site.Name) + " · Nr. " + B.H(b.Number) + "</p><h1>Online-Check-in</h1>"
-            + "<p>" + B.H(unit?.Name ?? "") + ", " + B.Date(b.Arrival) + " – " + B.Date(b.Departure) + ". Bitte für jede Person ausfüllen – wir sind gesetzlich verpflichtet, "
-            + "unsere Gäste zu melden. Die Angaben gehen nur an uns und werden nach der gesetzlichen Frist gelöscht.</p>"
-            + BookingCheckin.Form(profile, count, prefill, row?.Text("arrival_time") ?? "", row?.Text("travel") ?? "", ctx.Antiforgery, problem)
-            + "<p><a href=\"" + B.H(back) + "\">Zurück zur Buchung</a></p>";
-        return Shell("Online-Check-in", body);
+        var body = "<p class=\"bk-kicker\">" + B.H(house?.Name ?? ctx.Site.Name) + " · " + ctx.T("booking.public.number", B.H(b.Number)) + "</p><h1>" + ctx.T("booking.public.checkinTitle") + "</h1>"
+            + "<p>" + B.H(unit?.Name ?? "") + ", " + B.Date(b.Arrival) + " – " + B.Date(b.Departure) + ". " + ctx.T("booking.public.checkinIntro") + "</p>"
+            + BookingCheckin.Form(profile, count, prefill, row?.Text("arrival_time") ?? "", row?.Text("travel") ?? "", ctx.Antiforgery, problem, ctx.T)
+            + "<p><a href=\"" + B.H(back) + "\">" + ctx.T("booking.public.backToBooking") + "</a></p>";
+        return Shell(ctx.T("booking.public.checkinTitle"), body);
     }
 
     private static readonly KeyValuePair<string, string>[] NoIndex = { new("robots", "noindex, nofollow") };
@@ -73,22 +72,23 @@ public static partial class BookingPublic
     private static async Task<PluginResult> RequestAsync(IPluginContext ctx, CancellationToken ct)
     {
         var f = ctx.Request;
-        string Back(string message) => "<h1>Anfrage nicht gesendet</h1><p class=\"bk-alert\">" + B.H(message) + "</p><p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\""
-            + B.H(SafeBack(f.Header("Referer"), ctx)) + "\">Zurück zum Formular</a></p>";
+        string Back(string message) => "<h1>" + ctx.T("booking.public.notSent") + "</h1><p class=\"bk-alert\">" + B.H(message) + "</p><p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\""
+            + B.H(SafeBack(f.Header("Referer"), ctx)) + "\">" + ctx.T("booking.public.backToForm") + "</a></p>";
+        var title = ctx.T("booking.public.requestTitle");
         // a bot fills every field it sees — this one is hidden from people
-        if (f.F("website").Length > 0) return Shell("Danke", "<h1>Danke!</h1><p>Ihre Anfrage ist eingegangen.</p>");
+        if (f.F("website").Length > 0) return Shell(ctx.T("booking.public.thanksTitle"), "<h1>" + ctx.T("booking.public.thanks") + "</h1><p>" + ctx.T("booking.public.received") + "</p>");
         var store = new BookingStore(ctx.Data);
         var unit = await store.UnitBySlugAsync(B.Slug(f.F("einheit")), ct);
-        if (unit is null || !unit.Active) return Shell("Anfrage", Back("Bitte eine Unterkunft wählen."));
+        if (unit is null || !unit.Active) return Shell(title, Back(ctx.T("booking.public.chooseUnit")));
         // the date picker posts one field "zeitraum" (YYYY-MM-DD..YYYY-MM-DD); without script the form has the two plain date fields
         var (rawFrom, rawTo) = f.F("zeitraum").Split("..") is [var zf, var zt] ? (zf, zt) : (f.F("anreise"), f.F("abreise"));
-        if (B.Day(rawFrom) is not { } arrival || B.Day(rawTo) is not { } departure) return Shell("Anfrage", Back("Bitte An- und Abreise angeben."));
-        if (arrival < B.Today) return Shell("Anfrage", Back("Die Anreise liegt in der Vergangenheit."));
+        if (B.Day(rawFrom) is not { } arrival || B.Day(rawTo) is not { } departure) return Shell(title, Back(ctx.T("booking.public.datesNeeded")));
+        if (arrival < B.Today) return Shell(title, Back(ctx.T("booking.public.pastArrival")));
         var name = B.Clip(f.F("name"), 120);
         var email = B.Clip(f.F("email"), 200);
-        if (name.Length < 2) return Shell("Anfrage", Back("Bitte Ihren Namen angeben."));
-        if (!MailRe().IsMatch(email)) return Shell("Anfrage", Back("Bitte eine gültige E-Mail-Adresse angeben."));
-        if (!B.Checked(f.F("consent"))) return Shell("Anfrage", Back("Bitte der Verarbeitung Ihrer Angaben zustimmen."));
+        if (name.Length < 2) return Shell(title, Back(ctx.T("booking.public.nameNeeded")));
+        if (!MailRe().IsMatch(email)) return Shell(title, Back(ctx.T("booking.public.emailNeeded")));
+        if (!B.Checked(f.F("consent"))) return Shell(title, Back(ctx.T("booking.public.consentNeeded")));
         int N(string k, int def) => int.TryParse(f.F(k), NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, 0, 50) : def;
         var fees = await store.FeesAsync(unit.PropertyId, ct);
         var extras = fees.Where(x => x.Optional && B.Checked(f.F("extra_" + x.Id))).Select(x => x.Id).ToList();
@@ -98,9 +98,9 @@ public static partial class BookingPublic
         try
         {
             (booking, key) = await BookingFlow.RequestAsync(ctx.Data, new BookingFlow.RequestInput(unit, stay, name, email, f.F("telefon"), f.F("nachricht"), ctx.Locale),
-                BookingPlugin.HoldHours(ctx), BookingPlugin.Currency(ctx), ct);
+                BookingPlugin.HoldHours(ctx), BookingPlugin.Currency(ctx), ct, tr: ctx.T);
         }
-        catch (BookingException ex) { return Shell("Anfrage", Back(ex.Message)); }
+        catch (BookingException ex) { return Shell(title, Back(ex.Text(ctx))); }
 
         var house = await store.PropertyAsync(unit.PropertyId, ct);
         var values = BookingMail.Values(ctx, booking, unit, house, key);
@@ -144,72 +144,74 @@ public static partial class BookingPublic
 
         var cur = BookingPlugin.Currency(ctx);
         var sb = new StringBuilder();
+        string T(string k) => ctx.T(k);
         var (title, lead) = b.Status switch
         {
-            BookingStatus.Request => ("Ihre Anfrage", ctx.Request.Q("neu") == "1"
-                ? "Vielen Dank! Ihre Anfrage ist eingegangen und der Zeitraum für Sie vorgemerkt bis " + BookingMail.Local(b.HoldUntil) + ". Wir melden uns per E-Mail."
-                : "Ihre Anfrage liegt uns vor. Der Zeitraum ist für Sie vorgemerkt bis " + BookingMail.Local(b.HoldUntil) + "."),
-            BookingStatus.Offer => ("Unser Angebot", b.OfferUntil < DateTime.UtcNow ? "Dieses Angebot ist abgelaufen." : "Gerne können Sie bei uns wohnen. Das Angebot gilt bis " + BookingMail.Local(b.OfferUntil) + "."),
-            BookingStatus.Confirmed => ("Ihre Buchung", "Ihre Buchung ist bestätigt – wir freuen uns auf Sie!"),
-            BookingStatus.Declined => ("Ihre Anfrage", "Leider können wir Ihre Anfrage nicht annehmen."),
-            BookingStatus.Expired => ("Ihre Anfrage", "Diese Anfrage ist abgelaufen, der Zeitraum ist wieder frei."),
-            BookingStatus.Cancelled => ("Ihre Buchung", "Diese Buchung ist storniert."),
-            _ => ("Ihre Buchung", "")
+            BookingStatus.Request => (T("booking.public.yourRequest"), ctx.Request.Q("neu") == "1"
+                ? ctx.T("booking.public.leadNew", When(ctx, b.HoldUntil))
+                : ctx.T("booking.public.leadRequest", When(ctx, b.HoldUntil))),
+            BookingStatus.Offer => (T("booking.public.ourOffer"), b.OfferUntil < DateTime.UtcNow ? T("booking.public.offerExpired") : ctx.T("booking.public.leadOffer", When(ctx, b.OfferUntil))),
+            BookingStatus.Confirmed => (T("booking.public.yourBooking"), T("booking.public.leadConfirmed")),
+            BookingStatus.Declined => (T("booking.public.yourRequest"), T("booking.public.leadDeclined")),
+            BookingStatus.Expired => (T("booking.public.yourRequest"), T("booking.public.leadExpired")),
+            BookingStatus.Cancelled => (T("booking.public.yourBooking"), T("booking.public.leadCancelled")),
+            _ => (T("booking.public.yourBooking"), "")
         };
-        sb.Append("<p class=\"bk-kicker\">").Append(B.H(house?.Name ?? ctx.Site.Name)).Append(" · Nr. ").Append(B.H(b.Number)).Append("</p>");
+        sb.Append("<p class=\"bk-kicker\">").Append(B.H(house?.Name ?? ctx.Site.Name)).Append(" · ").Append(ctx.T("booking.public.number", B.H(b.Number))).Append("</p>");
         sb.Append("<h1>").Append(B.H(title)).Append("</h1>");
         sb.Append("<p class=\"bk-status bk-status-").Append(B.H(b.Status)).Append("\">").Append(B.H(lead)).Append("</p>");
         sb.Append("<div class=\"bk-card\"><h2>").Append(B.H(unit?.Name ?? "")).Append("</h2><dl class=\"bk-facts\">")
-          .Append("<dt>Anreise</dt><dd>").Append(B.Weekday(b.Arrival)).Append(' ').Append(B.Date(b.Arrival)).Append(house?.CheckIn is { Length: > 0 } ci ? ", ab " + B.H(ci) + " Uhr" : "").Append("</dd>")
-          .Append("<dt>Abreise</dt><dd>").Append(B.Weekday(b.Departure)).Append(' ').Append(B.Date(b.Departure)).Append(house?.CheckOut is { Length: > 0 } co ? ", bis " + B.H(co) + " Uhr" : "").Append("</dd>")
-          .Append("<dt>Nächte</dt><dd>").Append(b.Nights).Append("</dd><dt>Gäste</dt><dd>").Append(B.H(BookingMail.Persons(b.Adults, b.Children))).Append("</dd></dl>");
-        sb.Append(Bill(b.Lines, b.Total, cur)).Append("</div>");
+          .Append("<dt>").Append(T("booking.public.arrival")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Arrival)).Append(' ').Append(B.Date(b.Arrival)).Append(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.public.fromTime", B.H(ci)) : "").Append("</dd>")
+          .Append("<dt>").Append(T("booking.public.departure")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Departure)).Append(' ').Append(B.Date(b.Departure)).Append(house?.CheckOut is { Length: > 0 } co ? ctx.T("booking.public.untilTime", B.H(co)) : "").Append("</dd>")
+          .Append("<dt>").Append(T("booking.public.nights")).Append("</dt><dd>").Append(b.Nights).Append("</dd><dt>").Append(T("booking.public.guests")).Append("</dt><dd>").Append(B.H(Persons(ctx.T, b.Adults, b.Children))).Append("</dd></dl>");
+        sb.Append(Bill(b.Lines, b.Total, cur, ctx.T)).Append("</div>");
 
         if (b.Status == BookingStatus.Offer && b.OfferUntil >= DateTime.UtcNow)
             sb.Append("<form method=\"post\" class=\"bk-accept\">").Append(ctx.Antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"accept\">")
-              .Append("<p>Mit dem Klick buchen Sie verbindlich zu den genannten Bedingungen.</p><button class=\"btn bk-btn\" type=\"submit\">Verbindlich buchen</button></form>");
+              .Append("<p>").Append(T("booking.public.acceptNote")).Append("</p><button class=\"btn bk-btn\" type=\"submit\">").Append(T("booking.public.acceptButton")).Append("</button></form>");
         if (b.Status == BookingStatus.Confirmed)
         {
             var plan = await BookingPayments.PlanAsync(ctx, b, ct);
             var two = plan.Deposit > 0 && plan.Deposit < plan.Total;
-            sb.Append("<div class=\"bk-card\"><h2>Zahlung</h2><dl class=\"bk-facts\">");
-            if (two) sb.Append("<dt>Anzahlung</dt><dd>").Append(B.H(B.Money(plan.Deposit, cur))).Append(" bis ").Append(B.Date(plan.DepositDue)).Append("</dd>")
-                       .Append("<dt>Rest</dt><dd>").Append(B.H(B.Money(plan.Rest, cur))).Append(" bis ").Append(B.Date(plan.RestDue)).Append("</dd>");
-            else sb.Append("<dt>Gesamtbetrag</dt><dd>").Append(B.H(B.Money(plan.Total, cur))).Append(" bis ").Append(B.Date(plan.DepositDue)).Append("</dd>");
-            sb.Append("<dt>Bezahlt</dt><dd>").Append(B.H(B.Money(plan.Paid, cur))).Append("</dd><dt>Noch offen</dt><dd><strong>").Append(B.H(B.Money(plan.Open, cur))).Append("</strong></dd></dl>");
+            string Due(long amount, DateOnly day) => ctx.T("booking.public.dueBy", B.H(B.Money(amount, cur)), B.Date(day));
+            sb.Append("<div class=\"bk-card\"><h2>").Append(T("booking.public.payment")).Append("</h2><dl class=\"bk-facts\">");
+            if (two) sb.Append("<dt>").Append(T("booking.public.deposit")).Append("</dt><dd>").Append(Due(plan.Deposit, plan.DepositDue)).Append("</dd>")
+                       .Append("<dt>").Append(T("booking.public.rest")).Append("</dt><dd>").Append(Due(plan.Rest, plan.RestDue)).Append("</dd>");
+            else sb.Append("<dt>").Append(T("booking.public.totalAmount")).Append("</dt><dd>").Append(Due(plan.Total, plan.DepositDue)).Append("</dd>");
+            sb.Append("<dt>").Append(T("booking.public.paid")).Append("</dt><dd>").Append(B.H(B.Money(plan.Paid, cur))).Append("</dd><dt>").Append(T("booking.public.open")).Append("</dt><dd><strong>").Append(B.H(B.Money(plan.Open, cur))).Append("</strong></dd></dl>");
             if (ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
-                sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">Verwendungszweck: ").Append(B.H(b.Number)).Append("</p>");
-            sb.Append("<p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">Buchungsbestätigung (PDF)</a></p></div>");
+                sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">").Append(ctx.T("booking.public.reference", B.H(b.Number))).Append("</p>");
+            sb.Append("<p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">").Append(T("booking.public.pdf")).Append("</a></p></div>");
 
             if (b.Departure >= B.Today)
             {
                 var row = await ctx.Data.Table(BookingStore.TBookings).GetAsync(b.Id, ct);
                 var done = row?.Timestamp("checkin_at") is not null;
-                sb.Append("<div class=\"bk-card\"><h2>Online-Check-in</h2>");
-                if (ctx.Request.Q("checkin") == "1") sb.Append("<p class=\"bk-status bk-status-confirmed\">Danke! Ihr Check-in ist bei uns angekommen.</p>");
-                sb.Append(done ? "<p>Erledigt" + (row!.Text("arrival_time") is { Length: > 0 } at ? " – Ankunft " + B.H(at) : "") + ".</p>" : "<p>Bitte vor der Anreise die Angaben aller Personen eintragen.</p>");
+                sb.Append("<div class=\"bk-card\"><h2>").Append(T("booking.public.checkinTitle")).Append("</h2>");
+                if (ctx.Request.Q("checkin") == "1") sb.Append("<p class=\"bk-status bk-status-confirmed\">").Append(T("booking.public.checkinThanks")).Append("</p>");
+                sb.Append(done ? "<p>" + T("booking.public.checkinDone") + (row!.Text("arrival_time") is { Length: > 0 } at ? " " + ctx.T("booking.public.arrivalAt", B.H(at)) : "") + ".</p>" : "<p>" + T("booking.public.checkinPrompt") + "</p>");
                 if (b.Arrival >= B.Today)
                     sb.Append("<p><a class=\"btn bk-btn").Append(done ? " btn-outline bk-btn-ghost" : "").Append("\" href=\"").Append(B.H(self + "/checkin")).Append("\">")
-                      .Append(done ? "Angaben ändern" : "Jetzt einchecken").Append("</a></p>");
+                      .Append(done ? T("booking.public.checkinChange") : T("booking.public.checkinNow")).Append("</a></p>");
                 sb.Append("</div>");
 
                 // how to get there and in: directions and rules always; the way in (code, key box) and the Wi-Fi only from the day before arrival
                 var near = B.Today >= b.Arrival.AddDays(-1);
                 var parts = new List<(string, string)>();
-                if (house?.Directions is { Length: > 0 } dir) parts.Add(("Anfahrt", dir));
-                if (near && unit?.AccessInfo is { Length: > 0 } acc) parts.Add(("Zugang", acc));
-                if (near && unit?.Wifi is { Length: > 0 } wifi) parts.Add(("WLAN", wifi));
-                if (house?.HouseRules is { Length: > 0 } rules) parts.Add(("Hausregeln", rules));
+                if (house?.Directions is { Length: > 0 } dir) parts.Add((T("booking.public.directions"), dir));
+                if (near && unit?.AccessInfo is { Length: > 0 } acc) parts.Add((T("booking.public.access"), acc));
+                if (near && unit?.Wifi is { Length: > 0 } wifi) parts.Add((T("booking.public.wifi"), wifi));
+                if (house?.HouseRules is { Length: > 0 } rules) parts.Add((T("booking.public.houseRules"), rules));
                 if (parts.Count > 0 || unit?.AccessInfo is { Length: > 0 } || unit?.Wifi is { Length: > 0 })
                 {
-                    sb.Append("<div class=\"bk-card\"><h2>Ihre Anreise</h2>");
+                    sb.Append("<div class=\"bk-card\"><h2>").Append(T("booking.public.yourArrival")).Append("</h2>");
                     foreach (var (h, text) in parts) sb.Append("<h3>").Append(B.H(h)).Append("</h3><p class=\"bk-pre\">").Append(B.H(text)).Append("</p>");
-                    if (!near && unit?.AccessInfo is { Length: > 0 }) sb.Append("<p class=\"bk-muted\">Den Zugang (Schlüssel/Code) und das WLAN finden Sie hier ab dem Tag vor Ihrer Anreise.</p>");
+                    if (!near && unit?.AccessInfo is { Length: > 0 }) sb.Append("<p class=\"bk-muted\">").Append(T("booking.public.accessLater")).Append("</p>");
                     sb.Append("</div>");
                 }
             }
         }
-        sb.Append("<p class=\"bk-muted\">Diese Seite ist nur über den Link in Ihrer E-Mail erreichbar. Fragen? Antworten Sie einfach auf unsere E-Mail.</p>");
+        sb.Append("<p class=\"bk-muted\">").Append(T("booking.public.linkOnly")).Append("</p>");
         return Shell(title, sb.ToString());
     }
 
@@ -222,13 +224,25 @@ public static partial class BookingPublic
     }
 
     /// <summary>The bill as a table (lines, the way each was counted, total).</summary>
-    internal static string Bill(IReadOnlyList<QuoteLine> lines, long total, string cur)
+    internal static string Bill(IReadOnlyList<QuoteLine> lines, long total, string cur, Tr? tr = null)
     {
         var sb = new StringBuilder("<table class=\"bk-bill\"><tbody>");
         foreach (var l in lines)
             sb.Append("<tr><td>").Append(B.H(l.Text)).Append(l.Detail.Length > 0 ? "<small>" + B.H(l.Detail) + "</small>" : "").Append("</td><td>").Append(B.H(B.Money(l.Amount, cur))).Append("</td></tr>");
-        sb.Append("</tbody><tfoot><tr><td>Gesamt</td><td>").Append(B.H(B.Money(total, cur))).Append("</td></tr></tfoot></table>");
+        sb.Append("</tbody><tfoot><tr><td>").Append((tr ?? BookingStrings.German)("booking.public.total")).Append("</td><td>").Append(B.H(B.Money(total, cur))).Append("</td></tr></tfoot></table>");
         return sb.ToString();
+    }
+
+    /// <summary>"2 Erwachsene, 1 Kind" in the language of the request.</summary>
+    internal static string Persons(Tr t, int adults, int children) =>
+        (adults == 1 ? t("booking.public.adult") : t("booking.public.adults", adults))
+        + (children > 0 ? ", " + (children == 1 ? t("booking.public.child") : t("booking.public.children", children)) : "");
+
+    /// <summary>A moment in the houses' time ("12.08.2026 18:00 Uhr" in German, without "Uhr" in English).</summary>
+    private static string When(IPluginContext ctx, DateTime? utc)
+    {
+        var s = BookingMail.Local(utc);
+        return s.EndsWith(" Uhr", StringComparison.Ordinal) ? ctx.T("booking.public.time", s[..^4]) : s;
     }
 }
 

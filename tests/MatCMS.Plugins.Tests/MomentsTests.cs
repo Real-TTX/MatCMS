@@ -356,7 +356,7 @@ public class MomentsTests : IClassFixture<MomentsApp>
     public async Task The_entrance_block_and_the_admin_pages_render()
     {
         var admin = await _app.AdminAsync();
-        foreach (var page in new[] { "overview", "review", "photos", "comments", "guests", "guests/new", "tags", "_settings?group=Allgemein" })
+        foreach (var page in new[] { "overview", "review", "photos", "comments", "guests", "guests/new", "tags", "_settings?group=moments.set.groupGeneral" })
         {
             var r = await admin.GetAsync("/admin/p/moments/" + page);
             Assert.True(r.StatusCode == HttpStatusCode.OK, page + ": " + r.StatusCode + " " + r.Headers.Location);
@@ -497,7 +497,7 @@ public class MomentsTests : IClassFixture<MomentsApp>
     private async Task SignInSettingsAsync(string mode, string chars = "mixed", int length = 8)
     {
         var admin = await _app.AdminAsync();
-        var res = await PostFormAsync(admin, "/admin/p/moments/_settings?group=Anmeldung", new Dictionary<string, string>
+        var res = await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupLogin", new Dictionary<string, string>
         {
             ["action"] = "save-settings", ["s_loginMode"] = mode, ["s_codeChars"] = chars, ["s_codeLength"] = length.ToString()
         });

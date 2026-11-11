@@ -26,39 +26,44 @@ public static class MomentsCards
         var mode = MomentsSettings.Mode(ctx);
         var codes = mode != MomentsSettings.ModePassword;
 
-        var sb = new StringBuilder("<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Zugangskarten – ")
-            .Append(M.H(ev)).Append("</title><style>").Append(Css).Append("</style></head><body><div class=\"bar\"><span><strong>Zugangskarten</strong> · ")
-            .Append(M.Plural(guests.Count, "Haushalt", "Haushalte")).Append(" · acht Karten pro A4-Seite, an den gestrichelten Linien ausschneiden. Jede Karte gibt es auch einzeln als Bild oder PDF – zum Verschicken per WhatsApp.")
-            .Append("</span><button type=\"button\" id=\"print\">Alle drucken</button></div><div class=\"cards\">");
+        var lang = (ctx.Locale ?? "").Split('-')[0] is { Length: > 0 } l ? l : "de";
+        // the canvas script takes its words from the body's data-l-* attributes and each card's data-lead (the page's language)
+        var sb = new StringBuilder("<!doctype html><html lang=\"").Append(M.H(lang)).Append("\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>")
+            .Append(ctx.T("moments.cards.title")).Append(" – ").Append(M.H(ev)).Append("</title><style>").Append(Css).Append("</style></head><body data-l-code=\"").Append(M.H(ctx.T("moments.cards.code")))
+            .Append("\" data-l-user=\"").Append(M.H(ctx.T("moments.login.user"))).Append("\" data-l-pass=\"").Append(M.H(ctx.T("moments.login.password"))).Append("\" data-l-scan=\"").Append(M.H(ctx.T("moments.cards.scan")))
+            .Append("\" data-l-file=\"").Append(M.H(ctx.T("moments.cards.file"))).Append("\"><div class=\"bar\"><span><strong>").Append(ctx.T("moments.cards.title")).Append("</strong> · ")
+            .Append(M.Count(ctx, guests.Count, "moments.count.household.")).Append(" · ").Append(ctx.T("moments.cards.howTo"))
+            .Append("</span><button type=\"button\" id=\"print\">").Append(ctx.T("moments.cards.printAll")).Append("</button></div><div class=\"cards\">");
         foreach (var g in guests)
         {
             var link = codes ? origin + MomentsPublic.Base + "/z/" + g.Code : origin + MomentsPublic.Base;
+            var lead = ctx.T(codes ? "moments.cards.leadCode" : "moments.cards.leadPassword");
             sb.Append("<div class=\"slot\"><section class=\"card\" data-card data-ev=\"").Append(M.H(ev)).Append("\" data-name=\"").Append(M.H(g.Name)).Append("\" data-url=\"").Append(M.H(host + MomentsPublic.Base))
               .Append("\" data-link=\"").Append(M.H(link)).Append("\" data-code=\"").Append(codes ? M.H(g.CodeShown) : "").Append("\" data-login=\"").Append(mode != MomentsSettings.ModeCode ? M.H(g.Login) : "")
-              .Append("\" data-mode=\"").Append(mode).Append("\" data-file=\"").Append(M.H(FileName(g.Name))).Append("\"><div class=\"text\"><p class=\"ev\">").Append(M.H(ev)).Append("</p><h2>").Append(M.H(g.Name))
-              .Append("</h2><p class=\"lead\">").Append(codes ? "Euer persönlicher Zugang zu unseren Fotos – hier könnt ihr auch eure eigenen hochladen:" : "Euer Zugang zu unseren Fotos – meldet euch hier mit Benutzername und Passwort an:")
+              .Append("\" data-mode=\"").Append(mode).Append("\" data-lead=\"").Append(M.H(lead)).Append("\" data-file=\"").Append(M.H(FileName(ctx, g.Name))).Append("\"><div class=\"text\"><p class=\"ev\">").Append(M.H(ev)).Append("</p><h2>").Append(M.H(g.Name))
+              .Append("</h2><p class=\"lead\">").Append(lead)
               .Append("</p><p class=\"url\">").Append(M.H(host)).Append(MomentsPublic.Base).Append("</p>");
-            if (codes) sb.Append("<p class=\"code\"><span>Code</span> ").Append(M.H(g.CodeShown)).Append("</p>");
+            if (codes) sb.Append("<p class=\"code\"><span>").Append(ctx.T("moments.cards.code")).Append("</span> ").Append(M.H(g.CodeShown)).Append("</p>");
             if (mode != MomentsSettings.ModeCode && (g.Login.Length > 0 || !codes))
-                sb.Append("<p class=\"login\"><span>Benutzername</span> ").Append(g.Login.Length > 0 ? M.H(g.Login) : "________________").Append("</p>");
-            if (!codes) sb.Append("<p class=\"login\"><span>Passwort</span> ________________</p>");
-            sb.Append("</div><div class=\"qrbox\"><div class=\"qr\" data-qr=\"").Append(M.H(link)).Append("\" role=\"img\" aria-label=\"QR-Code: ").Append(codes ? "persönlicher Link" : "Adresse des Gästebereichs")
-              .Append("\"></div><p class=\"scan\">Mit der Handykamera scannen</p></div></section><div class=\"tools\">")
-              .Append("<button type=\"button\" data-png>Bild</button><button type=\"button\" data-pdf>PDF</button><button type=\"button\" data-share hidden>Teilen</button>")
+                sb.Append("<p class=\"login\"><span>").Append(ctx.T("moments.login.user")).Append("</span> ").Append(g.Login.Length > 0 ? M.H(g.Login) : "________________").Append("</p>");
+            if (!codes) sb.Append("<p class=\"login\"><span>").Append(ctx.T("moments.login.password")).Append("</span> ________________</p>");
+            sb.Append("</div><div class=\"qrbox\"><div class=\"qr\" data-qr=\"").Append(M.H(link)).Append("\" role=\"img\" aria-label=\"").Append(ctx.T(codes ? "moments.cards.qrLink" : "moments.cards.qrAddress"))
+              .Append("\"></div><p class=\"scan\">").Append(ctx.T("moments.cards.scan")).Append("</p></div></section><div class=\"tools\">")
+              .Append("<button type=\"button\" data-png>").Append(ctx.T("moments.cards.png")).Append("</button><button type=\"button\" data-pdf>PDF</button><button type=\"button\" data-share hidden>").Append(ctx.T("moments.cards.share")).Append("</button>")
               .Append("<a href=\"").Append(M.H(WhatsAppUrl(ctx, g))).Append("\" target=\"_blank\" rel=\"noopener\">WhatsApp</a></div></div>");
         }
-        if (guests.Count == 0) sb.Append("<p>Noch keine Gäste angelegt.</p>");
+        if (guests.Count == 0) sb.Append("<p>").Append(ctx.T("moments.cards.none")).Append("</p>");
         sb.Append("</div><script src=\"/_content/MatCMS.Shared.Web/lib/qrcode/qrcode.min.js\"></script><script>").Append(Script).Append("</script></body></html>");
         return PluginResult.Text(sb.ToString(), "text/html; charset=utf-8").WithHeader("Cache-Control", "no-store").WithHeader("X-Robots-Tag", "noindex");
     }
 
-    /// <summary>"Zoe & Fabian" → "Zugang-Zoe-Fabian" (a file name every phone and WhatsApp accept).</summary>
-    internal static string FileName(string name)
+    /// <summary>"Zoe & Fabian" → "Zugang-Zoe-Fabian" (a file name every phone and WhatsApp accept; the word in front is the page's language).</summary>
+    internal static string FileName(IPluginContext ctx, string name)
     {
         var s = new string(name.Normalize(NormalizationForm.FormC).Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
         while (s.Contains("--", StringComparison.Ordinal)) s = s.Replace("--", "-", StringComparison.Ordinal);
         s = s.Trim('-');
-        return "Zugang-" + (s.Length > 0 ? s[..Math.Min(s.Length, 40)] : "Gast");
+        return ctx.T("moments.cards.file") + "-" + (s.Length > 0 ? s[..Math.Min(s.Length, 40)] : ctx.T("moments.cards.fileGuest"));
     }
 
     /// <summary>
@@ -69,16 +74,16 @@ public static class MomentsCards
     {
         var origin = ctx.Site.Origin.TrimEnd('/');
         var mode = MomentsSettings.Mode(ctx);
-        var sb = new StringBuilder("Hallo ").Append(g.Name).Append("!\n\n");
+        var sb = new StringBuilder(ctx.T("moments.hello", g.Name)).Append("\n\n");
         if (mode != MomentsSettings.ModePassword)
         {
-            sb.Append("Hier ist euer persönlicher Zugang zu unseren Fotos (").Append(MomentsSettings.Event(ctx)).Append("):\n").Append(origin).Append(MomentsPublic.Base).Append("/z/").Append(g.Code)
-              .Append("\n\nEinfach antippen – dann seid ihr angemeldet, könnt alle Fotos ansehen und eure eigenen hochladen.\nEuer Code, falls ihr ihn einmal eintippen müsst: ").Append(g.CodeShown);
-            if (mode == MomentsSettings.ModeBoth && g.Login.Length > 0) sb.Append("\nOder mit Benutzername: ").Append(g.Login);
+            sb.Append(ctx.T("moments.wa.code", MomentsSettings.Event(ctx))).Append('\n').Append(origin).Append(MomentsPublic.Base).Append("/z/").Append(g.Code)
+              .Append("\n\n").Append(ctx.T("moments.wa.tap")).Append('\n').Append(ctx.T("moments.wa.yourCode")).Append(' ').Append(g.CodeShown);
+            if (mode == MomentsSettings.ModeBoth && g.Login.Length > 0) sb.Append('\n').Append(ctx.T("moments.wa.orUser")).Append(' ').Append(g.Login);
         }
         else
-            sb.Append("Hier ist euer Zugang zu unseren Fotos (").Append(MomentsSettings.Event(ctx)).Append("):\n").Append(origin).Append(MomentsPublic.Base)
-              .Append("\n\nBenutzername: ").Append(g.Login.Length > 0 ? g.Login : "…").Append("\nPasswort: ");
+            sb.Append(ctx.T("moments.wa.password", MomentsSettings.Event(ctx))).Append('\n').Append(origin).Append(MomentsPublic.Base)
+              .Append("\n\n").Append(ctx.T("moments.login.user")).Append(": ").Append(g.Login.Length > 0 ? g.Login : "…").Append('\n').Append(ctx.T("moments.login.password")).Append(": ");
         if (mode != MomentsSettings.ModePassword) sb.Append("\n\n").Append(MomentsSettings.Hosts(ctx));
         return sb.ToString();
     }
@@ -104,16 +109,16 @@ function draw(card){var d=card.dataset,W=1400,H=1000,cv=document.createElement('
  c.fillStyle='#a07d4a';c.font='600 30px '+FONT;spaced(c,'6px');c.fillText((d.ev||'').toUpperCase(),x,y);spaced(c,'0px');
  y+=92;c.fillStyle='#2b211b';c.font='600 76px '+FONT;y=wrap(c,d.name||'',x,y,col,86,2);
  y+=14;c.fillStyle='#5b4d43';c.font='32px '+FONT;
- y=wrap(c,d.mode==='password'?'Euer Zugang zu unseren Fotos – meldet euch hier mit Benutzername und Passwort an:':'Euer persönlicher Zugang zu unseren Fotos – hier könnt ihr auch eure eigenen hochladen:',x,y,col,44,3);
+ y=wrap(c,d.lead||'',x,y,col,44,3);
  y+=12;c.fillStyle='#2b211b';c.font='600 38px '+FONT;c.fillText(d.url||'',x,y);y+=96;
  function pair(label,value,mono){c.fillStyle='#8a7d72';c.font='26px '+FONT;spaced(c,'4px');c.fillText(label.toUpperCase(),x,y);var lw=c.measureText(label.toUpperCase()).width;spaced(c,mono?'6px':'0px');
   c.fillStyle='#2b211b';c.font=(mono?'700 62px '+MONO:'600 46px '+FONT);c.fillText(value,x+lw+26,y+(mono?6:2));spaced(c,'0px');y+=mono?92:70;}
- if(d.code)pair('Code',d.code,true);
- if(d.login||d.mode==='password')pair('Benutzername',d.login||'________________',false);
- if(d.mode==='password')pair('Passwort','________________',false);
+ var L=document.body.dataset;if(d.code)pair(L.lCode||'Code',d.code,true);
+ if(d.login||d.mode==='password')pair(L.lUser||'',d.login||'________________',false);
+ if(d.mode==='password')pair(L.lPass||'','________________',false);
  var q=qrOf(d.link||''),size=440,qx=W-96-size,qy=(H-size)/2-30;
  if(q){var n=q.getModuleCount(),m=size/n;c.fillStyle='#2b211b';for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect(Math.floor(qx+k*m),Math.floor(qy+r*m),Math.ceil(m),Math.ceil(m));}
- c.fillStyle='#8a7d72';c.font='26px '+FONT;c.textAlign='center';c.fillText('Mit der Handykamera scannen',qx+size/2,qy+size+52);c.textAlign='left';
+ c.fillStyle='#8a7d72';c.font='26px '+FONT;c.textAlign='center';c.fillText(L.lScan||'',qx+size/2,qy+size+52);c.textAlign='left';
  return cv;}
 function blobOf(cv,type,q){return new Promise(function(res){cv.toBlob(res,type,q);});}
 function save(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);}
@@ -126,7 +131,7 @@ function pdf(jpeg,w,h){var enc=new TextEncoder(),parts=[],len=0,off=[];function 
  var content='q '+pw+' 0 0 '+ph+' 0 0 cm /Im0 Do Q';obj(5,'<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');
  var xref=len,t='xref\n0 6\n0000000000 65535 f \n';for(var i=1;i<=5;i++)t+=String(off[i]).padStart(10,'0')+' 00000 n \n';
  put(t+'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF\n');return new Blob(parts,{type:'application/pdf'});}
-document.querySelectorAll('.slot').forEach(function(slot){var card=slot.querySelector('[data-card]'),name=card.dataset.file||'Zugang';
+document.querySelectorAll('.slot').forEach(function(slot){var card=slot.querySelector('[data-card]'),name=card.dataset.file||document.body.dataset.lFile||'card';
  slot.querySelector('[data-png]').addEventListener('click',function(){blobOf(draw(card),'image/png').then(function(b){save(b,name+'.png');});});
  slot.querySelector('[data-pdf]').addEventListener('click',function(){var cv=draw(card);blobOf(cv,'image/jpeg',0.92).then(function(b){return b.arrayBuffer();}).then(function(buf){save(pdf(new Uint8Array(buf),cv.width,cv.height),name+'.pdf');});});
  var share=slot.querySelector('[data-share]');

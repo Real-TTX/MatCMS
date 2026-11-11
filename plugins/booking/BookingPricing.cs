@@ -28,8 +28,9 @@ public sealed record Rate(long Id, long UnitId, long SeasonId, long Price, int M
 public static class FeePer
 {
     public const string Stay = "stay", Night = "night", Person = "person", PersonNight = "person_night";
-    public static readonly (string Key, string Label)[] All = { (Stay, "je Aufenthalt"), (Night, "je Nacht"), (Person, "je Person"), (PersonNight, "je Person und Nacht") };
-    public static string Label(string k) => All.FirstOrDefault(x => x.Key == k).Label ?? k;
+    public static readonly string[] Keys = { Stay, Night, Person, PersonNight };
+    public static string Label(string k) => Label(BookingStrings.German, k);
+    public static string Label(Tr t, string k) => Keys.Contains(k) ? t("booking.per." + k) : k;
 }
 
 /// <summary>
@@ -81,20 +82,22 @@ public static class Pricing
         return (s, r ?? new Rate(0, unit.Id, 0, unit.BasePrice, unit.BaseMinNights, Array.Empty<int>(), 0, unit.ExtraPerson));
     }
 
-    public static Quote Calculate(Unit unit, Stay stay, IReadOnlyList<Season> seasons, IReadOnlyList<Rate> rates, IReadOnlyList<Fee> fees, string currency = "EUR")
+    public static Quote Calculate(Unit unit, Stay stay, IReadOnlyList<Season> seasons, IReadOnlyList<Rate> rates, IReadOnlyList<Fee> fees, string currency = "EUR", Tr? tr = null)
     {
+        var t = tr ?? BookingStrings.German;
         var problems = new List<string>();
         var lines = new List<QuoteLine>();
-        if (stay.Nights <= 0) return new Quote(lines, new[] { "Die Abreise muss nach der Anreise liegen." }, 1, Array.Empty<int>());
-        if (stay.Nights > MaxNights) problems.Add("Höchstens " + MaxNights + " Nächte am Stück.");
-        if (stay.Adults < 1) problems.Add("Mindestens ein Erwachsener.");
-        if (stay.Persons > unit.GuestsMax) problems.Add(unit.Name + " ist für höchstens " + unit.GuestsMax + " Personen.");
+        if (stay.Nights <= 0) return new Quote(lines, new[] { t("booking.price.departureAfterArrival") }, 1, Array.Empty<int>());
+        if (stay.Nights > MaxNights) problems.Add(t("booking.price.maxNights", MaxNights));
+        if (stay.Adults < 1) problems.Add(t("booking.price.oneAdult"));
+        if (stay.Persons > unit.GuestsMax) problems.Add(t("booking.price.maxGuests", unit.Name, unit.GuestsMax));
 
         var (firstSeason, first) = RateOf(unit, stay.Arrival, seasons, rates);
         var min = Math.Max(1, first.MinNights);
-        if (stay.Nights < min) problems.Add((firstSeason is null ? "" : firstSeason.Name + ": ") + "mindestens " + min + " Nächte.");
+        if (stay.Nights < min) problems.Add((firstSeason is null ? "" : firstSeason.Name + ": ") + t("booking.price.minNights", min));
         if (first.ArrivalDays.Count > 0 && !first.ArrivalDays.Contains(B.IsoDay(stay.Arrival.DayOfWeek)))
-            problems.Add((firstSeason is null ? "Anreise" : firstSeason.Name + ": Anreise") + " nur " + string.Join(", ", first.ArrivalDays.OrderBy(d => d).Select(d => B.DayNames[d - 1])) + ".");
+            problems.Add(t("booking.price.arrivalOnly", (firstSeason is null ? "" : firstSeason.Name + ": ") + t("booking.price.arrival"),
+                string.Join(", ", first.ArrivalDays.OrderBy(d => d).Select(d => B.DayName(t, d)))));
         if (stay.Nights > MaxNights) return new Quote(lines, problems, min, first.ArrivalDays);
 
         // nights, grouped into runs of the same season — a week price applies to whole weeks inside one run
@@ -109,15 +112,15 @@ public static class Pricing
             while (j < nights.Count && nights[j].R.Season?.Id == season?.Id) j++;
             var run = nights.GetRange(i, j - i);
             var rate = run[0].R.Rate;
-            var name = season?.Name ?? "Grundpreis";
+            var name = season?.Name ?? t("booking.price.base");
             var weeks = rate.WeekPrice > 0 ? run.Count / 7 : 0;
-            if (weeks > 0) lines.Add(new QuoteLine("nights", weeks == 1 ? "1 Woche " + name : weeks + " Wochen " + name, weeks, rate.WeekPrice, weeks * rate.WeekPrice));
+            if (weeks > 0) lines.Add(new QuoteLine("nights", weeks == 1 ? t("booking.price.week", name) : t("booking.price.weeks", weeks, name), weeks, rate.WeekPrice, weeks * rate.WeekPrice));
             var rest = run.Count - weeks * 7;
-            if (rest > 0) lines.Add(new QuoteLine("nights", rest + (rest == 1 ? " Nacht " : " Nächte ") + name, rest, rate.Price, rest * rate.Price));
+            if (rest > 0) lines.Add(new QuoteLine("nights", rest == 1 ? t("booking.price.night", name) : t("booking.price.nights", rest, name), rest, rate.Price, rest * rate.Price));
             extra += run.Sum(n => n.R.Rate.ExtraPerson) * extraPersons;
             i = j;
         }
-        if (extra > 0) lines.Add(new QuoteLine("extra", extraPersons + (extraPersons == 1 ? " weitere Person" : " weitere Personen") + " (ab " + (unit.GuestsStd + 1) + ". Person)", 1, extra, extra));
+        if (extra > 0) lines.Add(new QuoteLine("extra", extraPersons == 1 ? t("booking.price.extraPerson", unit.GuestsStd + 1) : t("booking.price.extraPersons", extraPersons, unit.GuestsStd + 1), 1, extra, extra));
 
         foreach (var f in fees.Where(f => f.PropertyId == unit.PropertyId && (f.UnitId == 0 || f.UnitId == unit.Id)).OrderBy(f => f.TouristTax).ThenBy(f => f.Sort))
         {
@@ -133,22 +136,23 @@ public static class Pricing
                 _ => (1, f.Amount)
             };
             if (amount <= 0) continue;
-            lines.Add(new QuoteLine(f.TouristTax ? "tax" : "fee", f.Name, qty, f.Amount, amount) { Detail = FeeDetail(f, stay, currency) });
+            lines.Add(new QuoteLine(f.TouristTax ? "tax" : "fee", f.Name, qty, f.Amount, amount) { Detail = FeeDetail(f, stay, currency, t) });
         }
         return new Quote(lines, problems, min, first.ArrivalDays);
     }
 
-    private static string FeeDetail(Fee f, Stay stay, string currency)
+    private static string FeeDetail(Fee f, Stay stay, string currency, Tr t)
     {
-        var parts = new List<string> { B.Money(f.Amount, currency) + " " + FeePer.Label(f.Per) };
+        var parts = new List<string> { B.Money(f.Amount, currency) + " " + FeePer.Label(t, f.Per) };
         if (f.Per is FeePer.Person or FeePer.PersonNight)
         {
-            var who = stay.Adults + (stay.Adults == 1 ? " Erw." : " Erw.");
+            var who = t("booking.price.adults", stay.Adults);
             if (stay.Children > 0)
-                who += ", " + stay.Children + (stay.Children == 1 ? " Kind" : " Kinder") + (!f.TouristTax || f.Children == "full" ? "" : f.Children == "half" ? " zur Hälfte" : " frei");
+                who += ", " + (stay.Children == 1 ? t("booking.price.child") : t("booking.price.children", stay.Children))
+                    + (!f.TouristTax || f.Children == "full" ? "" : " " + (f.Children == "half" ? t("booking.price.childHalf") : t("booking.price.childFree")));
             parts.Add(who);
         }
-        if (f.Per is FeePer.Night or FeePer.PersonNight) parts.Add(stay.Nights + (stay.Nights == 1 ? " Nacht" : " Nächte"));
+        if (f.Per is FeePer.Night or FeePer.PersonNight) parts.Add(stay.Nights == 1 ? t("booking.price.oneNight") : t("booking.price.nNights", stay.Nights));
         return string.Join(" · ", parts);
     }
 }

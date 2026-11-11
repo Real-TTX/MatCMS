@@ -29,10 +29,10 @@ public static class VereinEvents
 
         b.Sitemap(async (ctx, ct) => (await PublicAsync(ctx, ct)).Select(e => new SitemapEntry(PagePath(e.Id), e.Created ?? DateTime.UtcNow)).Prepend(new SitemapEntry(ListPath)));
 
-        b.LinkTargets("Verein", async (ctx, ct) =>
-            new[] { new LinkTarget("Termine (Übersicht)", ListPath), new LinkTarget("Mitgliederbereich", VereinPublic.Base), new LinkTarget("Termine als Kalender (iCal)", VereinIcal.PublicFeed) }
+        b.LinkTargets("verein.links.group", async (ctx, ct) =>
+            new[] { new LinkTarget(ctx.T("verein.links.events"), ListPath), new LinkTarget(ctx.T("verein.links.memberArea"), VereinPublic.Base), new LinkTarget(ctx.T("verein.links.ical"), VereinIcal.PublicFeed) }
                 .Concat((await PublicAsync(ctx, ct)).Where(e => string.CompareOrdinal(e.Day, V.Today) >= 0).Take(100)
-                    .Select(e => new LinkTarget("Termin: " + e.Title + " (" + V.Date(e.Starts) + ")", PagePath(e.Id)))));
+                    .Select(e => new LinkTarget(ctx.T("verein.links.event", e.Title, V.Date(ctx, e.Starts)), PagePath(e.Id)))));
 
         b.On("site.search", SearchAsync);
 
@@ -57,10 +57,10 @@ public static class VereinEvents
     {
         var all = await PublicAsync(ctx, ct);
         var upcoming = all.Where(e => string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, V.Today) >= 0).ToList();
-        var title = ctx.Settings.Get(VereinSettings.EventsTitle) is { Length: > 0 } t ? t : "Termine";
+        var title = ctx.Settings.Get(VereinSettings.EventsTitle) is { Length: > 0 } t ? t : ctx.T("verein.events.title");
         var sb = new StringBuilder("<header class=\"vm-head\"><div><p class=\"vm-kicker\">").Append(V.H(VereinSettings.Club(ctx))).Append("</p><h1>").Append(V.H(title)).Append("</h1></div></header>");
-        sb.Append("<section class=\"vm-card\">").Append(VereinPublic.EventList(upcoming, internalBadge: false, publicLinks: true)).Append("</section>");
-        sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinIcal.PublicFeed).Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> Alle Termine im eigenen Kalender abonnieren</a></p>");
+        sb.Append("<section class=\"vm-card\">").Append(VereinPublic.EventList(ctx, upcoming, internalBadge: false, publicLinks: true)).Append("</section>");
+        sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinIcal.PublicFeed).Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> ").Append(V.H(ctx.T("verein.events.subscribeAll"))).Append("</a></p>");
         return Frame(ctx, title, sb.ToString());
     }
 
@@ -70,25 +70,25 @@ public static class VereinEvents
     {
         var e = (await PublicAsync(ctx, ct)).FirstOrDefault(x => x.Id == IdOf(ctx));
         if (e is null) return PluginResult.NotFound();
-        var (day, month, wd) = V.Badge(e.Starts);
-        var sb = new StringBuilder("<p class=\"vm-back\"><a href=\"").Append(ListPath).Append("\">← Alle Termine</a></p>");
+        var (day, month, wd) = V.Badge(ctx, e.Starts);
+        var sb = new StringBuilder("<p class=\"vm-back\"><a href=\"").Append(ListPath).Append("\">← ").Append(V.H(ctx.T("verein.events.all"))).Append("</a></p>");
         sb.Append("<article class=\"vm-card vm-event-page").Append(e.Cancelled ? " is-cancelled" : "").Append("\"><div class=\"vm-event-head\"><span class=\"vm-date big\"><b>").Append(V.H(day))
-          .Append("</b><small>").Append(V.H(month)).Append("</small><em>").Append(V.H(wd)).Append("</em></span><div><p class=\"vm-kicker\">").Append(V.H(e.Kind.Length > 0 ? e.Kind : "Termin"))
+          .Append("</b><small>").Append(V.H(month)).Append("</small><em>").Append(V.H(wd)).Append("</em></span><div><p class=\"vm-kicker\">").Append(V.H(e.Kind.Length > 0 ? e.Kind : ctx.T("verein.events.event")))
           .Append("</p><h1>").Append(V.H(e.Title)).Append("</h1>");
-        if (e.Cancelled) sb.Append("<p><span class=\"vm-badge err\">abgesagt</span></p>");
-        sb.Append("</div></div><dl class=\"vm-facts\"><dt>Wann</dt><dd>").Append(V.H(V.When(e.Starts)));
-        if (e.Ends.Length > 0 && e.Ends != e.Starts) sb.Append(" – ").Append(V.H(e.Ends[..Math.Min(10, e.Ends.Length)] == e.Day ? V.When(e.Ends).Split(", ").Last() : V.When(e.Ends)));
+        if (e.Cancelled) sb.Append("<p><span class=\"vm-badge err\">").Append(V.H(ctx.T("verein.events.cancelled"))).Append("</span></p>");
+        sb.Append("</div></div><dl class=\"vm-facts\"><dt>").Append(V.H(ctx.T("verein.events.when"))).Append("</dt><dd>").Append(V.H(V.When(ctx, e.Starts)));
+        if (e.Ends.Length > 0 && e.Ends != e.Starts) sb.Append(" – ").Append(V.H(e.Ends[..Math.Min(10, e.Ends.Length)] == e.Day ? V.When(ctx, e.Ends).Split(", ").Last() : V.When(ctx, e.Ends)));
         sb.Append("</dd>");
-        if (e.Place.Length > 0) sb.Append("<dt>Wo</dt><dd>").Append(V.H(e.Place)).Append("</dd>");
+        if (e.Place.Length > 0) sb.Append("<dt>").Append(V.H(ctx.T("verein.events.where"))).Append("</dt><dd>").Append(V.H(e.Place)).Append("</dd>");
         sb.Append("</dl>");
         if (e.Description.Length > 0) sb.Append("<div class=\"vm-text\">").Append(V.Paragraphs(e.Description)).Append("</div>");
-        sb.Append("<p class=\"vm-actions\"><a class=\"vm-btn\" href=\"").Append(IcsPath(e.Id)).Append("\"><i class=\"ti ti-calendar-plus\"></i> In den Kalender</a>");
-        if (e.Place.Length > 0) sb.Append("<a class=\"vm-btn ghost\" href=\"https://www.openstreetmap.org/search?query=").Append(Uri.EscapeDataString(e.Place)).Append("\" rel=\"noopener\" target=\"_blank\"><i class=\"ti ti-map-pin\"></i> Karte</a>");
+        sb.Append("<p class=\"vm-actions\"><a class=\"vm-btn\" href=\"").Append(IcsPath(e.Id)).Append("\"><i class=\"ti ti-calendar-plus\"></i> ").Append(V.H(ctx.T("verein.events.toCalendar"))).Append("</a>");
+        if (e.Place.Length > 0) sb.Append("<a class=\"vm-btn ghost\" href=\"https://www.openstreetmap.org/search?query=").Append(Uri.EscapeDataString(e.Place)).Append("\" rel=\"noopener\" target=\"_blank\"><i class=\"ti ti-map-pin\"></i> ").Append(V.H(ctx.T("verein.events.map"))).Append("</a>");
         if (e.Link.StartsWith("https://", StringComparison.Ordinal) || (e.Link.StartsWith('/') && !e.Link.StartsWith("//", StringComparison.Ordinal)))
-            sb.Append("<a class=\"vm-btn ghost\" href=\"").Append(V.H(e.Link)).Append("\">Mehr erfahren</a>");
+            sb.Append("<a class=\"vm-btn ghost\" href=\"").Append(V.H(e.Link)).Append("\">").Append(V.H(ctx.T("verein.events.more"))).Append("</a>");
         sb.Append("</p></article>");
         // the club's members get a way to their planning (running order, meeting point) — the page itself never shows it
-        if (ctx.Member is not null) sb.Append("<p class=\"vm-muted\"><a href=\"").Append(VereinPublic.Base).Append("/termine/").Append(e.Id).Append("\">Ablauf, Treffpunkt und Bilder im Mitgliederbereich →</a></p>");
+        if (ctx.Member is not null) sb.Append("<p class=\"vm-muted\"><a href=\"").Append(VereinPublic.Base).Append("/termine/").Append(e.Id).Append("\">").Append(V.H(ctx.T("verein.events.membersLink"))).Append(" →</a></p>");
         return Frame(ctx, e.Title, sb.ToString());
     }
 
@@ -106,7 +106,7 @@ public static class VereinEvents
         var terms = q.Split(new[] { ' ', ',', '.', '?', '!', ';', ':' }, StringSplitOptions.RemoveEmptyEntries).Where(t => t.Length >= 3).Distinct().ToList();
         if (terms.Count == 0) return null;
         // "Termin", "Umzug", "wann" … are what a date question is made of: every upcoming public event is a candidate then
-        var dateQuestion = terms.Any(t => t is "termin" or "termine" or "wann" or "nächste" or "nächster" or "nächsten" or "kalender" or "veranstaltung" or "veranstaltungen" or "events");
+        var dateQuestion = terms.Any(t => t is "termin" or "termine" or "wann" or "nächste" or "nächster" or "nächsten" or "kalender" or "veranstaltung" or "veranstaltungen" or "events" or "event" or "when" or "next" or "calendar" or "dates");
         var max = Math.Clamp(payload?["max"] is JsonValue m && m.TryGetValue<int>(out var n) ? n : 5, 1, 20);
         var items = new JsonArray();
         foreach (var hit in (await PublicAsync(ctx, ct)).Where(e => !e.Cancelled && string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, V.Today) >= 0)
@@ -114,8 +114,8 @@ public static class VereinEvents
                      .Where(x => x.Score > 0).OrderByDescending(x => x.Score).ThenBy(x => x.e.Starts).Take(max))
             items.Add(new JsonObject
             {
-                ["title"] = hit.e.Title, ["url"] = PagePath(hit.e.Id), ["score"] = hit.Score, ["kind"] = "Termin",
-                ["text"] = V.When(hit.e.Starts) + (hit.e.Place.Length > 0 ? " · " + hit.e.Place : "") + (hit.e.Description.Length > 0 ? " – " + V.Clip(hit.e.Description, 200) : "")
+                ["title"] = hit.e.Title, ["url"] = PagePath(hit.e.Id), ["score"] = hit.Score, ["kind"] = ctx.T("verein.events.event"),
+                ["text"] = V.When(ctx, hit.e.Starts) + (hit.e.Place.Length > 0 ? " · " + hit.e.Place : "") + (hit.e.Description.Length > 0 ? " – " + V.Clip(hit.e.Description, 200) : "")
             });
         return items.Count == 0 ? null : new JsonObject { ["items"] = items };
     }

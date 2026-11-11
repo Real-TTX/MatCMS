@@ -22,7 +22,7 @@ public class MatmonTemplatesBlockTests : IClassFixture<AppFactory>
     private static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", "matmon-live", name));
 
     [Fact]
-    public async Task The_block_shows_the_clouds_store_and_passes_the_download_through()
+    public async Task The_block_shows_the_clouds_store_and_offers_no_download()
     {
         using var cloud = new PathStub();
         cloud.Answers["/api/store/templates?sort=new&page=1"] = new JsonObject
@@ -44,7 +44,6 @@ public class MatmonTemplatesBlockTests : IClassFixture<AppFactory>
             ["templates"] = new JsonArray(new JsonObject { ["name"] = "Hornetsecurity - services", ["sensorType"] = "http-advanced", ["scope"] = "Sensor" }),
             ["versions"] = new JsonArray(new JsonObject { ["version"] = "1.0", ["notes"] = "First <release>", ["date"] = "2026-11-05T15:00:00+00:00" })
         }.ToJsonString();
-        cloud.Answers["/api/store/templates/hornetsecurity-status/download"] = """{"format":"matmon-templates","version":1,"templates":[]}""";
 
         using (var scope = _app.Services.CreateScope())
         {
@@ -52,7 +51,7 @@ public class MatmonTemplatesBlockTests : IClassFixture<AppFactory>
             var files = new[] { "snapshot.csx", "live.csx", "partners.csx", "changelog.csx", "templates.csx" }.ToDictionary(f => f, Fixture);
             var row = new Models.Plugin
             {
-                Key = "matmon-live", Name = "Matmon Live", Version = "1.6", Kind = PluginKind.Script, Enabled = true,
+                Key = "matmon-live", Name = "Matmon Live", Version = "1.7", Kind = PluginKind.Script, Enabled = true,
                 Code = Fixture("plugin.csx"),
                 FilesJson = System.Text.Json.JsonSerializer.Serialize(files),
                 ConfigJson = new JsonObject { ["cloudUrl"] = cloud.Url, ["githubApi"] = cloud.Url }.ToJsonString()
@@ -77,12 +76,8 @@ public class MatmonTemplatesBlockTests : IClassFixture<AppFactory>
         Assert.Contains("First &lt;release&gt;", html);
         Assert.DoesNotContain("Escape", html);                                   // an unsafe slug is left out
         Assert.Contains(cloud.Url + "/templates/submit", html);                  // "Submit" leads to the cloud's own page
-        Assert.Contains("href=\"/matmon-live/template/hornetsecurity-status\"", html);
-
-        var file = await browser.GetAsync("/matmon-live/template/hornetsecurity-status");
-        Assert.Equal(HttpStatusCode.OK, file.StatusCode);
-        Assert.Equal("matmon-templates-hornetsecurity-status-1.0.json", file.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
-        Assert.Contains("matmon-templates", await file.Content.ReadAsStringAsync());
-        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync("/matmon-live/template/not-listed")).StatusCode);
+        Assert.DoesNotContain("/matmon-live/template/", html);                  // 1.7: no download on the site — a set is added inside Matmon
+        Assert.Contains("In Matmon: Templates", html);
+        Assert.Equal(HttpStatusCode.NotFound, (await browser.GetAsync("/matmon-live/template/hornetsecurity-status")).StatusCode);
     }
 }

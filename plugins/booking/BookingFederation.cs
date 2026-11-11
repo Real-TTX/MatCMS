@@ -24,7 +24,7 @@ public static class BookingFederation
 {
     public const string RoleKey = "federation.role", UrlKey = "federation.url", KeyKey = "federation.key";
     public const string Solo = "solo", Lead = "lead", Member = "member";
-    public const string Group = "Verbund";
+    public const string Group = "booking.fed.group";      // the settings group's name is a text key (the host translates it); it is also the ?group= of the settings page
     private const string ApiPath = "/api/v1/booking/";
     private const int MaxBytes = 4 * 1024 * 1024, PageSize = 200;
 
@@ -37,21 +37,21 @@ public static class BookingFederation
     public static string Role(IPluginContext ctx) => ctx.Settings.Get(RoleKey) switch { Lead => Lead, Member => Member, _ => Solo };
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(RoleKey, "Rolle dieser Seite", SettingKind.Choice)
+        .Add(new SettingSpec(RoleKey, "booking.fed.role", SettingKind.Choice)
         {
             Group = Group, Default = Solo,
             Options = new[]
             {
-                new FieldOption(Solo, "für sich"),
-                new FieldOption(Lead, "Zentrale – Gästekartei und Anfragen aller Häuser"),
-                new FieldOption(Member, "Haus im Verbund – meldet an die Zentrale")
+                new FieldOption(Solo, "booking.fed.roleSolo"),
+                new FieldOption(Lead, "booking.fed.roleLead"),
+                new FieldOption(Member, "booking.fed.roleMember")
             },
-            Help = "Für mehrere Häuser eines Gastgebers. Gemeinsame Verarbeitung – jede Datenschutzerklärung muss den Verbund nennen (Hinweis, keine Rechtsberatung). Meldedaten werden nie geteilt."
+            Help = "booking.fed.roleHelp"
         })
-        .Add(new SettingSpec(UrlKey, "Adresse der Zentrale", SettingKind.Text) { Group = Group, Help = "Nur für ein Haus im Verbund, z. B. https://villa-nika.de" })
-        .Add(new SettingSpec(KeyKey, "API-Schlüssel der Zentrale", SettingKind.Secret)
+        .Add(new SettingSpec(UrlKey, "booking.fed.url", SettingKind.Text) { Group = Group, Help = "booking.fed.urlHelp" })
+        .Add(new SettingSpec(KeyKey, "booking.fed.key", SettingKind.Secret)
         {
-            Group = Group, Help = "In der Zentrale unter Admin → API-Schlüssel angelegt, Recht „Buchungen: Personendaten“."
+            Group = Group, Help = "booking.fed.keyHelp"
         });
 
     // ---- stamps and merging (pure) --------------------------------------------------------------------------------

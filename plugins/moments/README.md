@@ -47,6 +47,10 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
 - **Menü**: Angemeldete Gäste bekommen im Hauptmenü einen eigenen Eintrag (Name in den Einstellungen) mit Alle Fotos, Hochladen,
   Meine Fotos – und „Abmelden“ als letzten Punkt daneben (ganz rechts). Ein öffentlicher Menüpunkt zum Gästebereich bekommt die
   Sichtbarkeit „nur nicht angemeldet“.
+- **Deutsch und Englisch** (1.5): alle Texte stehen in `MomentsStrings.cs` (Schlüssel, Deutsch, Englisch) und kommen über `ctx.T` –
+  im Admin in der Sprache der Oberfläche, im Gästebereich in der Sprache der Seite. Einstellungen, Block-Felder und Menüpunkte tragen
+  die Schlüssel selbst. Die Skripte (Hochladen, Herz, Nachladen, Zugangskarten) bekommen ihre Wörter vom Server (`data-`-Attribute).
+  Was die Gastgeber selbst schreiben (Überschrift, Begrüßung, Anmeldetext, Menüpunkt) bleibt ihr Inhalt; die Vorgaben dafür sind deutsch.
 
 ## Wie es gebaut ist (und warum)
 
@@ -85,4 +89,4 @@ Link, kein Postfach, „Neuer Code“ wirft alte Geräte raus; Upload wartet auf
 Original entfernt, Datum bleibt; Markieren (Person aus der Gästeliste vs. Stichwort), Herz per Skript, Kommentar bleibt Text;
 Gäste in einem Rutsch, Zugangskarten nur für Admins (mit Bild, PDF, WhatsApp); Block und Admin-Seiten, „Abmelden“ ganz rechts im Menü;
 kurze Codes nur aus Ziffern, eigene Codes; Benutzername und Passwort (nur der Hash gespeichert; im reinen Passwort-Modus gilt der
-Karten-Link nicht); „Meine Herzen“ nur für wen, der eines vergeben hat.
+Karten-Link nicht); „Meine Herzen“ nur für wen, der eines vergeben hat. `MomentsStringsTests`: jeder Schlüssel im Code hat Deutsch und Englisch.

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace MatCMS.Plugin.Moments;
 
@@ -21,23 +22,32 @@ public static class MomentsUpload
         var choose = v.Admin && albums.Count > 0;
         var pick = preselect > 0 && albums.Any(a => a.Id == preselect) ? preselect : albums.FirstOrDefault(a => !a.Guests)?.Id ?? albums.FirstOrDefault()?.Id ?? 0;
         var sb = new StringBuilder("<section class=\"mo-card mo-upload\"><form method=\"post\" action=\"").Append(MomentsPublic.Base).Append("/hochladen\" enctype=\"multipart/form-data\" data-mo-up data-max=\"")
-            .Append(MomentsSettings.MaxBytes(ctx).ToString(CultureInfo.InvariantCulture)).Append("\">").Append(ctx.Antiforgery)
+            .Append(MomentsSettings.MaxBytes(ctx).ToString(CultureInfo.InvariantCulture)).Append("\" data-mo-words=\"").Append(M.H(ScriptWords(ctx))).Append("\">").Append(ctx.Antiforgery)
             .Append("<input type=\"hidden\" name=\"action\" value=\"upload\">");
         if (choose)
         {
-            sb.Append("<label class=\"mo-album-pick\"><span>In welches Album?</span><select name=\"album\" data-mo-album>");
-            foreach (var a in albums) sb.Append("<option value=\"").Append(a.Id).Append('"').Append(a.Id == pick ? " selected" : "").Append('>').Append(M.H(a.Name)).Append(a.Guests ? " (Gäste)" : "").Append("</option>");
-            sb.Append("<option value=\"0\"").Append(pick == 0 ? " selected" : "").Append(">kein Album</option></select></label>");
+            sb.Append("<label class=\"mo-album-pick\"><span>").Append(ctx.T("moments.upload.whichAlbum")).Append("</span><select name=\"album\" data-mo-album>");
+            foreach (var a in albums) sb.Append("<option value=\"").Append(a.Id).Append('"').Append(a.Id == pick ? " selected" : "").Append('>').Append(M.H(a.Name)).Append(a.Guests ? " (" + ctx.T("moments.guests") + ")" : "").Append("</option>");
+            sb.Append("<option value=\"0\"").Append(pick == 0 ? " selected" : "").Append('>').Append(ctx.T("moments.noAlbum")).Append("</option></select></label>");
         }
         sb
-            .Append("<label class=\"mo-drop\"><input type=\"file\" name=\"file\" multiple accept=\"image/*\"><span class=\"mo-big\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Fotos auswählen</span>")
-            .Append("<small>gern viele auf einmal – sie laden sofort hoch</small></label>")
+            .Append("<label class=\"mo-drop\"><input type=\"file\" name=\"file\" multiple accept=\"image/*\"><span class=\"mo-big\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload.choose")).Append("</span>")
+            .Append("<small>").Append(ctx.T("moments.upload.chooseHint")).Append("</small></label>")
             .Append("<div class=\"mo-up-tiles\" aria-live=\"polite\"></div><p class=\"mo-up-status\" role=\"status\"></p>")
-            .Append("<noscript><button class=\"mo-btn\" type=\"submit\">Hochladen</button></noscript></form>")
-            .Append("<p class=\"mo-muted small\">").Append(approval ? "Die anderen Gäste sehen deine Fotos, sobald die Gastgeber sie freigegeben haben. " : "")
-            .Append("Höchstens ").Append(M.Size(MomentsSettings.MaxBytes(ctx))).Append(" pro Foto. Standortdaten werden aus den Fotos entfernt. Bitte nur Bilder, die ihr teilen mögt.</p>")
-            .Append("<p class=\"mo-up-done\" hidden><a class=\"mo-btn\" href=\"").Append(MomentsPublic.Base).Append("/meine\"><i class=\"ti ti-check\" aria-hidden=\"true\"></i> Fertig – meine Fotos ansehen</a></p></section>");
+            .Append("<noscript><button class=\"mo-btn\" type=\"submit\">").Append(ctx.T("moments.upload")).Append("</button></noscript></form>")
+            .Append("<p class=\"mo-muted small\">").Append(approval ? ctx.T("moments.upload.approvalNote") + " " : "")
+            .Append(ctx.T("moments.upload.limits", M.Size(ctx, MomentsSettings.MaxBytes(ctx)))).Append("</p>")
+            .Append("<p class=\"mo-up-done\" hidden><a class=\"mo-btn\" href=\"").Append(MomentsPublic.Base).Append("/meine\"><i class=\"ti ti-check\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload.done")).Append("</a></p></section>");
         return sb.Append(MomentsScript.Upload).ToString();
+    }
+
+    /// <summary>The words of the upload script (MomentsScript.Upload), in the page's language; "{0}" stands for a number.</summary>
+    private static string ScriptWords(IPluginContext ctx)
+    {
+        var o = new JsonObject();
+        foreach (var k in new[] { "left1", "leftN", "done1", "doneN", "pending", "thanks", "bad1", "badN", "format", "tooBig", "error", "failed", "offline" })
+            o[k] = ctx.T("moments.upjs." + k);
+        return o.ToJsonString();
     }
 
     public sealed record Result(string? Error, bool Pending, int Saved);
@@ -51,7 +61,7 @@ public static class MomentsUpload
         var originals = r.Files.Where(f => f.Field == "file" && f.Length > 0).Take(40).ToList();
         var view = r.File("view") is { Length: > 0 } vf ? vf : null;
         var thumb = r.File("thumb") is { Length: > 0 } tf ? tf : null;
-        if (originals.Count == 0 && view is null) return new Result("Bitte wähle ein Foto aus.", pending, 0);
+        if (originals.Count == 0 && view is null) return new Result(ctx.T("moments.upload.pickOne"), pending, 0);
         // the album: what the hosts chose (if it exists), the guests' album for a guest
         var albums = await store.AlbumsAsync(ct);
         var albumId = v.Admin
@@ -61,7 +71,7 @@ public static class MomentsUpload
         // the script's case: at most one original, plus the browser's view and tile
         if (view is not null)
         {
-            if (originals.Count > 1) return new Result("Bitte ein Foto pro Anfrage.", pending, 0);
+            if (originals.Count > 1) return new Result(ctx.T("moments.upload.onePerRequest"), pending, 0);
             var err = await SaveOneAsync(ctx, store, v, originals.FirstOrDefault(), view, thumb, r.F("name"), pending, max, albumId, ct);
             return new Result(err, pending, err is null ? 1 : 0);
         }
@@ -87,8 +97,8 @@ public static class MomentsUpload
         string name, bool pending, long max, long albumId, CancellationToken ct)
     {
         var label = M.Line(Path.GetFileName(original?.FileName ?? name ?? ""), 120);
-        if (original is not null && original.Length > max) return "„" + label + "“ ist zu groß (höchstens " + M.Size(max) + ").";
-        if (view is not null && view.Length > MaxView) return "Die Ansicht von „" + label + "“ ist zu groß.";
+        if (original is not null && original.Length > max) return ctx.T("moments.upload.tooBig", label, M.Size(ctx, max));
+        if (view is not null && view.Length > MaxView) return ctx.T("moments.upload.viewTooBig", label);
         if (thumb is not null && thumb.Length > MaxThumb) thumb = null;
 
         var orig = original is null ? null : await ReadAsync(original, ct);
@@ -96,14 +106,14 @@ public static class MomentsUpload
         if (orig is not null && origExt.Length == 0)
         {
             // HEIC and friends: the server cannot check them — with a view from the browser the view stands in, without one it is refused
-            if (view is null) return "„" + label + "“ ist kein Foto, das wir annehmen können (JPG, PNG oder WebP).";
+            if (view is null) return ctx.T("moments.upload.badType", label);
             orig = null;
         }
         var viewBytes = view is null ? null : await ReadAsync(view, ct);
-        if (viewBytes is not null && MomentsImage.Sniff(viewBytes).Length == 0) return "Die Ansicht von „" + label + "“ ist kein Bild.";
+        if (viewBytes is not null && MomentsImage.Sniff(viewBytes).Length == 0) return ctx.T("moments.upload.viewNotImage", label);
         var thumbBytes = thumb is null ? null : await ReadAsync(thumb, ct);
         if (thumbBytes is not null && MomentsImage.Sniff(thumbBytes).Length == 0) thumbBytes = null;
-        if (orig is null && viewBytes is null) return "„" + label + "“ konnte nicht gelesen werden.";
+        if (orig is null && viewBytes is null) return ctx.T("moments.upload.unreadable", label);
 
         // when it was taken: the photo's own date; else what the phone says about the file; else now
         var taken = orig is not null && origExt == ".jpg" ? MomentsImage.TakenAt(orig) : "";

@@ -15,13 +15,16 @@ public static class VereinPrint
     public const string Logo = "printLogo", Head = "printHead", Foot = "printFoot", Color = "printColor";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(Logo, "Logo", SettingKind.Image) { Group = "Druckvorlage (PDF)", Help = "Oben links auf jedem PDF (Dokumente, Einladungen, Protokolle, Teilnehmerlisten). Leer = das Logo des Instagram-Bilds, sonst das Logo der Website." })
-        .Add(new SettingSpec(Head, "Briefkopf (rechts oben)", SettingKind.List) { AddLabel = "Zeile", Help = "Die erste Zeile fett – z. B. Name des Vereins, Anschrift, Telefon, E-Mail. Leer = Name des Vereins und Adresse der Website." })
-        .Add(new SettingSpec(Foot, "Fußzeile", SettingKind.List) { AddLabel = "Zeile", Help = "Bis zu drei Zeilen unten auf jeder Seite, z. B. Bankverbindung, Registergericht, Website. Leer = Name des Vereins · Adresse der Website." })
-        .Add(new SettingSpec(Color, "Farbe", SettingKind.Color) { Default = "#334155", Help = "Titel, Überschriften und Linien." });
+        .Add(new SettingSpec(Logo, "verein.print.set.logo", SettingKind.Image) { Group = "verein.print.set.group", Help = "verein.print.set.logoHelp" })
+        .Add(new SettingSpec(Head, "verein.print.set.head", SettingKind.List) { AddLabel = "verein.print.set.line", Help = "verein.print.set.headHelp" })
+        .Add(new SettingSpec(Foot, "verein.print.set.foot", SettingKind.List) { AddLabel = "verein.print.set.line", Help = "verein.print.set.footHelp" })
+        .Add(new SettingSpec(Color, "verein.print.set.color", SettingKind.Color) { Default = "#334155", Help = "verein.print.set.colorHelp" });
 
-    /// <summary>What every page carries.</summary>
-    internal sealed record Letterhead(string Club, IReadOnlyList<string> Head, IReadOnlyList<string> Foot, (double R, double G, double B) Accent, PluginImage? Logo);
+    /// <summary>What every page carries. <c>Ctx</c> is the request the paper is made for: its words and dates are in that request's language.</summary>
+    internal sealed record Letterhead(string Club, IReadOnlyList<string> Head, IReadOnlyList<string> Foot, (double R, double G, double B) Accent, PluginImage? Logo, IPluginContext Ctx)
+    {
+        public string T(string key, params object[] args) => Ctx.T(key, args);
+    }
 
     internal static async Task<Letterhead> LetterheadAsync(IPluginContext ctx, CancellationToken ct)
     {
@@ -39,7 +42,7 @@ public static class VereinPrint
             try { logo = await ctx.Site.LoadImageAsync(url.Trim(), 600, ct); } catch { logo = null; }
             if (logo is not null) break;                                       // an SVG or a missing file gives null: try the next
         }
-        return new Letterhead(club, head, foot, Rgb(color), logo);
+        return new Letterhead(club, head, foot, Rgb(color), logo, ctx);
     }
 
     /// <summary>The site's logo — a host older than this API has no such member, which shows only when the method is compiled, hence the extra frame.</summary>
@@ -79,32 +82,35 @@ public static class VereinPrint
 
     // ---- the papers -----------------------------------------------------------------------------------------------
 
-    private static string DocKind(string k) => k switch { VereinStore.Sign => "Zum Unterschreiben", VereinStore.Read => "Zum Lesen", _ => "Zum Bestätigen" };
+    private static string DocKind(Letterhead lh, string k) => lh.T(k switch { VereinStore.Sign => "verein.print.kind.sign", VereinStore.Read => "verein.print.kind.read", _ => "verein.print.kind.confirm" });
+
+    private static string Reply(Letterhead lh, string a) => lh.T(a switch { VereinStore.Yes => "verein.print.reply.yes", VereinStore.No => "verein.print.reply.no", _ => "verein.print.reply.maybe" });
 
     /// <summary>A document. <paramref name="mine"/> = the reader's own answer (member area); <paramref name="proof"/> = everybody's answers (the board's proof).</summary>
     internal static byte[] Document(Letterhead lh, Doc d, Answer? mine = null, IReadOnlyList<(string Name, Answer? Answer)>? proof = null)
     {
+        var ctx = lh.Ctx;
         var p = new PrintLayout(lh, d.Title);
-        p.Kicker(DocKind(d.Kind) + (d.Due.Length > 0 ? " · bitte bis " + V.Date(d.Due) : ""));
+        p.Kicker(DocKind(lh, d.Kind) + (d.Due.Length > 0 ? lh.T("verein.print.dueBy", V.Date(ctx, d.Due)) : ""));
         p.Title(d.Title);
-        p.Facts(("Datum", d.Created is DateTime cr ? V.Stamp(cr)[..10] : ""), ("Anlage", d.FileName.Length > 0 ? d.FileName + " (im Mitgliederbereich)" : ""));
+        p.Facts((lh.T("verein.print.date"), V.Day(ctx, d.Created)), (lh.T("verein.print.attachment"), d.FileName.Length > 0 ? lh.T("verein.print.inMemberArea", d.FileName) : ""));
         p.Body(d.Body);
         if (mine is not null)
             p.Box(mine.Status == VereinStore.Accepted
-                ? (d.Kind == VereinStore.Sign ? "Elektronisch unterschrieben als „" + mine.Signature + "“" : d.Kind == VereinStore.Read ? "Gelesen" : "Bestätigt") + " am " + V.Stamp(mine.At) + "."
-                : "Abgelehnt am " + V.Stamp(mine.At) + ".");
+                ? lh.T(d.Kind == VereinStore.Sign ? "verein.print.mine.signed" : d.Kind == VereinStore.Read ? "verein.print.mine.read" : "verein.print.mine.confirmed", V.Stamp(ctx, mine.At), mine.Signature)
+                : lh.T("verein.print.mine.declined", V.Stamp(ctx, mine.At)));
         else if (proof is null && d.Kind == VereinStore.Sign)
-            p.Signatures("Ort, Datum", "Unterschrift");
+            p.Signatures(lh.T("verein.print.placeDate"), lh.T("verein.print.signature"));
         if (proof is not null)
         {
             var done = proof.Count(x => x.Answer is not null);
-            p.Heading("Nachweis (" + done + " von " + proof.Count + " geantwortet)");
-            p.Table(new[] { "Name", "Antwort", "Unterschrift", "Wann" }, new[] { 0.32, 0.18, 0.28, 0.22 },
+            p.Heading(lh.T("verein.print.proof", done, proof.Count));
+            p.Table(new[] { lh.T("verein.print.col.name"), lh.T("verein.print.col.answer"), lh.T("verein.print.signature"), lh.T("verein.print.col.when") }, new[] { 0.32, 0.18, 0.28, 0.22 },
                 proof.Select(x => new[]
                 {
                     x.Name,
-                    x.Answer is null ? "offen" : x.Answer.Status == VereinStore.Accepted ? (d.Kind == VereinStore.Read ? "gelesen" : d.Kind == VereinStore.Sign ? "unterschrieben" : "bestätigt") : "abgelehnt",
-                    x.Answer?.Signature ?? "", V.Stamp(x.Answer?.At)
+                    lh.T(x.Answer is null ? "verein.print.open" : x.Answer.Status == VereinStore.Accepted ? (d.Kind == VereinStore.Read ? "verein.print.ans.read" : d.Kind == VereinStore.Sign ? "verein.print.ans.signed" : "verein.print.ans.confirmed") : "verein.print.ans.declined"),
+                    x.Answer?.Signature ?? "", V.Stamp(ctx, x.Answer?.At)
                 }).ToList());
         }
         return p.ToBytes();
@@ -113,14 +119,14 @@ public static class VereinPrint
     /// <summary>Who takes part in an event: counts, then everybody with their answer and a box to tick on the day.</summary>
     internal static byte[] Participants(Letterhead lh, Event e, IReadOnlyList<(Person P, EventReply? R)> list)
     {
-        var p = new PrintLayout(lh, "Teilnehmer: " + e.Title);
-        p.Kicker("Teilnehmerliste" + (e.Kind.Length > 0 ? " · " + e.Kind : ""));
+        var p = new PrintLayout(lh, lh.T("verein.print.participantsTitle", e.Title));
+        p.Kicker(lh.T("verein.print.participants") + (e.Kind.Length > 0 ? " · " + e.Kind : ""));
         p.Title(e.Title);
         int N(string a) => list.Count(x => x.R?.Answer == a);
-        p.Facts(("Wann", V.When(e.Starts)), ("Wo", e.Place), ("Treffpunkt", e.Meeting),
-            ("Stand", N(VereinStore.Yes) + " dabei · " + N(VereinStore.Maybe) + " unsicher · " + N(VereinStore.No) + " nicht dabei · " + list.Count(x => x.R is null) + " offen"));
-        p.Table(new[] { "Name", "Antwort", "Bemerkung", "Da" }, new[] { 0.36, 0.2, 0.36, 0.08 },
-            list.Select(x => new[] { x.P.Name + (x.P.Child ? " (Kind)" : ""), x.R is null ? "offen" : VereinPublic.ReplyLabel(x.R.Answer), x.R?.Note ?? "", "[   ]" }).ToList());
+        p.Facts((lh.T("verein.print.col.when"), V.When(lh.Ctx, e.Starts)), (lh.T("verein.print.where"), e.Place), (lh.T("verein.print.meetingPoint"), e.Meeting),
+            (lh.T("verein.print.state"), lh.T("verein.print.counts", N(VereinStore.Yes), N(VereinStore.Maybe), N(VereinStore.No), list.Count(x => x.R is null))));
+        p.Table(new[] { lh.T("verein.print.col.name"), lh.T("verein.print.col.answer"), lh.T("verein.print.col.note"), lh.T("verein.print.col.there") }, new[] { 0.36, 0.2, 0.36, 0.08 },
+            list.Select(x => new[] { x.P.Name + (x.P.Child ? lh.T("verein.print.child") : ""), x.R is null ? lh.T("verein.print.open") : Reply(lh, x.R.Answer), x.R?.Note ?? "", "[   ]" }).ToList());
         return p.ToBytes();
     }
 
@@ -128,16 +134,17 @@ public static class VereinPrint
     internal static byte[] Plan(Letterhead lh, string heading, string period, IReadOnlyList<Event> list)
     {
         var p = new PrintLayout(lh, heading);
-        p.Kicker("Termine · " + period);
+        var ctx = lh.Ctx;
+        p.Kicker(lh.T("verein.print.events") + " · " + period);
         p.Title(heading);
         static string Time(Event e) => e.Starts.Length >= 16 && e.Starts[11..16] != "00:00" ? e.Starts[11..16] + (e.Ends.Length >= 16 && e.Ends[..10] == e.Day ? "–" + e.Ends[11..16] : "") : "";
-        if (list.Count == 0) p.Body("In diesem Zeitraum stehen keine Termine an.");
+        if (list.Count == 0) p.Body(lh.T("verein.print.noEvents"));
         else
-            p.Table(new[] { "Datum", "Zeit", "Termin", "Ort" }, new[] { 0.18, 0.1, 0.41, 0.31 },
+            p.Table(new[] { lh.T("verein.print.date"), lh.T("verein.print.col.time"), lh.T("verein.print.col.event"), lh.T("verein.print.col.place") }, new[] { 0.18, 0.1, 0.41, 0.31 },
                 list.Select(e => new[]
                 {
-                    V.Badge(e.Starts).Weekday + " " + V.Date(e.Day) + (e.Ends.Length >= 10 && e.Ends[..10] != e.Day ? " – " + V.Date(e.Ends[..10]) : ""),
-                    Time(e), e.Title + (e.Kind.Length > 0 ? " (" + e.Kind + ")" : "") + (e.Public ? "" : " · intern"), e.Place
+                    V.Badge(ctx, e.Starts).Weekday + " " + V.Date(ctx, e.Day) + (e.Ends.Length >= 10 && e.Ends[..10] != e.Day ? " – " + V.Date(ctx, e.Ends[..10]) : ""),
+                    Time(e), e.Title + (e.Kind.Length > 0 ? " (" + e.Kind + ")" : "") + (e.Public ? "" : lh.T("verein.print.internal")), e.Place
                 }).ToList());
         return p.ToBytes();
     }
@@ -145,21 +152,22 @@ public static class VereinPrint
     /// <summary>A meeting: the invitation with its agenda, or (<paramref name="minutes"/>) the minutes with places to sign.</summary>
     internal static byte[] Meeting(Letterhead lh, Meeting m, bool minutes)
     {
-        var p = new PrintLayout(lh, (minutes ? "Protokoll: " : "Einladung: ") + m.Title);
-        p.Kicker(minutes ? "Protokoll" + (m.MinutesStatus == VereinStore.Final ? "" : " · Entwurf") : "Einladung" + (m.Kind.Length > 0 ? " · " + m.Kind : ""));
+        var p = new PrintLayout(lh, lh.T(minutes ? "verein.print.minutesTitle" : "verein.print.invitationTitle", m.Title));
+        p.Kicker(minutes ? lh.T("verein.print.minutes") + (m.MinutesStatus == VereinStore.Final ? "" : lh.T("verein.print.draft")) : lh.T("verein.print.invitation") + (m.Kind.Length > 0 ? " · " + m.Kind : ""));
         p.Title(m.Title);
-        p.Facts(("Wann", V.When(m.Starts)), ("Wo", m.Place), ("Art", minutes ? m.Kind : ""), ("Status", m.Status == VereinStore.Cancelled ? "abgesagt" : ""));
+        p.Facts((lh.T("verein.print.col.when"), V.When(lh.Ctx, m.Starts)), (lh.T("verein.print.where"), m.Place), (lh.T("verein.print.kind"), minutes ? m.Kind : ""),
+            (lh.T("verein.print.status"), m.Status == VereinStore.Cancelled ? lh.T("verein.print.cancelled") : ""));
         if (!minutes)
         {
-            p.Heading("Tagesordnung");
-            p.Body(m.Agenda.Trim().Length > 0 ? m.Agenda : "Die Tagesordnung folgt.");
+            p.Heading(lh.T("verein.print.agenda"));
+            p.Body(m.Agenda.Trim().Length > 0 ? m.Agenda : lh.T("verein.print.agendaFollows"));
         }
         else
         {
-            if (m.Agenda.Trim().Length > 0) { p.Heading("Tagesordnung"); p.Body(m.Agenda); }
-            p.Heading("Protokoll");
-            p.Body(m.Minutes.Trim().Length > 0 ? m.Minutes : "(noch kein Protokoll)");
-            p.Signatures("Sitzungsleitung", "Protokollführung");
+            if (m.Agenda.Trim().Length > 0) { p.Heading(lh.T("verein.print.agenda")); p.Body(m.Agenda); }
+            p.Heading(lh.T("verein.print.minutes"));
+            p.Body(m.Minutes.Trim().Length > 0 ? m.Minutes : lh.T("verein.print.noMinutes"));
+            p.Signatures(lh.T("verein.print.chair"), lh.T("verein.print.recorder"));
         }
         return p.ToBytes();
     }
@@ -356,14 +364,14 @@ internal sealed class PrintLayout
 
     public byte[] ToBytes()
     {
-        var stand = "Stand: " + V.Date(V.Today);
+        var stand = _lh.T("verein.print.asOf", V.Date(_lh.Ctx, V.Today));
         for (var i = 0; i < _pdf.Pages.Count; i++)
         {
             var p = _pdf.Pages[i];
             p.Line(Left, 792, Right, 792, 0.4, 0.8);
             var y = 804.0;
             foreach (var f in _lh.Foot.SelectMany(f => PdfWriter.Wrap(f, Right - Left - 90, 7.5, false)).Take(3)) { p.Text(Left, y, f, 7.5, false, 0.4); y += 10; }
-            p.TextRight(Right, 804, "Seite " + (i + 1).ToString(CultureInfo.InvariantCulture) + " / " + _pdf.Pages.Count.ToString(CultureInfo.InvariantCulture), 7.5, false, 0.4);
+            p.TextRight(Right, 804, _lh.T("verein.print.page", (i + 1).ToString(CultureInfo.InvariantCulture), _pdf.Pages.Count.ToString(CultureInfo.InvariantCulture)), 7.5, false, 0.4);
             p.TextRight(Right, 814, stand, 7.5, false, 0.4);
         }
         return _pdf.ToBytes();

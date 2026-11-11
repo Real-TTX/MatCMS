@@ -21,8 +21,8 @@ public static class VereinPhoto
     /// <summary>Stores the uploaded picture for the person (replacing an earlier one). Returns an error text, or null.</summary>
     public static async Task<string?> SaveAsync(IPluginContext ctx, VereinStore store, Person p, UploadedFile? up, CancellationToken ct)
     {
-        if (up is null || up.Length == 0) return "Bitte ein Bild auswählen.";
-        if (up.Length > MaxBytes) return "Das Bild ist zu groß (höchstens 8 MB).";
+        if (up is null || up.Length == 0) return ctx.T("verein.photo.choose");
+        if (up.Length > MaxBytes) return ctx.T("verein.photo.tooBig");
         byte[] bytes;
         using (var s = up.OpenRead()) using (var ms = new MemoryStream())
         {
@@ -30,7 +30,7 @@ public static class VereinPhoto
             bytes = ms.ToArray();
         }
         var ext = Sniff(bytes);
-        if (ext.Length == 0) return "Bitte ein Foto als JPG, PNG oder WebP hochladen.";
+        if (ext.Length == 0) return ctx.T("verein.photo.type");
         var file = "a/" + Guid.NewGuid().ToString("N") + ext;
         using (var ms = new MemoryStream(bytes)) await ctx.Files.SaveAsync(file, ms, ct);
         if (p.Photo.Length > 0) await ctx.Files.DeleteAsync(p.Photo, ct);

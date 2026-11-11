@@ -27,7 +27,7 @@ public static class VereinIcal
     private static async Task<PluginResult> PublicAsync(IPluginContext ctx, CancellationToken ct)
     {
         var events = (await new VereinStore(ctx.Data).EventsAsync(ct)).Where(e => !e.Draft && e.Public);
-        return Calendar(ctx, VereinSettings.Club(ctx) + " – Termine", events, Array.Empty<Meeting>());
+        return Calendar(ctx, ctx.T("verein.ical.public", VereinSettings.Club(ctx)), events, Array.Empty<Meeting>());
     }
 
     private static async Task<PluginResult> PersonalAsync(IPluginContext ctx, CancellationToken ct)
@@ -42,7 +42,7 @@ public static class VereinIcal
         var board = p.Roles.Any(r => boardRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
         var events = (await store.EventsAsync(ct)).Where(e => !e.Draft);
         var meetings = (await store.MeetingsAsync(ct)).Where(m => board || VereinStore.InAudience(p, m.Audience, boardRoles));
-        return Calendar(ctx, VereinSettings.Club(ctx) + " – meine Termine", events, meetings);
+        return Calendar(ctx, ctx.T("verein.ical.mine", VereinSettings.Club(ctx)), events, meetings);
     }
 
     /// <summary>The calendar; with <paramref name="download"/> as a file to open (one event: "add to calendar"), else as a feed to subscribe to.</summary>
@@ -60,11 +60,11 @@ public static class VereinIcal
             if (!V.TryParse(e.Starts, out var start, out var hasTime)) continue;
             L("BEGIN:VEVENT"); L("UID:event-" + e.Id + "@" + host); L("DTSTAMP:" + stamp);
             Times(L, start, hasTime, e.Ends, 2);
-            L("SUMMARY:" + Esc(e.Title + (e.Cancelled ? " (abgesagt)" : "")));
+            L("SUMMARY:" + Esc(e.Title + (e.Cancelled ? ctx.T("verein.ical.cancelled") : "")));
             if (e.Place.Length > 0) L("LOCATION:" + Esc(e.Place));
             var desc = new List<string>();
             if (e.Description.Length > 0) desc.Add(e.Description);
-            if (e.Meeting.Length > 0 && !e.Public) desc.Add("Treffpunkt: " + e.Meeting);
+            if (e.Meeting.Length > 0 && !e.Public) desc.Add(ctx.T("verein.ical.meetingPoint", e.Meeting));
             if (desc.Count > 0) L("DESCRIPTION:" + Esc(string.Join("\n\n", desc)));
             if (origin.Length > 0) L("URL:" + origin + (e.Public ? "/" : VereinPublic.Base + "/termine/" + e.Id));
             if (e.Cancelled) L("STATUS:CANCELLED");
@@ -75,9 +75,9 @@ public static class VereinIcal
             if (!V.TryParse(m.Starts, out var start, out var hasTime)) continue;
             L("BEGIN:VEVENT"); L("UID:meeting-" + m.Id + "@" + host); L("DTSTAMP:" + stamp);
             Times(L, start, hasTime, "", 2);
-            L("SUMMARY:" + Esc(m.Title + (m.Status == VereinStore.Cancelled ? " (abgesagt)" : "")));
+            L("SUMMARY:" + Esc(m.Title + (m.Status == VereinStore.Cancelled ? ctx.T("verein.ical.cancelled") : "")));
             if (m.Place.Length > 0) L("LOCATION:" + Esc(m.Place));
-            if (m.Agenda.Length > 0) L("DESCRIPTION:" + Esc("Tagesordnung:\n" + m.Agenda));
+            if (m.Agenda.Length > 0) L("DESCRIPTION:" + Esc(ctx.T("verein.ical.agenda") + "\n" + m.Agenda));
             if (origin.Length > 0) L("URL:" + origin + VereinPublic.Base + "/sitzungen/" + m.Id);
             if (m.Status == VereinStore.Cancelled) L("STATUS:CANCELLED");
             L("END:VEVENT");

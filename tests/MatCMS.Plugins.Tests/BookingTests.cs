@@ -53,6 +53,8 @@ public sealed class BookingApp : IDisposable
             }
             var c = App.Browser();
             await AppFactory.LoginAsync(c);
+            // The back office is English until its user chooses otherwise; the texts the tests look for are German.
+            await c.PostAsync("/set-language?culture=de", new StringContent(""));
             await SetUpAsync(c);
             _admin = c;
             return c;
@@ -121,6 +123,24 @@ public sealed class BookingTests(BookingApp app) : IClassFixture<BookingApp>
         var d = new DateOnly(year, month, 1);
         while (d.DayOfWeek != DayOfWeek.Saturday) d = d.AddDays(1);
         return d;
+    }
+
+    [Fact]
+    public async Task An_english_page_and_an_english_back_office_get_english_words()
+    {
+        await app.AdminAsync();
+        // the price answer under /en/: the bill's lines and the refusals in English, the money still written the German way
+        var res = await app.App.Browser().GetAsync($"/en/buchung/preis?einheit={app.Ids["a1"]}&anreise=2030-03-04&abreise=2030-03-07&erwachsene=5");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        var q = JsonNode.Parse(await res.Content.ReadAsStringAsync())!;
+        Assert.Contains("3 nights Nebensaison=30000", Lines(q));
+        Assert.Contains("sleeps at most 4 people", Problems(q));
+        // an admin who never chose German gets the English back office
+        var en = app.App.Browser();
+        await AppFactory.LoginAsync(en);
+        var page = await en.GetStringAsync("/admin/p/booking/check");
+        Assert.DoesNotContain("Preis prüfen", page);
+        Assert.Contains("Check price", page);
     }
 
     [Fact]

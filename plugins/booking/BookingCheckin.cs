@@ -35,21 +35,21 @@ public static class BookingCheckin
     /// <summary>What a country asks: the fields for everybody and the ones only for the first (main) traveller.</summary>
     public static readonly Dictionary<string, (string Label, string[] All, string[] MainOnly)> Profiles = new()
     {
-        ["simple"] = ("Einfach (Name, Geburtsdatum, Staatsangehörigkeit)", new[] { "first", "last", "born", "nationality" }, Array.Empty<string>()),
-        ["hr"] = ("Kroatien (eVisitor)", new[] { "first", "last", "gender", "born", "nationality", "res_country", "city", "doc_type", "doc_no" }, Array.Empty<string>()),
-        ["de"] = ("Deutschland/Österreich (Meldeschein)", new[] { "first", "last", "born", "nationality" }, new[] { "street", "zip", "city", "res_country" }),
-        ["it"] = ("Italien (Alloggiati Web)", new[] { "first", "last", "gender", "born", "birthplace", "nationality", "doc_type", "doc_no" }, Array.Empty<string>())
+        ["simple"] = ("booking.checkin.profile.simple", new[] { "first", "last", "born", "nationality" }, Array.Empty<string>()),
+        ["hr"] = ("booking.checkin.profile.hr", new[] { "first", "last", "gender", "born", "nationality", "res_country", "city", "doc_type", "doc_no" }, Array.Empty<string>()),
+        ["de"] = ("booking.checkin.profile.de", new[] { "first", "last", "born", "nationality" }, new[] { "street", "zip", "city", "res_country" }),
+        ["it"] = ("booking.checkin.profile.it", new[] { "first", "last", "gender", "born", "birthplace", "nationality", "doc_type", "doc_no" }, Array.Empty<string>())
     };
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(ProfileKey, "Meldedaten", SettingKind.Choice)
+        .Add(new SettingSpec(ProfileKey, "booking.checkin.set.profile", SettingKind.Choice)
         {
-            Group = "Check-in und Gästemails", Default = "auto",
-            Options = new[] { new FieldOption("auto", "nach dem Land des Objekts") }.Concat(Profiles.Select(p => new FieldOption(p.Key, p.Value.Label))).ToArray(),
-            Help = "Welche Angaben der Online-Check-in je Person verlangt."
+            Group = "booking.checkin.group", Default = "auto",
+            Options = new[] { new FieldOption("auto", "booking.checkin.set.auto") }.Concat(Profiles.Select(p => new FieldOption(p.Key, p.Value.Label))).ToArray(),
+            Help = "booking.checkin.set.profileHelp"
         })
-        .Add(new SettingSpec(DaysKey, "Check-in-Link (Tage vor Anreise)", SettingKind.Number) { Default = "7", Min = 1, Max = 60 })
-        .Add(new SettingSpec(RetentionKey, "Meldedaten löschen nach (Monaten)", SettingKind.Number) { Default = "12", Min = 1, Max = 120, Help = "Gezählt ab der Abreise. Die Buchung bleibt, nur die Angaben der Personen werden gelöscht." });
+        .Add(new SettingSpec(DaysKey, "booking.checkin.set.days", SettingKind.Number) { Default = "7", Min = 1, Max = 60 })
+        .Add(new SettingSpec(RetentionKey, "booking.checkin.set.retention", SettingKind.Number) { Default = "12", Min = 1, Max = 120, Help = "booking.checkin.set.retentionHelp" });
 
     public static string ProfileFor(IPluginContext ctx, Property? house)
     {
@@ -62,6 +62,21 @@ public static class BookingCheckin
         Profiles[profile].All.Concat(idx == 0 ? Profiles[profile].MainOnly : Array.Empty<string>());
 
     public static string Label(string key) => Fields.FirstOrDefault(f => f.Key == key).Label ?? key;
+
+    /// <summary>A field's label in the language of a request (the stored values themselves stay as they are).</summary>
+    public static string Label(Tr t, string key) => Fields.Any(f => f.Key == key) ? t("booking.checkin.f." + key) : key;
+
+    // the words shown for the stored choices of the select fields and the arrival times (the stored value is the German one)
+    private static readonly Dictionary<string, string> OptionKeys = new()
+    {
+        ["weiblich"] = "booking.checkin.opt.female", ["männlich"] = "booking.checkin.opt.male", ["divers"] = "booking.checkin.opt.diverse",
+        ["Personalausweis"] = "booking.checkin.opt.idcard", ["Reisepass"] = "booking.checkin.opt.passport"
+    };
+
+    private static string OptionText(Tr t, string value) => OptionKeys.TryGetValue(value, out var k) ? t(k) : value;
+
+    private static string ArrivalText(Tr t, string value) =>
+        Array.IndexOf(ArrivalTimes, value) is var i and > 0 ? t("booking.checkin.arr." + i.ToString(CultureInfo.InvariantCulture)) : value;
 
     // ---- data -------------------------------------------------------------------------------------------------------
 
@@ -139,8 +154,9 @@ public static class BookingCheckin
     public static readonly string[] ArrivalTimes = { "", "vor 14 Uhr (nach Absprache)", "14–16 Uhr", "16–18 Uhr", "18–20 Uhr", "20–22 Uhr", "nach 22 Uhr" };
 
     /// <summary>Reads the posted travellers. Returns them, or the first problem in words.</summary>
-    public static (List<Traveller> People, string? Problem) Read(RequestData f, string profile, int count)
+    public static (List<Traveller> People, string? Problem) Read(RequestData f, string profile, int count, Tr? tr = null)
     {
+        var t = tr ?? BookingStrings.German;
         var list = new List<Traveller>();
         for (var i = 0; i < count; i++)
         {
@@ -149,9 +165,9 @@ public static class BookingCheckin
             {
                 var v = B.Clip(f.F("t" + i + "_" + key), 120);
                 var def = Fields.First(x => x.Key == key);
-                if (v.Length == 0) return (list, "Bitte bei Person " + (i + 1) + " „" + def.Label + "“ angeben.");
-                if (def.Kind == "date" && (B.Day(v) is not { } d || d > B.Today || d < B.Today.AddYears(-120))) return (list, "Bitte bei Person " + (i + 1) + " ein gültiges Geburtsdatum angeben.");
-                if (def.Kind == "select" && !def.Options.Contains(v)) return (list, "Bitte bei Person " + (i + 1) + " „" + def.Label + "“ auswählen.");
+                if (v.Length == 0) return (list, t("booking.checkin.errMissing", i + 1, Label(t, key)));
+                if (def.Kind == "date" && (B.Day(v) is not { } d || d > B.Today || d < B.Today.AddYears(-120))) return (list, t("booking.checkin.errBorn", i + 1));
+                if (def.Kind == "select" && !def.Options.Contains(v)) return (list, t("booking.checkin.errChoose", i + 1, Label(t, key)));
                 values[key] = v;
             }
             list.Add(new Traveller(i, values));
@@ -160,25 +176,27 @@ public static class BookingCheckin
     }
 
     /// <summary>The form's HTML (the guest page's look — the site's variables). Prefilled from what was entered or remembered.</summary>
-    public static string Form(string profile, int count, IReadOnlyList<Traveller> prefill, string arrivalTime, string travel, string antiforgery, string? problem)
+    public static string Form(string profile, int count, IReadOnlyList<Traveller> prefill, string arrivalTime, string travel, string antiforgery, string? problem, Tr? tr = null)
     {
+        var tx = tr ?? BookingStrings.German;
         var sb = new StringBuilder();
         if (problem is not null) sb.Append("<p class=\"bk-alert\">").Append(B.H(problem)).Append("</p>");
         sb.Append("<form method=\"post\" class=\"bk-form\">").Append(antiforgery).Append("<input type=\"hidden\" name=\"action\" value=\"checkin\">");
         for (var i = 0; i < count; i++)
         {
             var t = prefill.FirstOrDefault(x => x.Idx == i);
-            sb.Append("<fieldset class=\"bk-card\"><legend><strong>Person ").Append(i + 1).Append(i == 0 ? " (Hauptgast)" : "").Append("</strong></legend><div class=\"bk-row\">");
+            sb.Append("<fieldset class=\"bk-card\"><legend><strong>").Append(tx("booking.checkin.person", i + 1)).Append(i == 0 ? " " + tx("booking.checkin.mainGuest") : "").Append("</strong></legend><div class=\"bk-row\">");
             foreach (var key in FieldsOf(profile, i))
             {
                 var def = Fields.First(x => x.Key == key);
                 var name = "t" + i + "_" + key;
                 var value = t?.Get(key) ?? "";
-                sb.Append("<label>").Append(B.H(def.Label));
+                sb.Append("<label>").Append(B.H(Label(tx, key)));
                 if (def.Kind == "select")
                 {
-                    sb.Append("<select name=\"").Append(name).Append("\" required><option value=\"\">bitte wählen</option>");
-                    foreach (var o in def.Options) sb.Append("<option").Append(o == value ? " selected" : "").Append('>').Append(B.H(o)).Append("</option>");
+                    sb.Append("<select name=\"").Append(name).Append("\" required><option value=\"\">").Append(tx("booking.checkin.choose")).Append("</option>");
+                    foreach (var o in def.Options)
+                        sb.Append("<option value=\"").Append(B.H(o)).Append('"').Append(o == value ? " selected" : "").Append('>').Append(B.H(OptionText(tx, o))).Append("</option>");
                     sb.Append("</select>");
                 }
                 else sb.Append("<input name=\"").Append(name).Append("\" type=\"").Append(def.Kind == "date" ? "date" : "text").Append("\" value=\"").Append(B.H(value)).Append("\" required maxlength=\"120\">");
@@ -186,11 +204,11 @@ public static class BookingCheckin
             }
             sb.Append("</div></fieldset>");
         }
-        sb.Append("<div class=\"bk-row\"><label>Voraussichtliche Ankunft<select name=\"arrival_time\">");
-        foreach (var a in ArrivalTimes) sb.Append("<option").Append(a == arrivalTime ? " selected" : "").Append(" value=\"").Append(B.H(a)).Append("\">").Append(a.Length == 0 ? "noch unklar" : B.H(a)).Append("</option>");
-        sb.Append("</select></label><label>Anreise mit (z. B. Auto mit Kennzeichen, Fähre, Flug)<input name=\"travel\" maxlength=\"200\" value=\"").Append(B.H(travel)).Append("\"></label></div>");
-        sb.Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"remember\" value=\"1\"> <span>Für meinen nächsten Aufenthalt merken (sonst werden die Angaben nach der gesetzlichen Frist gelöscht).</span></label>");
-        sb.Append("<p><button class=\"btn bk-btn\" type=\"submit\">Check-in absenden</button></p></form>");
+        sb.Append("<div class=\"bk-row\"><label>").Append(tx("booking.checkin.expectedArrival")).Append("<select name=\"arrival_time\">");
+        foreach (var a in ArrivalTimes) sb.Append("<option").Append(a == arrivalTime ? " selected" : "").Append(" value=\"").Append(B.H(a)).Append("\">").Append(a.Length == 0 ? tx("booking.checkin.unclear") : B.H(ArrivalText(tx, a))).Append("</option>");
+        sb.Append("</select></label><label>").Append(tx("booking.checkin.travel")).Append("<input name=\"travel\" maxlength=\"200\" value=\"").Append(B.H(travel)).Append("\"></label></div>");
+        sb.Append("<label class=\"bk-check\"><input type=\"checkbox\" name=\"remember\" value=\"1\"> <span>").Append(tx("booking.checkin.remember")).Append("</span></label>");
+        sb.Append("<p><button class=\"btn bk-btn\" type=\"submit\">").Append(tx("booking.checkin.submit")).Append("</button></p></form>");
         return sb.ToString();
     }
 
@@ -199,9 +217,11 @@ public static class BookingCheckin
     private static string C(string s) { s ??= ""; if (s.Length > 0 && "=+-@".Contains(s[0])) s = "'" + s; return "\"" + s.Replace("\"", "\"\"") + "\""; }
 
     /// <summary>The registration list as CSV: one row per traveller, all fields (empty where the country does not ask), the stay in front.</summary>
-    public static string Csv(IEnumerable<(Booking B, string Unit, IReadOnlyList<Traveller> People)> stays)
+    public static string Csv(IEnumerable<(Booking B, string Unit, IReadOnlyList<Traveller> People)> stays, Tr? tr = null)
     {
-        var sb = new StringBuilder("﻿" + string.Join(";", new[] { "Anreise", "Abreise", "Unterkunft", "Buchung", "Person" }.Concat(Fields.Select(f => f.Label)).Select(C)) + "\r\n");
+        var tx = tr ?? BookingStrings.German;
+        var head = new[] { tx("booking.public.arrival"), tx("booking.public.departure"), tx("booking.checkin.unit"), tx("booking.checkin.booking"), tx("booking.checkin.personCol") };
+        var sb = new StringBuilder("﻿" + string.Join(";", head.Concat(Fields.Select(f => Label(tx, f.Key))).Select(C)) + "\r\n");
         foreach (var (b, unit, people) in stays)
             foreach (var t in people)
                 sb.Append(string.Join(";", new[] { B.Date(b.Arrival), B.Date(b.Departure), unit, b.Number, B.Num(t.Idx + 1) }
@@ -210,24 +230,25 @@ public static class BookingCheckin
     }
 
     /// <summary>A registration form as PDF: the stay, every traveller, the main guest's address, a line to sign.</summary>
-    internal static byte[] Pdf(BookingPrint.Letterhead lh, Booking b, Unit? unit, Property? house, string profile, IReadOnlyList<Traveller> people)
+    internal static byte[] Pdf(BookingPrint.Letterhead lh, Booking b, Unit? unit, Property? house, string profile, IReadOnlyList<Traveller> people, Tr? tr = null)
     {
-        var p = new PrintLayout(lh, "Meldeschein " + b.Number);
-        p.Kicker("Meldeschein · Gästeliste · Nr. " + b.Number);
-        p.Title(unit?.Name ?? "Unterkunft");
-        p.Facts(("Objekt", house is null ? "" : house.Name + (house.Address.Length > 0 ? ", " + house.Address.Replace("\n", ", ") : "")),
-            ("Anreise", B.Date(b.Arrival)), ("Abreise", B.Date(b.Departure)), ("Personen", B.Num(people.Count)));
+        var t = tr ?? BookingStrings.German;
+        var p = new PrintLayout(lh, t("booking.checkin.form", b.Number));
+        p.Kicker(t("booking.checkin.formKicker", b.Number));
+        p.Title(unit?.Name ?? t("booking.checkin.unit"));
+        p.Facts((t("booking.checkin.property"), house is null ? "" : house.Name + (house.Address.Length > 0 ? ", " + house.Address.Replace("\n", ", ") : "")),
+            (t("booking.public.arrival"), B.Date(b.Arrival)), (t("booking.public.departure"), B.Date(b.Departure)), (t("booking.checkin.persons"), B.Num(people.Count)));
         var cols = Profiles[profile].All.Where(k => k is not ("first" or "last")).ToList();
         var share = 0.7 / Math.Max(1, cols.Count);
-        p.Table(new[] { "Name" }.Concat(cols.Select(Label)).ToArray(), new[] { 0.3 }.Concat(cols.Select(_ => share)).ToArray(),
+        p.Table(new[] { t("booking.checkin.name") }.Concat(cols.Select(k => Label(t, k))).ToArray(), new[] { 0.3 }.Concat(cols.Select(_ => share)).ToArray(),
             people.Select(t => new[] { t.Name }.Concat(cols.Select(k => k == "born" ? B.Date(t.Get(k)) : t.Get(k))).ToArray()).ToList());
         var main = people.FirstOrDefault();
         if (main is not null && Profiles[profile].MainOnly.Length > 0)
         {
-            p.Heading("Anschrift des Hauptgastes");
+            p.Heading(t("booking.checkin.mainAddress"));
             p.Body(string.Join("\n", new[] { main.Name, main.Get("street"), (main.Get("zip") + " " + main.Get("city")).Trim(), main.Get("res_country") }.Where(x => x.Length > 0)));
         }
-        p.Signatures("Ort, Datum", "Unterschrift des Gastes");
+        p.Signatures(t("booking.checkin.placeDate"), t("booking.checkin.signature"));
         return p.ToBytes();
     }
 }

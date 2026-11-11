@@ -23,30 +23,30 @@ public static class VereinSettings
     /// second list of role names (<see cref="BoardRoles"/>, no longer offered); it is now a tick per role and the old list is read until roles are saved.
     /// </summary>
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(ClubName, "Name des Vereins") { Group = "Allgemein", Help = "Erscheint im Mitgliederbereich, in den E-Mails und auf dem Briefkopf. Leer = Name der Website." })
-        .Text(ReplyTo, "Antwortadresse der E-Mails", "", "Wer auf eine E-Mail des Vereins antwortet, schreibt an diese Adresse (z. B. die des Vorstands).")
-        .Text(EventsTitle, "Überschrift der Termine", "Kommende Termine", "Über dem Block „Vereinstermine“ auf der Website, wenn der Block keine eigene hat.")
-        .Bool(AskDefault, "Neue Termine fragen die Teilnahme ab", false, "An: Bei jedem neuen Termin ist „Mitglieder sollen zu- oder absagen“ schon angehakt. Eine E-Mail geht erst raus, wenn beim Termin „Abfrage per E-Mail senden“ gedrückt wird.")
-        .Add(new SettingSpec(Roles, "Rollen", SettingKind.List)
+        .Add(new SettingSpec(ClubName, "verein.set.clubName") { Group = "verein.set.groupGeneral", Help = "verein.set.clubNameHelp" })
+        .Text(ReplyTo, "verein.set.replyTo", "", "verein.set.replyToHelp")
+        .Text(EventsTitle, "verein.set.eventsTitle", "Kommende Termine", "verein.set.eventsTitleHelp")
+        .Bool(AskDefault, "verein.set.askDefault", false, "verein.set.askDefaultHelp")
+        .Add(new SettingSpec(Roles, "verein.set.roles", SettingKind.List)
         {
-            Group = "Rollen & Felder", Default = DefaultRoles, AddLabel = "Rolle",
-            Help = "Ein Mitglied kann mehrere Rollen haben. Wer eine Vorstandsrolle hat, sieht im Mitgliederbereich die Übersichten (wer hat bestätigt, wer kommt) und alle Mitglieder.",
-            Columns = new[] { new SettingColumn("name", "Rolle") { Placeholder = "z. B. Kassierer/in" }, new SettingColumn("board", "Vorstand") { Kind = UiRowCell.Check, On = BoardMark, Off = "", Width = "7em" } }
+            Group = "verein.set.groupRoles", Default = DefaultRoles, AddLabel = "verein.set.role",
+            Help = "verein.set.rolesHelp",
+            Columns = new[] { new SettingColumn("name", "verein.set.role") { Placeholder = "verein.set.rolePlaceholder" }, new SettingColumn("board", "verein.set.board") { Kind = UiRowCell.Check, On = BoardMark, Off = "", Width = "7em" } }
         })
-        .Add(new SettingSpec(CustomFields, "Eigene Felder", SettingKind.List)
+        .Add(new SettingSpec(CustomFields, "verein.set.fields", SettingKind.List)
         {
-            AddLabel = "Feld",
-            Help = "Zusätzliche Angaben je Mitglied (z. B. Mitgliedsnummer, Instrument, Spielklasse, Häs-Nummer). Ohne Haken sieht ein Feld nur der Vorstand; auf der Website erscheint es nie. Umbenennen beginnt das Feld leer.",
-            Columns = new[] { new SettingColumn("name", "Feld") { Placeholder = "z. B. Mitgliedsnummer" }, new SettingColumn("all", "Alle sehen es") { Kind = UiRowCell.Check, On = "alle", Off = "vorstand", Width = "9em" } }
+            AddLabel = "verein.set.field",
+            Help = "verein.set.fieldsHelp",
+            Columns = new[] { new SettingColumn("name", "verein.set.field") { Placeholder = "verein.set.fieldPlaceholder" }, new SettingColumn("all", "verein.set.fieldAll") { Kind = UiRowCell.Check, On = "alle", Off = "vorstand", Width = "9em" } }
         })
-        .Add(new SettingSpec(DirectoryForAll, "Mitgliederliste für alle Mitglieder", SettingKind.Bool) { Group = "Mitgliederbereich", Default = "false", Help = "Aus: Mitglieder sehen nur den Vorstand. An: alle sehen alle Mitglieder (Name, Rolle, Telefon)." })
-        .Bool(BirthdayForAll, "Geburtsdatum für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht es.")
-        .Bool(AddressForAll, "Adresse für alle Mitglieder sichtbar", false, "Aus: nur der Vorstand (und die Person selbst) sieht sie.")
-        .TextArea(LoginIntro, "Text auf der Anmeldeseite", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.")
-        .Choice(TwoFactor, "Zwei-Faktor-Anmeldung", "", new[] { new FieldOption("", "freiwillig (jedes Mitglied kann sie im Profil einschalten)"), new FieldOption("vorstand", "Pflicht für den Vorstand"), new FieldOption("alle", "Pflicht für alle Mitglieder") },
-            "Pflicht: Wer sie noch nicht eingerichtet hat, wird beim Öffnen des Mitgliederbereichs zur Einrichtung geschickt (Code aus einer Authenticator-App, z. B. Google oder Microsoft Authenticator).")
-        .Add(new SettingSpec(UploadApproval, "Uploads vor dem Veröffentlichen freigeben", SettingKind.Bool) { Group = "Bilder & Material", Default = "true", Help = "An: Was ein Mitglied hochlädt, sehen erst der Vorstand und die Person selbst; die anderen Mitglieder erst nach der Freigabe." })
-        .Number(MaxUploadMb, "Größte Datei beim Hochladen (MB)", 15, 1, 25);
+        .Add(new SettingSpec(DirectoryForAll, "verein.set.directoryForAll", SettingKind.Bool) { Group = "verein.set.groupArea", Default = "false", Help = "verein.set.directoryForAllHelp" })
+        .Bool(BirthdayForAll, "verein.set.birthdayForAll", false, "verein.set.birthdayForAllHelp")
+        .Bool(AddressForAll, "verein.set.addressForAll", false, "verein.set.addressForAllHelp")
+        .TextArea(LoginIntro, "verein.set.loginIntro", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.")
+        .Choice(TwoFactor, "verein.set.twoFactor", "", new[] { new FieldOption("", "verein.set.twoFactorOptional"), new FieldOption("vorstand", "verein.set.twoFactorBoard"), new FieldOption("alle", "verein.set.twoFactorAll") },
+            "verein.set.twoFactorHelp")
+        .Add(new SettingSpec(UploadApproval, "verein.set.uploadApproval", SettingKind.Bool) { Group = "verein.set.groupUploads", Default = "true", Help = "verein.set.uploadApprovalHelp" })
+        .Number(MaxUploadMb, "verein.set.maxUpload", 15, 1, 25);
 
     /// <summary>One of the club's own fields and who sees it in the member area.</summary>
     public sealed record Field(string Label, bool ForAll);
@@ -147,6 +147,50 @@ public static class V
     /// <summary>A value posted from a date or datetime-local field, normalised; "" when it is not one.</summary>
     public static string CleanDate(string? s) => TryParse(s, out var d, out var hasTime)
         ? d.ToString(hasTime ? "yyyy-MM-ddTHH:mm" : "yyyy-MM-dd", CultureInfo.InvariantCulture) : "";
+
+    // ---- the same in the request's language ----------------------------------------------------------------------
+    // The overloads above write German and stay for what is German by design (mail placeholders, the operator-editable mail templates).
+    // Everything a person sees on a page goes through these: they follow ctx.T, so a date is in the same language as the words around it.
+
+    private static readonly string[] MonthsEn = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+    private static readonly string[] ShortEn = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    private static readonly string[] DaysEn = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    /// <summary>Whether the request's texts are English (asked through the string table, so it always agrees with <c>ctx.T</c>).</summary>
+    public static bool En(IPluginContext ctx) => ctx.T("verein.lang") == "en";
+
+    /// <summary>The month names of the request's language (January … / Januar …).</summary>
+    public static IReadOnlyList<string> MonthNames(IPluginContext ctx) => En(ctx) ? MonthsEn : Months;
+
+    /// <summary>A typed date (and time): "Sa, 14. Februar 2027, 14:00 Uhr" / "Sat, 14 February 2027, 14:00".</summary>
+    public static string When(IPluginContext ctx, string? s, bool weekday = true)
+    {
+        if (!En(ctx)) return When(s, weekday);
+        if (!TryParse(s, out var d, out var hasTime)) return s ?? "";
+        var text = (weekday ? DaysEn[(int)d.DayOfWeek] + ", " : "") + d.Day + " " + MonthsEn[d.Month - 1] + " " + d.Year;
+        return hasTime && (d.Hour != 0 || d.Minute != 0) ? text + ", " + d.ToString("HH:mm", CultureInfo.InvariantCulture) : text;
+    }
+
+    /// <summary>A short date: "14.02.2027" / "14 Feb 2027".</summary>
+    public static string Date(IPluginContext ctx, string? s) =>
+        !En(ctx) ? Date(s) : TryParse(s, out var d, out _) ? d.Day + " " + ShortEn[d.Month - 1] + " " + d.Year : s ?? "";
+
+    /// <summary>A stored moment (UTC): "07.11.2026, 20:35" / "7 Nov 2026, 20:35".</summary>
+    public static string Stamp(IPluginContext ctx, DateTime? utc)
+    {
+        if (!En(ctx) || utc is not DateTime u) return Stamp(utc);
+        var d = Local(u);
+        return d.Day + " " + ShortEn[d.Month - 1] + " " + d.Year + ", " + d.ToString("HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Only the day of a stored moment: "07.11.2026" / "7 Nov 2026" (never cut a <see cref="Stamp(IPluginContext, DateTime?)"/> by length).</summary>
+    public static string Day(IPluginContext ctx, DateTime? utc) =>
+        utc is DateTime u ? Date(ctx, Local(u).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) : "";
+
+    public static (string Day, string Month, string Weekday) Badge(IPluginContext ctx, string? s) =>
+        !En(ctx) ? Badge(s) : TryParse(s, out var d, out _) ? (d.Day.ToString(CultureInfo.InvariantCulture), ShortEn[d.Month - 1], DaysEn[(int)d.DayOfWeek]) : ("", "", "");
+
+    public static string Size(IPluginContext ctx, long bytes) => En(ctx) ? Size(bytes).Replace(',', '.') : Size(bytes);
 
     public static string Size(long bytes) => bytes >= 1024 * 1024
         ? (bytes / 1024d / 1024d).ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',') + " MB"

@@ -77,6 +77,12 @@ public static class B
     public static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
     public static string Month(DateOnly d) => MonthNames[d.Month - 1] + " " + d.Year.ToString(CultureInfo.InvariantCulture);
 
+    // the same in the language of a request (dates themselves stay dd.MM.yyyy)
+    public static string Weekday(Tr t, DateOnly d) => DayName(t, IsoDay(d.DayOfWeek));
+    public static string DayName(Tr t, int iso) => t("booking.day." + iso.ToString(CultureInfo.InvariantCulture));
+    public static string MonthName(Tr t, int month) => t("booking.month." + month.ToString(CultureInfo.InvariantCulture));
+    public static string Month(Tr t, DateOnly d) => MonthName(t, d.Month) + " " + d.Year.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>A slug: lower case, a–z, 0–9 and dashes; umlauts spelled out.</summary>
     public static string Slug(string? s)
     {

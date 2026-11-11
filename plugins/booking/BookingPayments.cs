@@ -14,6 +14,11 @@ public sealed record PaymentPlan(long Deposit, DateOnly DepositDue, long Rest, D
     public long Open => Math.Max(0, Total - Paid);
     /// <summary>"offen", "angezahlt", "bezahlt" — what the list and the guest see.</summary>
     public string State => Paid <= 0 ? "offen" : Paid >= Total ? "bezahlt" : Paid >= Deposit && Deposit < Total ? "angezahlt" : "teilweise";
+    /// <summary>The state in the language of a request.</summary>
+    public string StateLabel(Tr t) => State switch
+    {
+        "offen" => t("booking.pay.state.open"), "bezahlt" => t("booking.pay.state.paid"), "angezahlt" => t("booking.pay.state.deposit"), _ => t("booking.pay.state.partly")
+    };
     public UiTone Tone => State switch { "bezahlt" => UiTone.Success, "angezahlt" => UiTone.Info, _ => UiTone.Warning };
     /// <summary>The amount that should be in by <paramref name="day"/> but is not.</summary>
     public long Overdue(DateOnly day) => Math.Max(0, (RestDue <= day ? Total : DepositDue <= day ? Deposit : 0) - Paid);
@@ -23,13 +28,19 @@ public sealed record PaymentPlan(long Deposit, DateOnly DepositDue, long Rest, D
 public static class BookingPayments
 {
     public const string DepositKey = "depositPercent", DepositDaysKey = "depositDays", RestDaysKey = "restDays", RemindKey = "remindPayments";
+    // the stored values stay German (data); MethodLabel shows them in the request's language
     public static readonly string[] Methods = { "Überweisung", "Bar", "Karte", "PayPal", "über ein Portal" };
+    public static string MethodLabel(Tr t, string m) => m switch
+    {
+        "Überweisung" => t("booking.pay.method.transfer"), "Bar" => t("booking.pay.method.cash"), "Karte" => t("booking.pay.method.card"),
+        "PayPal" => t("booking.pay.method.paypal"), "über ein Portal" => t("booking.pay.method.portal"), _ => m
+    };
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(DepositKey, "Anzahlung (%)", SettingKind.Number) { Group = "Zahlung", Default = "30", Min = 0, Max = 100, Help = "Anteil am Gesamtbetrag. 0 = keine Anzahlung, alles zum Restzahlungstermin." })
-        .Add(new SettingSpec(DepositDaysKey, "Anzahlung fällig nach (Tagen)", SettingKind.Number) { Default = "7", Min = 0, Max = 60, Help = "Gezählt ab der Bestätigung." })
-        .Add(new SettingSpec(RestDaysKey, "Rest fällig vor Anreise (Tagen)", SettingKind.Number) { Default = "30", Min = 0, Max = 180, Help = "Liegt die Anreise näher, ist alles mit der Anzahlung fällig." })
-        .Add(new SettingSpec(RemindKey, "An fällige Zahlungen erinnern", SettingKind.Bool) { Default = "1", Help = "Eine Mail je Fälligkeit, wenn der Betrag zwei Tage danach noch nicht eingetragen ist." });
+        .Add(new SettingSpec(DepositKey, "booking.pay.deposit", SettingKind.Number) { Group = "booking.pay.group", Default = "30", Min = 0, Max = 100, Help = "booking.pay.depositHelp" })
+        .Add(new SettingSpec(DepositDaysKey, "booking.pay.depositDays", SettingKind.Number) { Default = "7", Min = 0, Max = 60, Help = "booking.pay.depositDaysHelp" })
+        .Add(new SettingSpec(RestDaysKey, "booking.pay.restDays", SettingKind.Number) { Default = "30", Min = 0, Max = 180, Help = "booking.pay.restDaysHelp" })
+        .Add(new SettingSpec(RemindKey, "booking.pay.remind", SettingKind.Bool) { Default = "1", Help = "booking.pay.remindHelp" });
 
     private static int N(IPluginContext ctx, string key, int def) =>
         double.TryParse(ctx.Settings.Get(key), NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? (int)v : def;
@@ -64,7 +75,7 @@ public static class BookingPayments
 
     public static async Task AddAsync(IPluginData data, long bookingId, long amount, DateOnly day, string method, string note, CancellationToken ct = default)
     {
-        if (amount == 0) throw new BookingException("Bitte einen Betrag eingeben.");
+        if (amount == 0) throw new BookingException("booking.pay.amountNeeded");
         await data.Table(BookingStore.TPayments).InsertAsync(new Dictionary<string, object?>
         {
             ["booking_id"] = bookingId, ["amount"] = amount, ["day"] = B.Iso(day), ["method"] = B.Clip(method, 40), ["note"] = B.Clip(note, 300), ["created"] = DateTime.UtcNow

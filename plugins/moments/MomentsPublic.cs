@@ -67,7 +67,7 @@ public static class MomentsPublic
         var withPassword = ctx.Request.F("benutzer").Length > 0 || ctx.Request.F("passwort").Length > 0;
         var typedLogin = M.Line(ctx.Request.F("benutzer"), 40);
         if (Throttle.Blocked(ctx.Request.ClientIp))
-            return LoginPage(ctx, "Zu viele falsche Versuche. Bitte wartet ein paar Minuten und versucht es dann noch einmal.", back, passwordOpen: withPassword, login: typedLogin);
+            return LoginPage(ctx, ctx.T("moments.login.tooMany"), back, passwordOpen: withPassword, login: typedLogin);
         var store = new MomentsStore(ctx.Data);
         if (withPassword && MomentsSettings.PasswordLogin(ctx))
         {
@@ -79,17 +79,17 @@ public static class MomentsPublic
             if (!ok || g is null || !g.Active)
             {
                 Throttle.Miss(ctx.Request.ClientIp);
-                return LoginPage(ctx, "Benutzername oder Passwort stimmt nicht. Bitte prüft beides noch einmal – oder fragt uns.", back, passwordOpen: true, login: typedLogin);
+                return LoginPage(ctx, ctx.T("moments.login.wrongPassword"), back, passwordOpen: true, login: typedLogin);
             }
             return await SignInAsync(ctx, store, g, back, ct);
         }
-        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, "Bitte meldet euch mit eurem Benutzernamen und Passwort an.", back);
+        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, ctx.T("moments.login.usePassword"), back);
         var code = Codes.Normalize(ctx.Request.F("code"));
         var guest = await store.GuestByCodeAsync(code, ct);
         if (guest is null || !guest.Active)
         {
             Throttle.Miss(ctx.Request.ClientIp);
-            return LoginPage(ctx, "Diesen Code kennen wir leider nicht. Bitte prüft ihn noch einmal – er steht auf eurer Karte.", back);
+            return LoginPage(ctx, ctx.T("moments.login.unknownCode"), back);
         }
         return await SignInAsync(ctx, store, guest, back, ct);
     }
@@ -97,15 +97,15 @@ public static class MomentsPublic
     /// <summary>The personal link of the card (and its QR code): signs the household in and opens the gallery.</summary>
     private static async Task<PluginResult> LinkAsync(IPluginContext ctx, CancellationToken ct)
     {
-        if (Throttle.Blocked(ctx.Request.ClientIp)) return LoginPage(ctx, "Zu viele falsche Versuche. Bitte wartet ein paar Minuten.", "");
+        if (Throttle.Blocked(ctx.Request.ClientIp)) return LoginPage(ctx, ctx.T("moments.login.tooManyShort"), "");
         // the hosts switched to user name + password: an old card's link is no way in any more
-        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, "Bitte meldet euch mit eurem Benutzernamen und Passwort an.", "");
+        if (!MomentsSettings.CodeLogin(ctx)) return LoginPage(ctx, ctx.T("moments.login.usePassword"), "");
         var store = new MomentsStore(ctx.Data);
         var guest = await store.GuestByCodeAsync(Codes.Normalize(ctx.Request.R("code")), ct);
         if (guest is null || !guest.Active)
         {
             Throttle.Miss(ctx.Request.ClientIp);
-            return LoginPage(ctx, "Dieser Link gilt nicht (mehr). Meldet euch bitte hier an oder fragt uns nach einem neuen Zugang.", "");
+            return LoginPage(ctx, ctx.T("moments.login.badLink"), "");
         }
         if (ctx.Member is not null && ctx.Member.Id == guest.MemberId && string.Equals(ctx.Member.Email, guest.Account, StringComparison.OrdinalIgnoreCase))
             return PluginResult.Redirect(Base);
@@ -120,7 +120,7 @@ public static class MomentsPublic
         if (g.MemberId > 0 && g.Account.Length > 0 && await ctx.Members.FindAsync(g.MemberId, ct) is MemberAccount byId
             && string.Equals(byId.Email, g.Account, StringComparison.OrdinalIgnoreCase)) account = byId;
         if (account is null && g.Account.Length > 0) account = await ctx.Members.FindByEmailAsync(g.Account, ct);
-        if (account is not null && !account.IsActive) return LoginPage(ctx, "Dieser Zugang ist gesperrt. Bitte sprecht uns an.", back);
+        if (account is not null && !account.IsActive) return LoginPage(ctx, ctx.T("moments.login.locked"), back);
         if (account is null)
         {
             // The household's own account. The address only has to be unique and valid in form: ".invalid" is reserved and can never receive mail,
@@ -131,7 +131,7 @@ public static class MomentsPublic
             if (account is null)
             {
                 ctx.Log("Konto für Gast " + g.Id + " konnte nicht angelegt werden: " + invited.Status);
-                return LoginPage(ctx, "Die Anmeldung hat gerade nicht geklappt. Bitte versucht es gleich noch einmal.", back);
+                return LoginPage(ctx, ctx.T("moments.login.failed"), back);
             }
         }
         // always (cheap): binds this household and frees the number from any other one that still holds it
@@ -142,7 +142,7 @@ public static class MomentsPublic
         catch (InvalidOperationException ex)
         {
             ctx.Log("Anmeldung von Gast " + g.Id + " abgelehnt: " + ex.Message);
-            return LoginPage(ctx, "Die Anmeldung mit dem Code geht für diesen Zugang nicht. Bitte sprecht uns an.", back);
+            return LoginPage(ctx, ctx.T("moments.login.refused"), back);
         }
         await store.Guests.UpdateAsync(g.Id, new Dictionary<string, object?> { ["last_seen"] = DateTime.UtcNow }, ct);
         await store.Guests.IncrementAsync(g.Id, "visits", 1, ct: ct);
@@ -152,7 +152,7 @@ public static class MomentsPublic
     private static async Task<PluginResult> SignOutAsync(IPluginContext ctx, CancellationToken ct)
     {
         if (ctx.Member is not null) await ctx.Members.SignOutAsync(ct);
-        return PluginResult.Redirect("/", "Ihr seid abgemeldet.");
+        return PluginResult.Redirect("/", ctx.T("moments.login.signedOut"));
     }
 
     // ---- frame --------------------------------------------------------------------------------------------------
@@ -166,7 +166,7 @@ public static class MomentsPublic
         var name = v.Guest?.Name ?? MomentsSettings.Hosts(ctx);
         var kicker = crumb is null ? M.H(MomentsSettings.Event(ctx)) : "<a href=\"" + Base + "\">" + M.H(MomentsSettings.GalleryTitle(ctx)) + "</a>";
         return "<header class=\"mo-head\"><div><p class=\"mo-kicker\">" + kicker + "</p><h1>" + M.H(title) + "</h1></div>" +
-               "<a class=\"mo-me\" href=\"" + Base + "/meine\" title=\"Meine Fotos\"><span class=\"mo-avatar\">" + M.H(M.Initials(name)) + "</span><span class=\"mo-me-name\">" +
+               "<a class=\"mo-me\" href=\"" + Base + "/meine\" title=\"" + ctx.T("moments.myPhotos") + "\"><span class=\"mo-avatar\">" + M.H(M.Initials(name)) + "</span><span class=\"mo-me-name\">" +
                M.H(name) + "</span></a></header>";
     }
 
@@ -183,25 +183,25 @@ public static class MomentsPublic
             .Append(M.H(heading is { Length: > 0 } ? heading : MomentsSettings.GalleryTitle(ctx))).Append("</").Append(tag).Append("><p class=\"mo-login-intro\">")
             .Append(M.Text(intro is { Length: > 0 } ? intro : ctx.Settings.Get(MomentsSettings.LoginIntro))).Append("</p>");
         if (error is { Length: > 0 }) sb.Append("<p class=\"mo-alert bad\" role=\"alert\">").Append(M.H(error)).Append("</p>");
-        if (memberWithoutAccess) sb.Append("<p class=\"mo-alert\">Mit diesem Konto gibt es keinen Zugang zum Gästebereich. Meldet euch mit eurem Zugang von der Karte an.</p>");
+        if (memberWithoutAccess) sb.Append("<p class=\"mo-alert\">").Append(ctx.T("moments.login.noAccess")).Append("</p>");
         var hidden = back.Length > 0 ? "<input type=\"hidden\" name=\"zurueck\" value=\"" + M.H(back) + "\">" : "";
         if (mode != MomentsSettings.ModePassword)
         {
             var (length, _) = MomentsSettings.CodeFormat(ctx);
             sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/anmelden\" class=\"mo-code\">").Append(hidden)
-              .Append("<label for=\"mo-code\">Euer Zugangscode</label><input id=\"mo-code\" name=\"code\" required maxlength=\"40\" autocomplete=\"one-time-code\" autocapitalize=\"characters\" ")
+              .Append("<label for=\"mo-code\">").Append(ctx.T("moments.login.codeLabel")).Append("</label><input id=\"mo-code\" name=\"code\" required maxlength=\"40\" autocomplete=\"one-time-code\" autocapitalize=\"characters\" ")
               .Append("autocorrect=\"off\" spellcheck=\"false\" placeholder=\"").Append(Codes.Shown(new string('X', length))).Append("\" class=\"mo-code-input\">")
-              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> Anmelden</button></form>")
+              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.login.submit")).Append("</button></form>")
               // the card's QR code is read by the phone's own camera, not by this page — say so, or people look for a scan button here
-              .Append("<p class=\"mo-qr-hint\"><i class=\"ti ti-qrcode\" aria-hidden=\"true\"></i><span><strong>Noch einfacher mit dem QR-Code:</strong> ")
-              .Append("Öffnet die Kamera eures Handys, haltet sie auf den QR-Code auf eurer Karte und tippt auf den Link, der erscheint – dann seid ihr sofort angemeldet.</span></p>");
+              .Append("<p class=\"mo-qr-hint\"><i class=\"ti ti-qrcode\" aria-hidden=\"true\"></i><span><strong>").Append(ctx.T("moments.login.qrTitle")).Append("</strong> ")
+              .Append(ctx.T("moments.login.qrHint")).Append("</span></p>");
         }
-        if (mode == MomentsSettings.ModeBoth) sb.Append("<details class=\"mo-alt\"").Append(passwordOpen ? " open" : "").Append("><summary>Mit Benutzername und Passwort anmelden</summary>");
+        if (mode == MomentsSettings.ModeBoth) sb.Append("<details class=\"mo-alt\"").Append(passwordOpen ? " open" : "").Append("><summary>").Append(ctx.T("moments.login.withPassword")).Append("</summary>");
         if (mode != MomentsSettings.ModeCode)
             sb.Append("<form method=\"post\" action=\"").Append(Base).Append("/anmelden\" class=\"mo-code mo-pass\">").Append(hidden)
-              .Append("<label for=\"mo-user\">Benutzername</label><input id=\"mo-user\" name=\"benutzer\" required maxlength=\"40\" autocomplete=\"username\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" class=\"mo-text-input\" value=\"")
-              .Append(M.H(login)).Append("\"><label for=\"mo-pass\">Passwort</label><input id=\"mo-pass\" name=\"passwort\" type=\"password\" required maxlength=\"128\" autocomplete=\"current-password\" class=\"mo-text-input\">")
-              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> Anmelden</button></form>");
+              .Append("<label for=\"mo-user\">").Append(ctx.T("moments.login.user")).Append("</label><input id=\"mo-user\" name=\"benutzer\" required maxlength=\"40\" autocomplete=\"username\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" class=\"mo-text-input\" value=\"")
+              .Append(M.H(login)).Append("\"><label for=\"mo-pass\">").Append(ctx.T("moments.login.password")).Append("</label><input id=\"mo-pass\" name=\"passwort\" type=\"password\" required maxlength=\"128\" autocomplete=\"current-password\" class=\"mo-text-input\">")
+              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-door-enter\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.login.submit")).Append("</button></form>");
         if (mode == MomentsSettings.ModeBoth) sb.Append("</details>");
         return sb.Append("</div>").ToString();
     }
@@ -220,16 +220,16 @@ public static class MomentsPublic
     private static string Notice(IPluginContext ctx) => ctx.Request.Q("ok") switch
     {
         "herz" => "",
-        "kommentar" => Ok("Danke für deinen Kommentar!"),
-        "kommentar-pruefung" => Ok("Danke! Dein Kommentar erscheint, sobald wir ihn freigegeben haben."),
-        "markiert" => Ok("Markiert."),
-        "entfernt" => Ok("Entfernt."),
-        "kommentar-weg" => Ok("Der Kommentar ist gelöscht."),
-        "text" => Ok("Die Bildunterschrift ist gespeichert."),
-        "geloescht" => Ok("Das Foto ist gelöscht."),
-        "freigegeben" => Ok("Freigegeben – jetzt sehen es alle."),
-        "ausgeblendet" => Ok("Ausgeblendet – nur noch ihr seht es."),
-        "highlight" => Ok("Gespeichert."),
+        "kommentar" => Ok(ctx.T("moments.ok.comment")),
+        "kommentar-pruefung" => Ok(ctx.T("moments.ok.commentPending")),
+        "markiert" => Ok(ctx.T("moments.ok.tagged")),
+        "entfernt" => Ok(ctx.T("moments.ok.removed")),
+        "kommentar-weg" => Ok(ctx.T("moments.ok.commentDeleted")),
+        "text" => Ok(ctx.T("moments.ok.caption")),
+        "geloescht" => Ok(ctx.T("moments.ok.photoDeleted")),
+        "freigegeben" => Ok(ctx.T("moments.ok.approved")),
+        "ausgeblendet" => Ok(ctx.T("moments.ok.hidden")),
+        "highlight" => Ok(ctx.T("moments.saved")),
         _ => ""
     };
 
@@ -237,7 +237,7 @@ public static class MomentsPublic
     private static string Err(string text) => "<p class=\"mo-alert bad\" role=\"alert\">" + M.H(text) + "</p>";
 
     internal static string AuthorName(IPluginContext ctx, long guestId, IReadOnlyDictionary<long, Guest> guests) =>
-        guestId == 0 ? MomentsSettings.Hosts(ctx) : guests.TryGetValue(guestId, out var g) ? g.Name : "ein Gast";
+        guestId == 0 ? MomentsSettings.Hosts(ctx) : guests.TryGetValue(guestId, out var g) ? g.Name : ctx.T("moments.aGuest");
 
     // ---- the gallery --------------------------------------------------------------------------------------------
 
@@ -305,11 +305,11 @@ public static class MomentsPublic
         return new Listing(list.ToList(), tags, marks, hearts, comments, guests, photos.Count);
     }
 
-    internal static string Tile(Photo p, string query, Listing? listing, string? badge = null, bool large = false)
+    internal static string Tile(IPluginContext ctx, Photo p, string query, Listing? listing, string? badge = null, bool large = false)
     {
         var hearts = listing is not null && listing.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0;
         var comments = listing is not null && listing.Comments.TryGetValue(p.Id, out var c) ? c : 0;
-        var alt = p.Caption.Length > 0 ? p.Caption : "Foto";
+        var alt = p.Caption.Length > 0 ? p.Caption : ctx.T("moments.photo");
         var sb = new StringBuilder("<a class=\"mo-tile").Append(large ? " large" : "").Append("\" href=\"").Append(Base).Append("/foto/").Append(p.Id).Append(M.H(query)).Append("\">")
             .Append("<img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/t\" alt=\"").Append(M.H(alt)).Append("\" loading=\"lazy\" decoding=\"async\">");
         if (badge is not null) sb.Append("<span class=\"mo-tile-badge\">").Append(M.H(badge)).Append("</span>");
@@ -334,34 +334,34 @@ public static class MomentsPublic
         // the script asks for the next part of the stream while the visitor scrolls
         if (part)
         {
-            var (html, next) = Stream(f, listing, continued: true);
+            var (html, next) = Stream(ctx, f, listing, continued: true);
             return PluginResult.Json(new JsonObject { ["html"] = html, ["next"] = next });
         }
         var albums = await store.AlbumsAsync(ct);
         var album = f.Album > 0 ? albums.FirstOrDefault(a => a.Id == f.Album) : null;
         if (f.Album > 0 && album is null) return PluginResult.Redirect(Base);
         var title = MomentsSettings.GalleryTitle(ctx);
-        var heading = album?.Name ?? (f.All ? "Alle Fotos" : title);
+        var heading = album?.Name ?? (f.All ? ctx.T("moments.allPhotos") : title);
         var sb = new StringBuilder(Head(ctx, v, heading, album is not null || f.All ? "" : null)).Append(Notice(ctx));
         var uploads = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload);
 
         if (f.Start)
         {
             var name = v.Guest?.Name ?? MomentsSettings.Hosts(ctx);
-            sb.Append("<section class=\"mo-welcome\"><div><h2>").Append(ctx.Request.Q("willkommen") == "1" ? "Willkommen, " : "Hallo ").Append(M.H(name)).Append("!</h2><p>")
+            sb.Append("<section class=\"mo-welcome\"><div><h2>").Append(ctx.T(ctx.Request.Q("willkommen") == "1" ? "moments.welcomeName" : "moments.hello", M.H(name))).Append("</h2><p>")
               .Append(M.Text(ctx.Settings.Get(MomentsSettings.Welcome))).Append("</p>");
             if (v.Guest is { Table.Length: > 0 } g && ctx.Settings.GetBool(MomentsSettings.ShowTable))
-                sb.Append("<p class=\"mo-table\"><i class=\"ti ti-armchair\" aria-hidden=\"true\"></i> Euer Tisch: <strong>").Append(M.H(g.Table)).Append("</strong></p>");
+                sb.Append("<p class=\"mo-table\"><i class=\"ti ti-armchair\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.yourTable")).Append(" <strong>").Append(M.H(g.Table)).Append("</strong></p>");
             sb.Append("</div><div class=\"mo-welcome-actions\">");
-            if (uploads) sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Fotos hochladen</a>");
-            sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/meine\"><i class=\"ti ti-user-heart\" aria-hidden=\"true\"></i> Meine Fotos</a></div></section>");
+            if (uploads) sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.uploadPhotos")).Append("</a>");
+            sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/meine\"><i class=\"ti ti-user-heart\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.myPhotos")).Append("</a></div></section>");
             if (v.Admin && await store.PendingCountAsync(ct) is var pending and > 0)
-                sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> ").Append(M.Plural(pending, "Foto wartet", "Fotos warten"))
-                  .Append(" auf eure Freigabe. <a href=\"/admin/p/moments/review\">Jetzt ansehen</a></p>");
+                sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> ").Append(ctx.T(pending == 1 ? "moments.gallery.pending1" : "moments.gallery.pendingN", M.N(pending)))
+                  .Append(" <a href=\"/admin/p/moments/review\">").Append(ctx.T("moments.gallery.reviewNow")).Append("</a></p>");
             var featured = listing.Photos.Where(p => p.Featured).ToList();
             if (featured.Count > 0)
-                sb.Append("<section class=\"mo-highlights\"><h2><i class=\"ti ti-sparkles\" aria-hidden=\"true\"></i> Highlights</h2><div class=\"mo-strip\">")
-                  .Append(string.Concat(featured.Take(12).Select(p => Tile(p, "", listing, large: true)))).Append("</div></section>");
+                sb.Append("<section class=\"mo-highlights\"><h2><i class=\"ti ti-sparkles\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.highlights")).Append("</h2><div class=\"mo-strip\">")
+                  .Append(string.Concat(featured.Take(12).Select(p => Tile(ctx, p, "", listing, large: true)))).Append("</div></section>");
             // with albums, the start page is an overview — the albums in the hosts' order, then who is on the photos and the keywords
             if (albums.Count > 0 && listing.Total > 0 || albums.Count > 0 && v.Admin)
                 return Frame(ctx, sb.Append(Overview(ctx, v, listing, albums, uploads)).ToString(), title);
@@ -371,38 +371,40 @@ public static class MomentsPublic
         // sort buttons, "0 Fotos" and a lone "Meine Herzen" looked broken)
         if (listing.Total > 0)
         {
-            sb.Append("<nav class=\"mo-bar\" aria-label=\"Sortierung\"><div class=\"mo-seg\">");
-            foreach (var (key, label) in new[] { ("zeit", "Chronologisch"), ("neu", "Neueste"), ("beliebt", "Beliebteste") })
+            sb.Append("<nav class=\"mo-bar\" aria-label=\"").Append(ctx.T("moments.sort.label")).Append("\"><div class=\"mo-seg\">");
+            foreach (var (key, label) in new[] { ("zeit", ctx.T("moments.sort.time")), ("neu", ctx.T("moments.sort.new")), ("beliebt", ctx.T("moments.sort.popular")) })
                 sb.Append("<a href=\"").Append(Base).Append(M.H(f.Query(sort: key))).Append("\"").Append(f.Sort == key ? " class=\"on\" aria-current=\"true\"" : "").Append(">").Append(label).Append("</a>");
-            sb.Append("</div><span class=\"mo-count\">").Append(M.Plural(listing.Photos.Count, "Foto", "Fotos")).Append("</span></nav>");
+            sb.Append("</div><span class=\"mo-count\">").Append(M.Count(ctx, listing.Photos.Count, "moments.count.photo.")).Append("</span></nav>");
             sb.Append(Chips(ctx, f, listing, v));
         }
 
         if (listing.Photos.Count == 0)
         {
             sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>")
-              .Append(album is not null ? "In diesem Album ist noch kein Foto." : f.Narrowed ? "Hier ist (noch) kein Foto." : "Noch sind keine Fotos da.").Append("</p>");
+              .Append(ctx.T(album is not null ? "moments.empty.album" : f.Narrowed ? "moments.empty.filter" : "moments.empty.none")).Append("</p>");
             if (uploads && (album is null && !f.Narrowed || album is not null && (v.Admin || album.Guests)))
                 sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen").Append(album is not null && v.Admin ? "?album=" + M.N(album.Id) : "")
-                  .Append("\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>");
-            if (f.Narrowed || f.All) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> Zur Übersicht</a>");
+                  .Append("\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.empty.uploadFirst")).Append("</a>");
+            if (f.Narrowed || f.All) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.toOverview")).Append("</a>");
             sb.Append("</div>");
             return Frame(ctx, sb.ToString(), heading);
         }
 
         // the stream: the first part now, the rest while scrolling (the script asks for ?…&teil=1); without a script the pages stay as links
-        var (first, nextUrl) = Stream(f, listing, continued: false);
+        var (first, nextUrl) = Stream(ctx, f, listing, continued: false);
         sb.Append("<div class=\"mo-grid\" data-mo-grid>").Append(first).Append("</div>");
         var pages = (listing.Photos.Count + PageSize - 1) / PageSize;
         var page = Math.Clamp(f.Page, 1, Math.Max(1, pages));
+        // the script's words travel with the element it works on (data-mo-error), so they follow the page's language
         if (nextUrl.Length > 0)
-            sb.Append("<div class=\"mo-more\" data-mo-more=\"").Append(M.H(nextUrl)).Append("\" aria-live=\"polite\"><span class=\"mo-spin\" aria-hidden=\"true\"></span> Weitere Fotos werden geladen …</div>");
+            sb.Append("<div class=\"mo-more\" data-mo-more=\"").Append(M.H(nextUrl)).Append("\" data-mo-error=\"").Append(M.H(ctx.T("moments.more.error")))
+              .Append("\" aria-live=\"polite\"><span class=\"mo-spin\" aria-hidden=\"true\"></span> ").Append(ctx.T("moments.more.loading")).Append("</div>");
         if (pages > 1)
         {
-            sb.Append("<nav class=\"mo-pager\" aria-label=\"Seiten\">");
-            if (page > 1) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page - 1))).Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> Zurück</a>");
-            sb.Append("<span>Seite ").Append(page).Append(" von ").Append(pages).Append("</span>");
-            if (page < pages) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page + 1))).Append("\">Weiter <i class=\"ti ti-chevron-right\" aria-hidden=\"true\"></i></a>");
+            sb.Append("<nav class=\"mo-pager\" aria-label=\"").Append(ctx.T("moments.pager.label")).Append("\">");
+            if (page > 1) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page - 1))).Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.back")).Append("</a>");
+            sb.Append("<span>").Append(ctx.T("moments.pager.page", M.N(page), M.N(pages))).Append("</span>");
+            if (page < pages) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append(M.H(f.Query(page: page + 1))).Append("\">").Append(ctx.T("moments.pager.next")).Append(" <i class=\"ti ti-chevron-right\" aria-hidden=\"true\"></i></a>");
             sb.Append("</nav>");
         }
         return Frame(ctx, sb.Append(MomentsScript.Gallery).ToString(), heading);
@@ -412,7 +414,7 @@ public static class MomentsPublic
     /// One part of the photo stream (<see cref="PageSize"/> tiles) and the address of the next ("" at the end). Chronologically there is a heading for every
     /// hour, with the day as soon as the photos span more than one; a <paramref name="continued"/> part does not repeat the hour the part before ended in.
     /// </summary>
-    private static (string Html, string Next) Stream(Filter f, Listing listing, bool continued)
+    private static (string Html, string Next) Stream(IPluginContext ctx, Filter f, Listing listing, bool continued)
     {
         var pages = (listing.Photos.Count + PageSize - 1) / PageSize;
         if (pages == 0) return ("", "");
@@ -428,9 +430,9 @@ public static class MomentsPublic
             if (f.Sort == "zeit" && M.TryTaken(p.Taken, out var d))
             {
                 var hour = d.ToString("yyyy-MM-ddTHH", CultureInfo.InvariantCulture);
-                if (hour != lastHour) { sb.Append("<h3 class=\"mo-hour\">").Append(M.H(M.Hour(d, days > 1))).Append("</h3>"); lastHour = hour; }
+                if (hour != lastHour) { sb.Append("<h3 class=\"mo-hour\">").Append(M.H(M.Hour(ctx, d, days > 1))).Append("</h3>"); lastHour = hour; }
             }
-            sb.Append(Tile(p, query, listing));
+            sb.Append(Tile(ctx, p, query, listing));
         }
         return (sb.ToString(), page < pages ? Base + f.Query(page: page + 1) + "&teil=1" : "");
     }
@@ -442,7 +444,7 @@ public static class MomentsPublic
     /// </summary>
     private static string Overview(IPluginContext ctx, Viewer v, Listing listing, IReadOnlyList<Album> albums, bool uploads)
     {
-        var sb = new StringBuilder("<section class=\"mo-section\"><h2>Alben</h2><div class=\"mo-albums\">");
+        var sb = new StringBuilder("<section class=\"mo-section\"><h2>").Append(ctx.T("moments.albums")).Append("</h2><div class=\"mo-albums\">");
         Photo? Cover(IEnumerable<Photo> photos) => photos.OrderByDescending(p => p.Featured)
             .ThenByDescending(p => listing.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0).ThenBy(p => p.Taken, StringComparer.Ordinal).FirstOrDefault();
         void Card(string href, string name, int count, Photo? cover, string? note = null)
@@ -450,16 +452,16 @@ public static class MomentsPublic
             sb.Append("<a class=\"mo-album\" href=\"").Append(M.H(href)).Append("\"><span class=\"mo-album-cover\">");
             if (cover is not null) sb.Append("<img src=\"").Append(Base).Append("/bild/").Append(cover.Id).Append("/t\" alt=\"\" loading=\"lazy\" decoding=\"async\">");
             else sb.Append("<i class=\"ti ti-photo\" aria-hidden=\"true\"></i>");
-            sb.Append("</span><span class=\"mo-album-text\"><strong>").Append(M.H(name)).Append("</strong><small>").Append(M.Plural(count, "Foto", "Fotos"))
+            sb.Append("</span><span class=\"mo-album-text\"><strong>").Append(M.H(name)).Append("</strong><small>").Append(M.Count(ctx, count, "moments.count.photo."))
               .Append(note is null ? "" : " · " + M.H(note)).Append("</small></span></a>");
         }
         foreach (var a in albums)
         {
             var photos = listing.Photos.Where(p => p.AlbumId == a.Id).ToList();
             if (photos.Count == 0 && !v.Admin) continue;
-            Card(Base + "?album=" + M.N(a.Id), a.Name, photos.Count, Cover(photos), v.Admin && a.Guests ? "hier landen die Fotos der Gäste" : null);
+            Card(Base + "?album=" + M.N(a.Id), a.Name, photos.Count, Cover(photos), v.Admin && a.Guests ? ctx.T("moments.album.guestsLand") : null);
         }
-        if (listing.Total > 0) Card(Base + "?alle=1", "Alle Fotos", listing.Total, Cover(listing.Photos));
+        if (listing.Total > 0) Card(Base + "?alle=1", ctx.T("moments.allPhotos"), listing.Total, Cover(listing.Photos));
         sb.Append("</div></section>");
 
         var visible = listing.Photos.Select(p => p.Id).ToHashSet();
@@ -475,13 +477,13 @@ public static class MomentsPublic
                   .Append(M.H(t.Name)).Append(" <small>").Append(counts[t.Id]).Append("</small></a>");
             sb.Append("</div></section>");
         }
-        TagRow("Wer ist drauf?", "user", " person", used.Where(t => t.Kind == MomentsStore.Person));
-        TagRow("Stichworte", "tag", "", used.Where(t => t.Kind != MomentsStore.Person));
+        TagRow(ctx.T("moments.whoIsOn"), "user", " person", used.Where(t => t.Kind == MomentsStore.Person));
+        TagRow(ctx.T("moments.keywords"), "tag", "", used.Where(t => t.Kind != MomentsStore.Person));
         if (listing.Hearts.Values.Any(h => h.Contains(v.Id)))
-            sb.Append("<p class=\"mo-chiprow\"><a class=\"mo-chip\" href=\"").Append(Base).Append("?alle=1&amp;herzen=1\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a></p>");
+            sb.Append("<p class=\"mo-chiprow\"><a class=\"mo-chip\" href=\"").Append(Base).Append("?alle=1&amp;herzen=1\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.myHearts")).Append("</a></p>");
         if (listing.Total == 0)
-            sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>Noch sind keine Fotos da.</p>")
-              .Append(uploads ? "<a class=\"mo-btn\" href=\"" + Base + "/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Die ersten hochladen</a>" : "").Append("</div>");
+            sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i><p>").Append(ctx.T("moments.empty.none")).Append("</p>")
+              .Append(uploads ? "<a class=\"mo-btn\" href=\"" + Base + "/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> " + ctx.T("moments.empty.uploadFirst") + "</a>" : "").Append("</div>");
         return sb.ToString();
     }
 
@@ -494,10 +496,10 @@ public static class MomentsPublic
         {
             sb.Append("<div class=\"mo-active\">");
             if (f.Tag > 0 && listing.Tags.FirstOrDefault(t => t.Id == f.Tag) is Tag t)
-                sb.Append(ActiveChip(t.Kind == MomentsStore.Person ? "user" : "tag", t.Name, f.Query(tag: 0)));
+                sb.Append(ActiveChip(ctx, t.Kind == MomentsStore.Person ? "user" : "tag", t.Name, f.Query(tag: 0)));
             if (f.From.Length > 0)
-                sb.Append(ActiveChip("camera", "von " + (f.From == "gastgeber" ? MomentsSettings.Hosts(ctx) : long.TryParse(f.From, out var gid) && listing.Guests.TryGetValue(gid, out var gg) ? gg.Name : "einem Gast"), f.Query(from: "")));
-            if (f.Hearts) sb.Append(ActiveChip("heart", "Meine Herzen", f.Query(hearts: false)));
+                sb.Append(ActiveChip(ctx, "camera", ctx.T("moments.filter.from", f.From == "gastgeber" ? MomentsSettings.Hosts(ctx) : long.TryParse(f.From, out var gid) && listing.Guests.TryGetValue(gid, out var gg) ? gg.Name : ctx.T("moments.filter.aGuest")), f.Query(from: "")));
+            if (f.Hearts) sb.Append(ActiveChip(ctx, "heart", ctx.T("moments.myHearts"), f.Query(hearts: false)));
             sb.Append("</div>");
         }
         var used = listing.Tags.Where(t => counts.ContainsKey(t.Id) && t.Id != f.Tag).OrderByDescending(t => counts[t.Id]).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
@@ -507,7 +509,7 @@ public static class MomentsPublic
         var heartsChip = !f.Hearts && listing.Hearts.Values.Any(h => h.Contains(v.Id));
         if (people.Count + topics.Count == 0 && !heartsChip) return sb.ToString();
         sb.Append("<div class=\"mo-filters\">");
-        if (heartsChip) sb.Append("<a class=\"mo-chip\" href=\"").Append(Base).Append(M.H(f.Query(hearts: true))).Append("\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen</a>");
+        if (heartsChip) sb.Append("<a class=\"mo-chip\" href=\"").Append(Base).Append(M.H(f.Query(hearts: true))).Append("\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.myHearts")).Append("</a>");
         foreach (var t in people.Take(40))
             sb.Append("<a class=\"mo-chip person\" href=\"").Append(Base).Append(M.H(f.Query(tag: t.Id))).Append("\"><i class=\"ti ti-user\" aria-hidden=\"true\"></i> ").Append(M.H(t.Name))
               .Append(" <small>").Append(counts[t.Id]).Append("</small></a>");
@@ -517,8 +519,8 @@ public static class MomentsPublic
         return sb.Append("</div>").ToString();
     }
 
-    private static string ActiveChip(string icon, string label, string query) =>
-        "<a class=\"mo-chip on\" href=\"" + Base + M.H(query) + "\" title=\"Filter entfernen\"><i class=\"ti ti-" + icon + "\" aria-hidden=\"true\"></i> " + M.H(label) +
+    private static string ActiveChip(IPluginContext ctx, string icon, string label, string query) =>
+        "<a class=\"mo-chip on\" href=\"" + Base + M.H(query) + "\" title=\"" + ctx.T("moments.filter.remove") + "\"><i class=\"ti ti-" + icon + "\" aria-hidden=\"true\"></i> " + M.H(label) +
         " <i class=\"ti ti-x\" aria-hidden=\"true\"></i></a>";
 
     // ---- one photo ----------------------------------------------------------------------------------------------
@@ -581,14 +583,14 @@ public static class MomentsPublic
         switch (r.Action)
         {
             case "heart":
-                if (!p.Approved) return ("", "Herzen gibt es, sobald das Foto freigegeben ist.");
+                if (!p.Approved) return ("", ctx.T("moments.err.heartPending"));
                 await store.ToggleHeartAsync(p.Id, v.Id, ct);
                 return ("herz", null);
             case "comment":
             {
-                if (!p.Approved && !v.Admin) return ("", "Kommentieren geht, sobald das Foto freigegeben ist.");
+                if (!p.Approved && !v.Admin) return ("", ctx.T("moments.err.commentPending"));
                 var text = M.Clip(r.F("text"), 1000);
-                if (text.Length == 0) return ("", "Bitte schreib etwas.");
+                if (text.Length == 0) return ("", ctx.T("moments.err.writeSomething"));
                 var pending = ctx.Settings.GetBool(MomentsSettings.CommentApproval) && !v.Admin;
                 await store.Comments.InsertAsync(new Dictionary<string, object?>
                 {
@@ -598,24 +600,24 @@ public static class MomentsPublic
             }
             case "uncomment":
             {
-                if (!long.TryParse(r.F("comment"), out var cid) || await store.CommentAsync(cid, ct) is not Comment c || c.PhotoId != p.Id) return ("", "Diesen Kommentar gibt es nicht mehr.");
-                if (!v.Admin && !(v.Guest is not null && c.GuestId == v.Guest.Id)) return ("", "Das ist nicht dein Kommentar.");
+                if (!long.TryParse(r.F("comment"), out var cid) || await store.CommentAsync(cid, ct) is not Comment c || c.PhotoId != p.Id) return ("", ctx.T("moments.err.commentGone"));
+                if (!v.Admin && !(v.Guest is not null && c.GuestId == v.Guest.Id)) return ("", ctx.T("moments.err.notYourComment"));
                 await store.Comments.DeleteAsync(c.Id, ct);
                 return ("kommentar-weg", null);
             }
             case "tag":
             {
-                if (!v.Admin && !ctx.Settings.GetBool(MomentsSettings.GuestTags)) return ("", "Markieren ist ausgeschaltet.");
+                if (!v.Admin && !ctx.Settings.GetBool(MomentsSettings.GuestTags)) return ("", ctx.T("moments.err.taggingOff"));
                 var name = M.Line(r.F("tag"), 40);
-                if (name.Length < 2) return ("", "Bitte gib einen Namen oder ein Stichwort ein.");
+                if (name.Length < 2) return ("", ctx.T("moments.err.tagName"));
                 var tag = await store.TagByNameAsync(name, ct);
                 if (tag is null)
                 {
                     var person = (await store.GuestsAsync(ct)).SelectMany(g => g.PeopleList).FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
-                    if (person is null && !v.Admin && !ctx.Settings.GetBool(MomentsSettings.NewTags)) return ("", "Bitte wähle eine Person oder ein Stichwort aus der Liste.");
+                    if (person is null && !v.Admin && !ctx.Settings.GetBool(MomentsSettings.NewTags)) return ("", ctx.T("moments.err.tagFromList"));
                     tag = await store.EnsureTagAsync(person ?? name, person is null ? MomentsStore.Topic : MomentsStore.Person, ct);
                 }
-                if ((await store.TagsOfPhotoAsync(p.Id, ct)).Count >= 30) return ("", "Mehr Markierungen passen an ein Foto nicht.");
+                if ((await store.TagsOfPhotoAsync(p.Id, ct)).Count >= 30) return ("", ctx.T("moments.err.tooManyTags"));
                 await store.AddTagAsync(p.Id, tag.Id, v.Id, ct);
                 return ("markiert", null);
             }
@@ -624,16 +626,16 @@ public static class MomentsPublic
                 if (!long.TryParse(r.F("mark"), out var mid)) return ("", null);
                 var mark = (await store.TagsOfPhotoAsync(p.Id, ct)).FirstOrDefault(m => m.Id == mid);
                 if (mark is null) return ("entfernt", null);
-                if (!v.Owns(p) && !(v.Guest is not null && mark.By == v.Guest.Id)) return ("", "Diese Markierung kann nur entfernen, wer sie gesetzt hat.");
+                if (!v.Owns(p) && !(v.Guest is not null && mark.By == v.Guest.Id)) return ("", ctx.T("moments.err.notYourTag"));
                 await store.PhotoTags.DeleteAsync(mark.Id, ct);
                 return ("entfernt", null);
             }
             case "caption":
-                if (!v.Owns(p)) return ("", "Nur wer das Foto hochgeladen hat, kann die Bildunterschrift ändern.");
+                if (!v.Owns(p)) return ("", ctx.T("moments.err.captionOwner"));
                 await store.Photos.UpdateAsync(p.Id, new Dictionary<string, object?> { ["caption"] = M.Line(r.F("caption"), 200) }, ct);
                 return ("text", null);
             case "delete":
-                if (!v.Owns(p)) return ("", "Nur wer das Foto hochgeladen hat, kann es löschen.");
+                if (!v.Owns(p)) return ("", ctx.T("moments.err.deleteOwner"));
                 await store.DeletePhotoAsync(ctx.Files, p, ct);
                 return ("geloescht", null);
             case "approve" when v.Admin:
@@ -662,26 +664,26 @@ public static class MomentsPublic
         var form = "<input type=\"hidden\" name=\"q\" value=\"" + M.H(query) + "\">" + ctx.Antiforgery;
 
         var sb = new StringBuilder("<div class=\"mo-photo-page\"><p class=\"mo-back\"><a href=\"").Append(Base).Append(M.H(f.Query()))
-            .Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> Alle Fotos</a>");
+            .Append("\"><i class=\"ti ti-chevron-left\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.allPhotos")).Append("</a>");
         if (index >= 0) sb.Append("<span class=\"mo-pos\">").Append(index + 1).Append(" / ").Append(listing.Photos.Count).Append("</span>");
         sb.Append("</p>").Append(Notice(ctx));
         if (error is not null) sb.Append(Err(error));
-        if (p.Pending) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> Wartet auf Freigabe – bis dahin sehen es nur ").Append(v.Admin ? "ihr und der Gast, der es hochgeladen hat." : "du und die Gastgeber.").Append("</p>");
-        if (p.Status == MomentsStore.Hidden) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-eye-off\" aria-hidden=\"true\"></i> Ausgeblendet – die Gäste sehen es nicht.</p>");
+        if (p.Pending) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-hourglass\" aria-hidden=\"true\"></i> ").Append(ctx.T(v.Admin ? "moments.photo.pendingHosts" : "moments.photo.pendingGuest")).Append("</p>");
+        if (p.Status == MomentsStore.Hidden) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-eye-off\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.photo.hiddenNote")).Append("</p>");
 
-        var alt = p.Caption.Length > 0 ? p.Caption : "Foto von " + author;
+        var alt = p.Caption.Length > 0 ? p.Caption : ctx.T("moments.photo.by", author);
         sb.Append("<figure class=\"mo-stage\" data-mo-stage><img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/v\" alt=\"").Append(M.H(alt)).Append("\"");
         if (p.Width > 0 && p.Height > 0) sb.Append(" width=\"").Append(p.Width).Append("\" height=\"").Append(p.Height).Append("\"");
         sb.Append(">");
-        if (prev is not null) sb.Append("<a class=\"mo-nav prev\" rel=\"prev\" href=\"").Append(Base).Append("/foto/").Append(prev.Id).Append(M.H(query)).Append("\" aria-label=\"Vorheriges Foto\"><i class=\"ti ti-chevron-left\"></i></a>");
-        if (next is not null) sb.Append("<a class=\"mo-nav next\" rel=\"next\" href=\"").Append(Base).Append("/foto/").Append(next.Id).Append(M.H(query)).Append("\" aria-label=\"Nächstes Foto\"><i class=\"ti ti-chevron-right\"></i></a>");
+        if (prev is not null) sb.Append("<a class=\"mo-nav prev\" rel=\"prev\" href=\"").Append(Base).Append("/foto/").Append(prev.Id).Append(M.H(query)).Append("\" aria-label=\"").Append(ctx.T("moments.photo.prev")).Append("\"><i class=\"ti ti-chevron-left\"></i></a>");
+        if (next is not null) sb.Append("<a class=\"mo-nav next\" rel=\"next\" href=\"").Append(Base).Append("/foto/").Append(next.Id).Append(M.H(query)).Append("\" aria-label=\"").Append(ctx.T("moments.photo.next")).Append("\"><i class=\"ti ti-chevron-right\"></i></a>");
         sb.Append("</figure>");
 
         sb.Append("<div class=\"mo-detail\"><div class=\"mo-info\" id=\"mo-info\">");
         sb.Append("<div class=\"mo-by\"><span class=\"mo-avatar\">").Append(M.H(M.Initials(author))).Append("</span><div><strong>").Append(M.H(author)).Append("</strong><small>")
-          .Append(M.H(M.Taken(p.Taken))).Append("</small></div></div>");
+          .Append(M.H(M.Taken(ctx, p.Taken))).Append("</small></div></div>");
         if (p.AlbumId > 0 && await store.AlbumAsync(p.AlbumId, ct) is Album inAlbum)
-            sb.Append("<p class=\"mo-in-album\"><i class=\"ti ti-album\" aria-hidden=\"true\"></i> Album <a href=\"").Append(Base).Append("?album=").Append(inAlbum.Id).Append("\">")
+            sb.Append("<p class=\"mo-in-album\"><i class=\"ti ti-album\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.album")).Append(" <a href=\"").Append(Base).Append("?album=").Append(inAlbum.Id).Append("\">")
               .Append(M.H(inAlbum.Name)).Append("</a></p>");
         if (p.Caption.Length > 0) sb.Append("<p class=\"mo-caption\">").Append(M.H(p.Caption)).Append("</p>");
 
@@ -690,32 +692,35 @@ public static class MomentsPublic
         if (p.Approved)
         {
             var who = string.Join(", ", hearts.Select(g => AuthorName(ctx, g, listing.Guests)).Distinct());
-            sb.Append("<form method=\"post\" class=\"mo-inline\">").Append(form).Append("<button class=\"mo-heart").Append(mine ? " on" : "").Append("\" name=\"action\" value=\"heart\" type=\"submit\" aria-pressed=\"")
+            var like = ctx.T("moments.like");
+            // data-mo-like: the word the page script writes when the last heart is taken back
+            sb.Append("<form method=\"post\" class=\"mo-inline\">").Append(form).Append("<button class=\"mo-heart").Append(mine ? " on" : "").Append("\" name=\"action\" value=\"heart\" type=\"submit\" data-mo-like=\"").Append(M.H(like)).Append("\" aria-pressed=\"")
               .Append(mine ? "true" : "false").Append("\"").Append(who.Length > 0 ? " title=\"" + M.H(who) + "\"" : "").Append("><i class=\"ti ti-heart").Append(mine ? "-filled" : "").Append("\" aria-hidden=\"true\"></i> ")
-              .Append(hearts.Count > 0 ? hearts.Count.ToString(CultureInfo.InvariantCulture) : "Gefällt mir").Append("</button></form>");
+              .Append(hearts.Count > 0 ? hearts.Count.ToString(CultureInfo.InvariantCulture) : like).Append("</button></form>");
         }
         if (MomentsSettings.DownloadMode(ctx) != MomentsSettings.DownloadOff || v.Owns(p))
-            sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/download/").Append(p.Id).Append("\" download><i class=\"ti ti-download\" aria-hidden=\"true\"></i> Herunterladen</a>");
+            sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/download/").Append(p.Id).Append("\" download><i class=\"ti ti-download\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.download")).Append("</a>");
         if (v.Admin)
         {
-            if (!p.Approved) sb.Append(Act(form, "approve", "ti-check", "Freigeben", primary: true));
-            else sb.Append(Act(form, "hide", "ti-eye-off", "Ausblenden"));
-            sb.Append(Act(form, "feature", p.Featured ? "ti-star-off" : "ti-star", p.Featured ? "Kein Highlight mehr" : "Als Highlight"));
+            if (!p.Approved) sb.Append(Act(form, "approve", "ti-check", ctx.T("moments.approve"), primary: true));
+            else sb.Append(Act(form, "hide", "ti-eye-off", ctx.T("moments.hide")));
+            sb.Append(Act(form, "feature", p.Featured ? "ti-star-off" : "ti-star", ctx.T(p.Featured ? "moments.photo.unfeature" : "moments.photo.feature")));
         }
         if (v.Owns(p))
-            sb.Append("<details class=\"mo-confirm\"><summary class=\"mo-btn ghost danger\"><i class=\"ti ti-trash\" aria-hidden=\"true\"></i> Löschen</summary><form method=\"post\">").Append(form)
-              .Append("<p>Das Foto wird für alle gelöscht.</p><button class=\"mo-btn danger\" name=\"action\" value=\"delete\" type=\"submit\">Ja, löschen</button></form></details>");
+            sb.Append("<details class=\"mo-confirm\"><summary class=\"mo-btn ghost danger\"><i class=\"ti ti-trash\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.delete")).Append("</summary><form method=\"post\">").Append(form)
+              .Append("<p>").Append(ctx.T("moments.photo.deleteForAll")).Append("</p><button class=\"mo-btn danger\" name=\"action\" value=\"delete\" type=\"submit\">").Append(ctx.T("moments.photo.deleteYes")).Append("</button></form></details>");
         sb.Append("</div>");
         if (v.Owns(p))
-            sb.Append("<details class=\"mo-edit\"><summary><i class=\"ti ti-pencil\" aria-hidden=\"true\"></i> ").Append(p.Caption.Length > 0 ? "Bildunterschrift ändern" : "Bildunterschrift schreiben")
+            sb.Append("<details class=\"mo-edit\"><summary><i class=\"ti ti-pencil\" aria-hidden=\"true\"></i> ").Append(ctx.T(p.Caption.Length > 0 ? "moments.caption.change" : "moments.caption.write"))
               .Append("</summary><form method=\"post\" class=\"mo-row\">").Append(form).Append("<input type=\"hidden\" name=\"action\" value=\"caption\"><input name=\"caption\" maxlength=\"200\" value=\"")
-              .Append(M.H(p.Caption)).Append("\" placeholder=\"Was passiert hier?\" aria-label=\"Bildunterschrift\"><button class=\"mo-btn\" type=\"submit\">Speichern</button></form></details>");
+              .Append(M.H(p.Caption)).Append("\" placeholder=\"").Append(ctx.T("moments.caption.placeholder")).Append("\" aria-label=\"").Append(ctx.T("moments.caption")).Append("\"><button class=\"mo-btn\" type=\"submit\">")
+              .Append(ctx.T("moments.save")).Append("</button></form></details>");
 
         // marks: who and what is on it
         var marks = listing.MarksByPhoto[p.Id].ToList();
         var tagById = listing.Tags.ToDictionary(t => t.Id);
         var canTag = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestTags);
-        sb.Append("<section class=\"mo-tags\" id=\"mo-tags\"><h2>Wer und was ist drauf?</h2><div class=\"mo-chiprow\">");
+        sb.Append("<section class=\"mo-tags\" id=\"mo-tags\"><h2>").Append(ctx.T("moments.tags.heading")).Append("</h2><div class=\"mo-chiprow\">");
         foreach (var m in marks.Where(m => tagById.ContainsKey(m.TagId)).OrderBy(m => tagById[m.TagId].Kind == MomentsStore.Person ? 0 : 1).ThenBy(m => tagById[m.TagId].Name, StringComparer.OrdinalIgnoreCase))
         {
             var t = tagById[m.TagId];
@@ -723,17 +728,18 @@ public static class MomentsPublic
               .Append(t.Kind == MomentsStore.Person ? "user" : "tag").Append("\" aria-hidden=\"true\"></i> ").Append(M.H(t.Name)).Append("</a>");
             if (v.Owns(p) || (v.Guest is not null && m.By == v.Guest.Id))
                 sb.Append("<form method=\"post\">").Append(form).Append("<input type=\"hidden\" name=\"mark\" value=\"").Append(m.Id).Append("\"><button name=\"action\" value=\"untag\" type=\"submit\" aria-label=\"")
-                  .Append(M.H(t.Name)).Append(" entfernen\" title=\"Entfernen\"><i class=\"ti ti-x\"></i></button></form>");
+                  .Append(ctx.T("moments.tags.removeName", M.H(t.Name))).Append("\" title=\"").Append(ctx.T("moments.remove")).Append("\"><i class=\"ti ti-x\"></i></button></form>");
             sb.Append("</span>");
         }
-        if (marks.Count == 0) sb.Append("<span class=\"mo-muted\">Noch niemand markiert.</span>");
+        if (marks.Count == 0) sb.Append("<span class=\"mo-muted\">").Append(ctx.T("moments.tags.none")).Append("</span>");
         sb.Append("</div>");
         if (canTag)
         {
             var names = (await store.GuestsAsync(ct)).Where(g => g.Active).SelectMany(g => g.PeopleList).Concat(listing.Tags.Select(t => t.Name))
                 .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList();
             sb.Append("<form method=\"post\" class=\"mo-row\">").Append(form).Append("<input type=\"hidden\" name=\"action\" value=\"tag\"><input name=\"tag\" list=\"mo-names\" maxlength=\"40\" autocomplete=\"off\" placeholder=\"")
-              .Append(ctx.Settings.GetBool(MomentsSettings.NewTags) || v.Admin ? "Name oder Stichwort, z. B. Tanzfläche" : "Name oder Stichwort aus der Liste").Append("\" aria-label=\"Person oder Stichwort\"><button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-tag\" aria-hidden=\"true\"></i> Markieren</button></form><datalist id=\"mo-names\">");
+              .Append(ctx.T(ctx.Settings.GetBool(MomentsSettings.NewTags) || v.Admin ? "moments.tags.placeholderNew" : "moments.tags.placeholderList")).Append("\" aria-label=\"").Append(ctx.T("moments.tags.field"))
+              .Append("\"><button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-tag\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.tags.submit")).Append("</button></form><datalist id=\"mo-names\">");
             foreach (var n in names) sb.Append("<option value=\"").Append(M.H(n)).Append("\">");
             sb.Append("</datalist>");
         }
@@ -742,24 +748,27 @@ public static class MomentsPublic
         // comments
         var guests = listing.Guests;
         var comments = (await store.CommentsOfPhotoAsync(p.Id, ct)).Where(c => c.Visible || v.Admin || (v.Guest is not null && c.GuestId == v.Guest.Id)).ToList();
-        sb.Append("<section class=\"mo-comments\" id=\"mo-comments\"><h2>Kommentare").Append(comments.Count > 0 ? " (" + comments.Count + ")" : "").Append("</h2>");
-        if (comments.Count == 0) sb.Append("<p class=\"mo-muted\">Noch keine Kommentare.</p>");
+        sb.Append("<section class=\"mo-comments\" id=\"mo-comments\"><h2>").Append(ctx.T("moments.comments")).Append(comments.Count > 0 ? " (" + comments.Count + ")" : "").Append("</h2>");
+        if (comments.Count == 0) sb.Append("<p class=\"mo-muted\">").Append(ctx.T("moments.comments.none")).Append("</p>");
         sb.Append("<ul class=\"mo-commentlist\">");
         foreach (var c in comments)
         {
             var name = AuthorName(ctx, c.GuestId, guests);
             sb.Append("<li").Append(c.Visible ? "" : " class=\"waiting\"").Append("><span class=\"mo-avatar small\">").Append(M.H(M.Initials(name))).Append("</span><div><p class=\"mo-comment-head\"><strong>")
-              .Append(M.H(name)).Append("</strong> <small>").Append(M.H(M.Ago(c.Created))).Append(c.Status == MomentsStore.Pending ? " · wartet auf Freigabe" : c.Status == MomentsStore.Hidden ? " · ausgeblendet" : "")
+              .Append(M.H(name)).Append("</strong> <small>").Append(M.H(M.Ago(ctx, c.Created)))
+              .Append(c.Status == MomentsStore.Pending ? " · " + ctx.T("moments.status.waiting") : c.Status == MomentsStore.Hidden ? " · " + ctx.T("moments.status.hidden") : "")
               .Append("</small></p><p>").Append(M.Text(c.Text)).Append("</p></div>");
             if (v.Admin || (v.Guest is not null && c.GuestId == v.Guest.Id))
                 sb.Append("<form method=\"post\">").Append(form).Append("<input type=\"hidden\" name=\"comment\" value=\"").Append(c.Id)
-                  .Append("\"><button name=\"action\" value=\"uncomment\" type=\"submit\" class=\"mo-x\" aria-label=\"Kommentar löschen\" title=\"Löschen\"><i class=\"ti ti-trash\"></i></button></form>");
+                  .Append("\"><button name=\"action\" value=\"uncomment\" type=\"submit\" class=\"mo-x\" aria-label=\"").Append(ctx.T("moments.comments.delete")).Append("\" title=\"").Append(ctx.T("moments.delete"))
+                  .Append("\"><i class=\"ti ti-trash\"></i></button></form>");
             sb.Append("</li>");
         }
         sb.Append("</ul>");
         if (p.Approved || v.Admin)
-            sb.Append("<form method=\"post\" class=\"mo-comment-form\">").Append(form).Append("<input type=\"hidden\" name=\"action\" value=\"comment\"><textarea name=\"text\" rows=\"2\" maxlength=\"1000\" required placeholder=\"Schreib etwas dazu …\" aria-label=\"Kommentar\"></textarea>")
-              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-send\" aria-hidden=\"true\"></i> Senden</button></form>");
+            sb.Append("<form method=\"post\" class=\"mo-comment-form\">").Append(form).Append("<input type=\"hidden\" name=\"action\" value=\"comment\"><textarea name=\"text\" rows=\"2\" maxlength=\"1000\" required placeholder=\"")
+              .Append(ctx.T("moments.comments.placeholder")).Append("\" aria-label=\"").Append(ctx.T("moments.comment")).Append("\"></textarea>")
+              .Append("<button class=\"mo-btn\" type=\"submit\"><i class=\"ti ti-send\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.comments.send")).Append("</button></form>");
         sb.Append("</section></div></div>").Append(MomentsScript.Stage);
         return sb.ToString();
     }
@@ -778,25 +787,25 @@ public static class MomentsPublic
         var mine = await store.PhotosOfGuestAsync(v.Id, ct);
         var listing = await ListingAsync(ctx, store, v, new Filter(0, "", "zeit", false, 1), ct);
         var hearted = listing.Hearts.Count(kv => kv.Value.Contains(v.Id));
-        var sb = new StringBuilder(Head(ctx, v, "Meine Fotos", crumb: "")).Append(Notice(ctx));
+        var sb = new StringBuilder(Head(ctx, v, ctx.T("moments.myPhotos"), crumb: "")).Append(Notice(ctx));
         sb.Append("<div class=\"mo-welcome-actions left\">");
         if (v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload))
-            sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Fotos hochladen</a>");
-        if (hearted > 0) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("?herzen=1\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> Meine Herzen (").Append(hearted).Append(")</a>");
-        if (v.Guest is not null) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/abmelden\"><i class=\"ti ti-logout\" aria-hidden=\"true\"></i> Abmelden</a>");
+            sb.Append("<a class=\"mo-btn\" href=\"").Append(Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.uploadPhotos")).Append("</a>");
+        if (hearted > 0) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("?herzen=1\"><i class=\"ti ti-heart\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.myHearts")).Append(" (").Append(hearted).Append(")</a>");
+        if (v.Guest is not null) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(Base).Append("/abmelden\"><i class=\"ti ti-logout\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.signOut")).Append("</a>");
         sb.Append("</div>");
-        if (mine.Count == 0) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-camera\" aria-hidden=\"true\"></i><p>Du hast noch keine Fotos hochgeladen.</p></div>");
+        if (mine.Count == 0) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-camera\" aria-hidden=\"true\"></i><p>").Append(ctx.T("moments.mine.none")).Append("</p></div>");
         else
         {
             var waiting = mine.Count(x => x.Pending);
-            sb.Append("<p class=\"mo-muted\">").Append(M.Plural(mine.Count, "Foto", "Fotos"));
-            if (waiting > 0) sb.Append(", davon ").Append(waiting).Append(" noch nicht freigegeben – die anderen Gäste sehen sie, sobald die Gastgeber sie freigegeben haben");
+            sb.Append("<p class=\"mo-muted\">").Append(M.Count(ctx, mine.Count, "moments.count.photo."));
+            if (waiting > 0) sb.Append(", ").Append(ctx.T("moments.mine.waiting", M.N(waiting)));
             sb.Append(".</p><div class=\"mo-grid\">");
             foreach (var p in mine)
-                sb.Append(Tile(p, "", listing, p.Pending ? "wartet auf Freigabe" : p.Status == MomentsStore.Hidden ? "ausgeblendet" : null));
+                sb.Append(Tile(ctx, p, "", listing, p.Pending ? ctx.T("moments.status.waiting") : p.Status == MomentsStore.Hidden ? ctx.T("moments.status.hidden") : null));
             sb.Append("</div>");
         }
-        return Frame(ctx, sb.ToString(), "Meine Fotos");
+        return Frame(ctx, sb.ToString(), ctx.T("moments.myPhotos"));
     }
 
     // ---- upload -------------------------------------------------------------------------------------------------
@@ -805,27 +814,27 @@ public static class MomentsPublic
     {
         var store = new MomentsStore(ctx.Data);
         var v = await ViewerAsync(ctx, store, ct);
-        if (v is null) return ctx.Request.IsPost ? PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = "Bitte melde dich erst an." }, 403) : ToLogin(ctx);
+        if (v is null) return ctx.Request.IsPost ? PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = ctx.T("moments.upload.signInFirst") }, 403) : ToLogin(ctx);
         var open = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload);
         if (ctx.Request.IsPost && ctx.Request.Action == "upload")
         {
             var ajax = ctx.Request.F("ajax") == "1";
-            if (!open) return Answer(ctx, ajax, "Das Hochladen ist geschlossen.", false);
+            if (!open) return Answer(ctx, ajax, ctx.T("moments.upload.closed"), false);
             var result = await MomentsUpload.SaveAsync(ctx, store, v, ct);
             return Answer(ctx, ajax, result.Error, result.Pending);
         }
-        var sb = new StringBuilder(Head(ctx, v, "Fotos hochladen", crumb: ""));
-        if (!open) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-lock\" aria-hidden=\"true\"></i><p>Das Hochladen ist geschlossen. Danke für all eure Bilder!</p></div>");
+        var sb = new StringBuilder(Head(ctx, v, ctx.T("moments.uploadPhotos"), crumb: ""));
+        if (!open) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-lock\" aria-hidden=\"true\"></i><p>").Append(ctx.T("moments.upload.closedThanks")).Append("</p></div>");
         else sb.Append(MomentsUpload.Panel(ctx, v, await store.AlbumsAsync(ct),
             long.TryParse(ctx.Request.Q("album"), NumberStyles.None, CultureInfo.InvariantCulture, out var preselect) ? preselect : 0));
-        return Frame(ctx, sb.ToString(), "Fotos hochladen");
+        return Frame(ctx, sb.ToString(), ctx.T("moments.uploadPhotos"));
     }
 
     /// <summary>The script sends one photo per request and wants JSON; without script the form comes whole and the answer is a page.</summary>
     private static PluginResult Answer(IPluginContext ctx, bool ajax, string? error, bool pending)
     {
         if (ajax) return PluginResult.Json(new JsonObject { ["ok"] = error is null, ["error"] = error, ["pending"] = pending });
-        if (error is not null) return Frame(ctx, Err(error) + "<p><a class=\"mo-btn\" href=\"" + Base + "/hochladen\">Zurück</a></p>", "Fotos hochladen");
+        if (error is not null) return Frame(ctx, Err(error) + "<p><a class=\"mo-btn\" href=\"" + Base + "/hochladen\">" + ctx.T("moments.back") + "</a></p>", ctx.T("moments.uploadPhotos"));
         return PluginResult.Redirect(Base + "/meine");
     }
 
@@ -858,18 +867,18 @@ public static class MomentsPublic
         var mode = v.Owns(p) ? MomentsSettings.DownloadOriginal : MomentsSettings.DownloadMode(ctx);
         var file = mode switch { MomentsSettings.DownloadOriginal => p.File, MomentsSettings.DownloadView => p.View.Length > 0 ? p.View : p.File, _ => "" };
         if (file.Length == 0) return PluginResult.NotFound();
-        var name = DownloadName(MomentsSettings.Event(ctx)) + "-" + M.N(p.Id) + Path.GetExtension(file);
+        var name = DownloadName(MomentsSettings.Event(ctx), ctx.T("moments.photo")) + "-" + M.N(p.Id) + Path.GetExtension(file);
         return await ServeAsync(ctx, file, name, ct);
     }
 
-    private static string DownloadName(string s)
+    private static string DownloadName(string s, string fallback)
     {
         var sb = new StringBuilder();
         foreach (var ch in s.Normalize(NormalizationForm.FormD))
             if (char.IsAsciiLetterOrDigit(ch)) sb.Append(ch);
             else if (ch is ' ' or '-' or '_' or '&' && sb.Length > 0 && sb[^1] != '-') sb.Append('-');
         var r = sb.ToString().Trim('-');
-        return r.Length == 0 ? "Foto" : r.Length > 40 ? r[..40] : r;
+        return r.Length == 0 ? fallback : r.Length > 40 ? r[..40] : r;
     }
 
     /// <summary>A photo file from the plugin's private store: never sniffed, never cached by a shared cache, a download when a name is given.</summary>

@@ -13,15 +13,17 @@ public static class VereinInstagram
     public const string Color = "instaColor", Logo = "instaLogo", Hashtags = "instaHashtags", SeasonKind = "instaSeason", SeasonTitle = "instaSeasonTitle";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(Color, "Vereinsfarbe", SettingKind.Color) { Group = "Instagram-Bild", Default = "#8a1f33", Help = "Hintergrund und Akzente der Bilder." })
-        .Add(new SettingSpec(Logo, "Logo", SettingKind.Image) { Help = "Erscheint in einem weißen Kreis auf dem Bild (ein Bild aus der Mediathek; transparente Flächen werden weiß)." })
-        .Choice(SeasonKind, "Zeitraum der Saison", "monate", new[] { new FieldOption("monate", "die nächsten drei Monate"), new FieldOption("jahr", "das laufende Jahr"), new FieldOption("fasnet", "die nächste Fasnet (6. Januar bis Aschermittwoch)") },
-            "Voreinstellung der Vorlage „Saison“ – beim Erstellen lässt sich der Zeitraum ändern.")
-        .Text(SeasonTitle, "Überschrift der Saison", "Terminplan", "z. B. „Saisonplan“, „Spielplan“ oder „Narrenfahrplan“ – die Jahreszahl kommt dazu.")
-        .Text(Hashtags, "Zeile unten", "", "z. B. #fasnet #narren #besigheim – leer = Name des Vereins.");
+        .Add(new SettingSpec(Color, "verein.insta.set.color", SettingKind.Color) { Group = "verein.insta.set.group", Default = "#8a1f33", Help = "verein.insta.set.colorHelp" })
+        .Add(new SettingSpec(Logo, "verein.insta.set.logo", SettingKind.Image) { Help = "verein.insta.set.logoHelp" })
+        .Choice(SeasonKind, "verein.insta.set.season", "monate", new[] { new FieldOption("monate", "verein.insta.set.seasonMonths"), new FieldOption("jahr", "verein.insta.set.seasonYear"), new FieldOption("fasnet", "verein.insta.set.seasonFasnet") },
+            "verein.insta.set.seasonHelp")
+        // the default value is stored as typed — it stays German; an English club types its own word
+        .Text(SeasonTitle, "verein.insta.set.seasonTitle", "Terminplan", "verein.insta.set.seasonTitleHelp")
+        .Text(Hashtags, "verein.insta.set.footer", "", "verein.insta.set.footerHelp");
 
-    private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "Quadrat 1080 × 1080", 1080, 1080), ("portrait", "Hochformat 1080 × 1350", 1080, 1350), ("story", "Story 1080 × 1920", 1080, 1920) };
+    private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "verein.insta.format.square", 1080, 1080), ("portrait", "verein.insta.format.portrait", 1080, 1350), ("story", "verein.insta.format.story", 1080, 1920) };
 
+    /// <summary>German month names — kept for callers that have no request; anything shown on a page uses <see cref="V.MonthNames"/>.</summary>
     internal static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
 
     /// <summary>
@@ -46,7 +48,8 @@ public static class VereinInstagram
 
         // ---- the period and the chosen dates ----
         var seasonKind = ctx.Settings.Get(SeasonKind);
-        var (defFrom, defTo, season) = DefaultSeason(seasonKind);
+        var (defFrom, defTo, season) = DefaultSeason(ctx, seasonKind);
+        var monthNames = V.MonthNames(ctx);
         var from = V.CleanDate(P("von")) is { Length: 10 } f1 ? f1 : defFrom;
         var to = V.CleanDate(P("bis")) is { Length: 10 } t1 ? t1 : defTo;
         if (string.CompareOrdinal(to, from) < 0) (from, to) = (to, from);
@@ -62,13 +65,13 @@ public static class VereinInstagram
         {
             if (template == "plakat") return "";
             if (legacySeason || (seasonKind is "fasnet" or "jahr" && from == defFrom && to == defTo))
-                return (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : "Terminplan") + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]);
-            string M(string d) => MonthNames[int.Parse(d[5..7], CultureInfo.InvariantCulture) - 1];
-            if (from[..7] == to[..7]) return "Termine im " + M(from) + " " + from[..4];
+                return (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : ctx.T("verein.insta.planDefault")) + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]);
+            string M(string d) => monthNames[int.Parse(d[5..7], CultureInfo.InvariantCulture) - 1];
+            if (from[..7] == to[..7]) return ctx.T("verein.insta.head.month", M(from), from[..4]);
             // whole months of one year: "Termine Januar – Februar 2027"
             var lastOfTo = new DateTime(int.Parse(to[..4], CultureInfo.InvariantCulture), int.Parse(to[5..7], CultureInfo.InvariantCulture), 1).AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            if (from[..4] == to[..4] && from[8..] == "01" && to == lastOfTo) return "Termine " + M(from) + " – " + M(to) + " " + from[..4];
-            return string.CompareOrdinal(from, V.Today) <= 0 ? "Nächste Termine" : "Termine";
+            if (from[..4] == to[..4] && from[8..] == "01" && to == lastOfTo) return ctx.T("verein.insta.head.months", M(from), M(to), from[..4]);
+            return ctx.T(string.CompareOrdinal(from, V.Today) <= 0 ? "verein.insta.head.next" : "verein.insta.head.events");
         }
         var auto = Auto();
         var typed = V.Clip(P("titel"), 40);
@@ -85,7 +88,7 @@ public static class VereinInstagram
         // ---- the pictures: as many as the chosen dates need ----
         var single = template == "plakat" ? (upcoming.FirstOrDefault(e => e.Id == eventId) ?? upcoming.FirstOrDefault(e => e.Public) ?? upcoming.FirstOrDefault()) : null;
         var svgs = new List<string>();
-        if (template == "plakat") { if (single is not null) svgs.Add(Poster(single, format.W, format.H, color, photoData, logoData, club, footer, heading)); }
+        if (template == "plakat") { if (single is not null) svgs.Add(Poster(ctx, single, format.W, format.H, color, photoData, logoData, club, footer, heading)); }
         else if (chosen.Count > 0)
         {
             var per = style == "kompakt" ? SeasonCapacity(format.H) : ListCapacity(format.H);
@@ -94,8 +97,8 @@ public static class VereinInstagram
             {
                 var part = chosen.Skip(i * per).Take(per).ToList();
                 svgs.Add(style == "kompakt"
-                    ? Season(part, i + 1, pages, chosen[0].Day, chosen[^1].Day, format.W, format.H, color, photoData, logoData, club, footer, heading)
-                    : List(part, i + 1, pages, format.W, format.H, color, photoData, logoData, club, footer, heading));
+                    ? Season(ctx, part, i + 1, pages, chosen[0].Day, chosen[^1].Day, format.W, format.H, color, photoData, logoData, club, footer, heading)
+                    : List(ctx, part, i + 1, pages, format.W, format.H, color, photoData, logoData, club, footer, heading));
             }
         }
 
@@ -106,59 +109,59 @@ public static class VereinInstagram
         // one click per month that has dates (from this month on, a year ahead), and the season
         var months = everything.Where(Fits).Select(e => e.Day[..7]).Where(m => string.CompareOrdinal(m, V.Today[..7]) >= 0).Distinct().OrderBy(m => m).Take(12).ToList();
         UiNode Quick() => Ui.Stack(
-            Ui.Muted("Schnell wählen:"),
-            Ui.Inline(new UiNode?[] { Ui.Button("Saison: " + season, Link(defFrom, defTo), UiButtonKind.Ghost, "ti-calendar", small: true) }
+            Ui.Muted(ctx.T("verein.insta.quick")),
+            Ui.Inline(new UiNode?[] { Ui.Button(ctx.T("verein.insta.seasonButton", season), Link(defFrom, defTo), UiButtonKind.Ghost, "ti-calendar", small: true) }
                 .Concat(months.Select(m =>
                 {
                     var first = m + "-01";
                     var last = new DateTime(int.Parse(m[..4], CultureInfo.InvariantCulture), int.Parse(m[5..7], CultureInfo.InvariantCulture), 1).AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                     var n = everything.Count(e => Fits(e) && e.Day[..7] == m);
-                    return (UiNode?)Ui.Button(MonthNames[int.Parse(m[5..7], CultureInfo.InvariantCulture) - 1] + " " + m[..4] + " (" + n + ")", Link(first, last), from == first && to == last ? UiButtonKind.Primary : UiButtonKind.Ghost, small: true);
+                    return (UiNode?)Ui.Button(monthNames[int.Parse(m[5..7], CultureInfo.InvariantCulture) - 1] + " " + m[..4] + " (" + n + ")", Link(first, last), from == first && to == last ? UiButtonKind.Primary : UiButtonKind.Ghost, small: true);
                 })).ToArray()));
 
         var chosenIds = chosen.Select(e => e.Id).ToHashSet();
         UiNode Picker() => candidates.Count == 0
-            ? Ui.Empty("In diesem Zeitraum gibt es keine passenden Termine.")
+            ? Ui.Empty(ctx.T("verein.insta.noneFit"))
             : Ui.Stack(
                 Ui.Hidden("gezeigt", string.Join(",", candidates.Select(e => e.Id))),
-                Ui.Inline(Ui.Text(chosen.Count + " von " + candidates.Count + " Terminen ausgewählt"),
-                    Ui.Submit("Alle", UiButtonKind.Ghost, "sel", "alle", small: true), Ui.Submit("Keine", UiButtonKind.Ghost, "sel", "keine", small: true)),
-                Ui.Grid(300, candidates.Select(e => (UiNode?)Ui.Checkbox("e_" + e.Id, V.Badge(e.Starts).Weekday + " " + V.Date(e.Starts) + " – " + e.Title + (e.Public ? "" : " (intern)"), chosenIds.Contains(e.Id))).ToArray()));
+                Ui.Inline(Ui.Text(ctx.T("verein.insta.chosen", chosen.Count, candidates.Count)),
+                    Ui.Submit(ctx.T("verein.insta.all"), UiButtonKind.Ghost, "sel", "alle", small: true), Ui.Submit(ctx.T("verein.insta.none"), UiButtonKind.Ghost, "sel", "keine", small: true)),
+                Ui.Grid(300, candidates.Select(e => (UiNode?)Ui.Checkbox("e_" + e.Id, V.Badge(ctx, e.Starts).Weekday + " " + V.Date(ctx, e.Starts) + " – " + e.Title + (e.Public ? "" : ctx.T("verein.insta.internal")), chosenIds.Contains(e.Id))).ToArray()));
 
         var form = Ui.Form(
             Ui.Hidden("titel_auto", auto),
             Ui.Grid(200,
-                Ui.Select("vorlage", "Vorlage", template, Ui.Option("liste", "Terminliste (Termine auswählen)"), Ui.Option("plakat", "Plakat (ein Termin)")),
-                Ui.Select("format", "Format", format.Key, Formats.Select(f => Ui.Option(f.Key, f.Label)).ToArray()),
-                template == "plakat" ? null : Ui.Select("stil", "Darstellung", style, Ui.Option("normal", "Normal – große Datumskacheln"), Ui.Option("kompakt", "Kompakt – kleinere Schrift, mehr Termine")),
-                Ui.Input("titel", "Überschrift", heading) with { Help = template == "plakat" ? null : "Leer lassen = automatisch (" + auto + ")." }),
+                Ui.Select("vorlage", ctx.T("verein.insta.template"), template, Ui.Option("liste", ctx.T("verein.insta.template.list")), Ui.Option("plakat", ctx.T("verein.insta.template.poster"))),
+                Ui.Select("format", ctx.T("verein.insta.format"), format.Key, Formats.Select(f => Ui.Option(f.Key, ctx.T(f.Label))).ToArray()),
+                template == "plakat" ? null : Ui.Select("stil", ctx.T("verein.insta.style"), style, Ui.Option("normal", ctx.T("verein.insta.style.normal")), Ui.Option("kompakt", ctx.T("verein.insta.style.compact"))),
+                Ui.Input("titel", ctx.T("verein.insta.heading"), heading) with { Help = template == "plakat" ? null : ctx.T("verein.insta.headingHelp", auto) }),
             template == "plakat"
-                ? Ui.Select("event", "Termin", single?.Id.ToString(CultureInfo.InvariantCulture) ?? "", upcoming.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(e.Starts) + " – " + e.Title)).ToArray())
-                : Ui.Grid(200, Ui.Input("von", "Von", from, UiInputType.Date), Ui.Input("bis", "Bis", to, UiInputType.Date),
-                    Ui.Select("art", "Nur diese Art", kind, new[] { Ui.Option("", "alle") }.Concat(kinds.Select(k => Ui.Option(k, k))).ToArray())),
-            template == "plakat" ? null : Ui.Checkbox("oeffentlich", "Nur öffentliche Termine", onlyPublic),
+                ? Ui.Select("event", ctx.T("verein.insta.event"), single?.Id.ToString(CultureInfo.InvariantCulture) ?? "", upcoming.Select(e => Ui.Option(e.Id.ToString(CultureInfo.InvariantCulture), V.Date(ctx, e.Starts) + " – " + e.Title)).ToArray())
+                : Ui.Grid(200, Ui.Input("von", ctx.T("verein.export.from"), from, UiInputType.Date), Ui.Input("bis", ctx.T("verein.export.to"), to, UiInputType.Date),
+                    Ui.Select("art", ctx.T("verein.export.onlyKind"), kind, new[] { Ui.Option("", ctx.T("verein.export.all")) }.Concat(kinds.Select(k => Ui.Option(k, k))).ToArray())),
+            template == "plakat" ? null : Ui.Checkbox("oeffentlich", ctx.T("verein.export.onlyPublic"), onlyPublic),
             template == "plakat" ? null : Quick(),
-            template == "plakat" ? null : Ui.Heading("Termine", 3),
+            template == "plakat" ? null : Ui.Heading(ctx.T("verein.insta.events"), 3),
             template == "plakat" ? null : Picker(),
-            Ui.Image("bild", "Hintergrundfoto (freiwillig)", photo),
-            Ui.FormActions(Ui.Submit("Vorschau aktualisieren", icon: "ti-refresh")));
+            Ui.Image("bild", ctx.T("verein.insta.photo"), photo),
+            Ui.FormActions(Ui.Submit(ctx.T("verein.insta.refresh"), icon: "ti-refresh")));
 
         var name = (template == "plakat" ? "termin" : "termine-" + (chosen.Count > 0 ? chosen[0].Day : from)) + "-" + format.Key;
         UiNode preview;
         if (svgs.Count == 0)
-            preview = Ui.Empty(template == "plakat" ? "Kein kommender Termin zum Zeigen." : candidates.Count == 0 ? "Keine Termine in diesem Zeitraum." : "Kein Termin ausgewählt.");
+            preview = Ui.Empty(ctx.T(template == "plakat" ? "verein.insta.noUpcoming" : candidates.Count == 0 ? "verein.insta.noneInPeriod" : "verein.insta.noneChosen"));
         else
         {
             var html = new StringBuilder();
             if (svgs.Count > 1)
-                html.Append("<p style=\"margin:0 0 14px\">").Append(chosen.Count).Append(" Termine passen nicht auf ein Bild – es sind ").Append(svgs.Count)
-                    .Append(" Bilder (fürs Karussell). <button type=\"button\" class=\"btn btn-sm vm-ig-all\"><i class=\"ti ti-download\"></i> Alle herunterladen</button></p>");
+                html.Append("<p style=\"margin:0 0 14px\">").Append(V.H(ctx.T("verein.insta.several", chosen.Count, svgs.Count)))
+                    .Append(" <button type=\"button\" class=\"btn btn-sm vm-ig-all\"><i class=\"ti ti-download\"></i> ").Append(V.H(ctx.T("verein.insta.downloadAll"))).Append("</button></p>");
             html.Append("<div class=\"vm-ig-list\" style=\"display:flex;flex-direction:column;gap:22px\">");
             for (var i = 0; i < svgs.Count; i++)
                 html.Append("<div class=\"vm-ig-item\" style=\"max-width:").Append(format.H > format.W ? 360 : 460).Append("px\">")
                     .Append(svgs[i].Replace("<svg ", "<svg style=\"width:100%;height:auto;display:block;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18)\" "))
                     .Append("<p style=\"margin-top:12px\"><button type=\"button\" class=\"btn vm-ig-dl\" data-name=\"").Append(name).Append(svgs.Count > 1 ? "-" + (i + 1) : "")
-                    .Append("\"><i class=\"ti ti-download\"></i> PNG herunterladen").Append(svgs.Count > 1 ? " (" + (i + 1) + "/" + svgs.Count + ")" : "").Append("</button></p></div>");
+                    .Append("\"><i class=\"ti ti-download\"></i> ").Append(V.H(ctx.T("verein.insta.downloadPng"))).Append(svgs.Count > 1 ? " (" + (i + 1) + "/" + svgs.Count + ")" : "").Append("</button></p></div>");
             html.Append("</div><script>(function(){function dl(b){var svg=b.closest('.vm-ig-item').querySelector('svg');")
                 .Append("var s=new XMLSerializer().serializeToString(svg).replace(/ style=\"[^\"]*\"/,'');var img=new Image();img.onload=function(){var c=document.createElement('canvas');c.width=").Append(format.W)
                 .Append(";c.height=").Append(format.H).Append(";c.getContext('2d').drawImage(img,0,0,").Append(format.W).Append(',').Append(format.H)
@@ -170,8 +173,8 @@ public static class VereinInstagram
             preview = Ui.Html(html.ToString());
         }
 
-        return Ui.Columns(new UiNode?[] { Ui.Card("Bild für Instagram, Facebook oder WhatsApp", form), Ui.Muted("Farbe, Logo, Saison und die Zeile unten stehen unter Einstellungen → Instagram-Bild.") },
-            new UiNode?[] { Ui.Card("Vorschau", preview) });
+        return Ui.Columns(new UiNode?[] { Ui.Card(ctx.T("verein.insta.cardTitle"), form), Ui.Muted(ctx.T("verein.insta.settingsHint")) },
+            new UiNode?[] { Ui.Card(ctx.T("verein.insta.preview"), preview) });
     }
 
     /// <summary>How many dates the normal list draws on one picture (a row keeps at least 150 px — the date tile stays readable).</summary>
@@ -183,25 +186,25 @@ public static class VereinInstagram
     }
 
     /// <summary>The season preselected by the setting: the next three months (default), this year, or the next Fasnet.</summary>
-    public static (string From, string To, string Label) DefaultSeason(string kind)
+    public static (string From, string To, string Label) DefaultSeason(IPluginContext ctx, string kind)
     {
         var today = V.Local(DateTime.UtcNow).Date;
         string D(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return kind switch
         {
-            "fasnet" => NextFasnet(),
-            "jahr" => (D(new DateTime(today.Year, 1, 1)), D(new DateTime(today.Year, 12, 31)), "das Jahr " + today.Year.ToString(CultureInfo.InvariantCulture)),
-            _ => (D(today), D(today.AddMonths(3)), "die nächsten drei Monate")
+            "fasnet" => NextFasnet(ctx),
+            "jahr" => (D(new DateTime(today.Year, 1, 1)), D(new DateTime(today.Year, 12, 31)), ctx.T("verein.insta.season.year", today.Year.ToString(CultureInfo.InvariantCulture))),
+            _ => (D(today), D(today.AddMonths(3)), ctx.T("verein.insta.season.months"))
         };
     }
 
     /// <summary>The next Fasnet: 6 January to Ash Wednesday (Easter Sunday − 46 days). After this year's Ash Wednesday it is next year's.</summary>
-    public static (string From, string To, string Label) NextFasnet()
+    public static (string From, string To, string Label) NextFasnet(IPluginContext ctx)
     {
         var today = V.Local(DateTime.UtcNow).Date;
         var year = today.Year;
         if (today > Easter(year).AddDays(-46)) year++;
-        return (year.ToString(CultureInfo.InvariantCulture) + "-01-06", Easter(year).AddDays(-46).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "Fasnet " + year.ToString(CultureInfo.InvariantCulture));
+        return (year.ToString(CultureInfo.InvariantCulture) + "-01-06", Easter(year).AddDays(-46).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ctx.T("verein.insta.season.fasnet", year.ToString(CultureInfo.InvariantCulture)));
     }
 
     /// <summary>Easter Sunday (Gregorian calendar, the anonymous algorithm).</summary>
@@ -219,27 +222,27 @@ public static class VereinInstagram
     public static int SeasonCapacity(int h) => Math.Max(1, (SeasonBottom(h) - 70 - (SeasonTop(h) + 190)) / SeasonRow);
 
     /// <summary>The compact list ("Saison"): every chosen date — date pill, title, time and place on one row; several pictures when they do not fit.</summary>
-    private static string Season(List<Event> events, int page, int pages, string from, string to, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
+    private static string Season(IPluginContext ctx, List<Event> events, int page, int pages, string from, string to, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
     {
         var sb = new StringBuilder();
         var top = SeasonTop(h);
         sb.Append(LogoBadge(logo, w - 140, top + 20));
         sb.Append("<text x=\"80\" y=\"").Append(top).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"28\" font-weight=\"700\" letter-spacing=\"5\" fill=\"#fff\" opacity=\".85\">").Append(X(club.ToUpperInvariant())).Append("</text>");
         sb.Append("<text x=\"80\" y=\"").Append(top + 78).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"").Append(Fit(heading, w - 80 - (logo is null ? 80 : 240), 72)).Append("\" fill=\"#fff\">").Append(X(heading)).Append("</text>");
-        var period = V.When(from, weekday: false) + " – " + V.When(to, weekday: false) + (pages > 1 ? "   ·   Seite " + page + "/" + pages : "");
+        var period = V.When(ctx, from, weekday: false) + " – " + V.When(ctx, to, weekday: false) + (pages > 1 ? "   ·   " + ctx.T("verein.insta.page", page, pages) : "");
         sb.Append("<text x=\"80\" y=\"").Append(top + 128).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"30\" font-weight=\"600\" fill=\"#fff\" opacity=\".9\">").Append(X(period)).Append("</text>");
         var y = top + 190;
         foreach (var e in events)
         {
             V.TryParse(e.Starts, out var d, out var hasTime);
-            var wd = V.Badge(e.Starts).Weekday;
+            var wd = V.Badge(ctx, e.Starts).Weekday;
             sb.Append("<rect x=\"80\" y=\"").Append(y).Append("\" width=\"190\" height=\"").Append(SeasonRow - 18).Append("\" rx=\"16\" fill=\"#fff\"/>");
             sb.Append("<text x=\"175\" y=\"").Append(y + 49).Append("\" text-anchor=\"middle\" font-family=\"").Append(Head).Append("\" font-size=\"34\" fill=\"").Append(color).Append("\">")
-              .Append(X(wd + " " + d.ToString("dd.MM.", CultureInfo.InvariantCulture))).Append("</text>");
+              .Append(X(wd + " " + d.ToString(V.En(ctx) ? "dd/MM" : "dd.MM.", CultureInfo.InvariantCulture))).Append("</text>");
             var tx = 300;
             var maxChars = (w - tx - 60) / 24;
             sb.Append("<text x=\"").Append(tx).Append("\" y=\"").Append(y + 34).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"38\" fill=\"#fff\">").Append(X(Wrap(e.Title, maxChars, 1)[0])).Append("</text>");
-            var time = hasTime && (d.Hour != 0 || d.Minute != 0) ? d.ToString("HH:mm", CultureInfo.InvariantCulture) + " Uhr" : "";
+            var time = hasTime && (d.Hour != 0 || d.Minute != 0) ? ctx.T("verein.insta.time", d.ToString("HH:mm", CultureInfo.InvariantCulture)) : "";
             var line2 = string.Join(" · ", new[] { time, e.Place }.Where(x => x.Length > 0));
             if (line2.Length > 0)
                 sb.Append("<text x=\"").Append(tx).Append("\" y=\"").Append(y + 68).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"28\" fill=\"#fff\" opacity=\".85\">").Append(X(Wrap(line2, maxChars + 8, 1)[0])).Append("</text>");
@@ -294,7 +297,7 @@ public static class VereinInstagram
         "<g transform=\"translate(" + x + "," + y + ")\"><circle r=\"70\" fill=\"#fff\"/><image href=\"" + logo + "\" xlink:href=\"" + logo + "\" x=\"-62\" y=\"-62\" width=\"124\" height=\"124\" clip-path=\"url(#lc)\" preserveAspectRatio=\"xMidYMid meet\"/></g>";
 
     /// <summary>"Terminliste": a heading and up to eight dates, each with a date badge.</summary>
-    private static string List(List<Event> events, int page, int pages, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
+    private static string List(IPluginContext ctx, List<Event> events, int page, int pages, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
     {
         var sb = new StringBuilder();
         var top = h >= 1900 ? 260 : h >= 1300 ? 150 : 110;
@@ -307,7 +310,7 @@ public static class VereinInstagram
         var y = top + 120 + Math.Max(0, (avail - row * events.Count) / 3);
         foreach (var e in events)
         {
-            var (day, month, wd) = V.Badge(e.Starts);
+            var (day, month, wd) = V.Badge(ctx, e.Starts);
             var box = Math.Min(140, row - 22);
             sb.Append("<rect x=\"80\" y=\"").Append(y).Append("\" width=\"").Append(box).Append("\" height=\"").Append(box).Append("\" rx=\"20\" fill=\"#fff\"/>");
             sb.Append("<text x=\"").Append(80 + box / 2).Append("\" y=\"").Append(y + box * 0.52).Append("\" text-anchor=\"middle\" font-family=\"").Append(Head).Append("\" font-size=\"").Append((int)(box * 0.42)).Append("\" fill=\"").Append(color).Append("\">").Append(X(day)).Append("</text>");
@@ -316,7 +319,7 @@ public static class VereinInstagram
             var maxChars = (w - tx - 70) / 26;
             var title = Wrap(e.Title, maxChars, 1)[0];
             sb.Append("<text x=\"").Append(tx).Append("\" y=\"").Append(y + box * 0.45).Append("\" font-family=\"").Append(Head).Append("\" font-size=\"44\" fill=\"#fff\">").Append(X(title)).Append("</text>");
-            var sub = V.When(e.Starts, weekday: false).Split(", ").Skip(1).FirstOrDefault() is { } time ? time : "";
+            var sub = V.When(ctx, e.Starts, weekday: false).Split(", ").Skip(1).FirstOrDefault() is { } time ? time : "";
             var line2 = string.Join(" · ", new[] { sub, e.Place }.Where(x => x.Length > 0));
             sb.Append("<text x=\"").Append(tx).Append("\" y=\"").Append(y + box * 0.80).Append("\" font-family=\"").Append(Body).Append("\" font-size=\"32\" fill=\"#fff\" opacity=\".85\">").Append(X(Wrap(line2, maxChars + 6, 1).FirstOrDefault() ?? "")).Append("</text>");
             y += row;
@@ -328,7 +331,7 @@ public static class VereinInstagram
     }
 
     /// <summary>"Plakat": one event, big — date block, title, time and place.</summary>
-    private static string Poster(Event e, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
+    private static string Poster(IPluginContext ctx, Event e, int w, int h, string color, string? photo, string? logo, string club, string footer, string heading)
     {
         var sb = new StringBuilder();
         var top = h >= 1900 ? 260 : 110;
@@ -337,9 +340,9 @@ public static class VereinInstagram
         // laid out from the bottom up, so a long title or place never runs into the line at the foot
         var footerY = h - (h >= 1900 ? 300 : 70);
         var ruleY = footerY - 54;
-        var info = new[] { V.When(e.Starts), e.Place }.Where(x => x.Length > 0).SelectMany(x => Wrap(x, 44, 2)).Take(3).ToList();
+        var info = new[] { V.When(ctx, e.Starts), e.Place }.Where(x => x.Length > 0).SelectMany(x => Wrap(x, 44, 2)).Take(3).ToList();
         var infoFirst = ruleY - 40 - (info.Count - 1) * 50;
-        var (day, month, wd) = V.Badge(e.Starts);
+        var (day, month, wd) = V.Badge(ctx, e.Starts);
         var lines = Wrap(e.Title, 16, 3);
         var titleSize = lines.Count >= 3 ? 92 : 104;
         var titleTop = infoFirst - 60 - lines.Count * (titleSize + 6);

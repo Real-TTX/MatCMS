@@ -35,7 +35,7 @@ public static class BookingAdminMore
         var sb = new StringBuilder("<style>").Append(Css).Append("</style><div class=\"bk-plan-wrap\"><table class=\"bk-plan\"><thead><tr><th class=\"bk-plan-unit\"></th>");
         for (var d = first; d < end; d = d.AddDays(1))
             sb.Append("<th class=\"").Append(d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? "we" : "").Append(d == today ? " today" : "").Append("\"><small>")
-              .Append(B.Weekday(d)[..1]).Append("</small>").Append(d.Day).Append("</th>");
+              .Append(B.H(B.Weekday(ctx.T, d)[..1])).Append("</small>").Append(d.Day).Append("</th>");
         sb.Append("</tr></thead><tbody>");
         foreach (var house in houses)
         {
@@ -54,14 +54,14 @@ public static class BookingAdminMore
                     {
                         var run = 0;
                         while (d.AddDays(run) < end && !byDay.ContainsKey(d.AddDays(run)) && nights.Any(x => x.Day == d.AddDays(run) && u.Contains.Contains(x.UnitId))) run++;
-                        sb.Append("<td colspan=\"").Append(run).Append("\" class=\"bar part\" title=\"Nicht buchbar: ein Teil des Hauses ist belegt\"><span>Teil belegt</span></td>");
+                        sb.Append("<td colspan=\"").Append(run).Append("\" class=\"bar part\" title=\"").Append(B.H(ctx.T("booking.admin.partTakenTitle"))).Append("\"><span>").Append(B.H(ctx.T("booking.admin.partTaken"))).Append("</span></td>");
                         d = d.AddDays(run);
                         continue;
                     }
                     if (!byDay.TryGetValue(d, out var n))
                     {
                         sb.Append("<td class=\"free").Append(d < today ? " past" : "").Append(d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? " we" : "").Append("\">");
-                        if (d >= today) sb.Append("<a href=\"").Append(R).Append("bookings/new?unit=").Append(u.Id).Append("&amp;arrival=").Append(B.Iso(d)).Append("\" title=\"Neue Buchung ab ").Append(B.Date(d)).Append("\"></a>");
+                        if (d >= today) sb.Append("<a href=\"").Append(R).Append("bookings/new?unit=").Append(u.Id).Append("&amp;arrival=").Append(B.Iso(d)).Append("\" title=\"").Append(B.H(ctx.T("booking.admin.newBookingFrom", B.Date(d)))).Append("\"></a>");
                         sb.Append("</td>");
                         d = d.AddDays(1);
                         continue;
@@ -71,9 +71,9 @@ public static class BookingAdminMore
                     while (d.AddDays(span) < end && byDay.TryGetValue(d.AddDays(span), out var x) && x.BookingId == n.BookingId && x.BlockId == n.BlockId) span++;
                     if (n.BookingId > 0 && bookings.TryGetValue(n.BookingId, out var b))
                     {
-                        var via = n.Origin != u.Id ? " (über " + (units.FirstOrDefault(o => o.Id == n.Origin)?.Name ?? "andere Einheit") + ")" : "";
+                        var via = n.Origin != u.Id ? " " + ctx.T("booking.admin.via", units.FirstOrDefault(o => o.Id == n.Origin)?.Name ?? ctx.T("booking.admin.otherUnit")) : "";
                         sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar ").Append(B.H(b.Status)).Append("\"><a href=\"").Append(R).Append("bookings/").Append(b.Id)
-                          .Append("\" title=\"").Append(B.H(b.Number + " · " + b.Name + " · " + B.Date(b.Arrival) + "–" + B.Date(b.Departure) + " · " + BookingStatus.Label(b.Status) + via)).Append("\">")
+                          .Append("\" title=\"").Append(B.H(b.Number + " · " + b.Name + " · " + B.Date(b.Arrival) + "–" + B.Date(b.Departure) + " · " + BookingStatus.Label(ctx.T, b.Status) + via)).Append("\">")
                           .Append(B.H(b.Name.Length > 0 ? b.Name : b.Number)).Append("</a></td>");
                     }
                     else
@@ -81,23 +81,26 @@ public static class BookingAdminMore
                         var reason = blocks.TryGetValue(n.BlockId, out var bl) ? bl.Reason : "";
                         var clash = bl?.Conflict ?? "";
                         sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar block").Append(bl?.Source.StartsWith("feed:", StringComparison.Ordinal) == true ? " feed" : "").Append(clash.Length > 0 ? " conflict" : "")
-                          .Append("\" title=\"").Append(B.H((clash.Length > 0 ? clash : "Gesperrt" + (reason.Length > 0 ? ": " + reason : "")))).Append("\"><span>")
-                          .Append(B.H(reason.Length > 0 ? reason : "gesperrt")).Append("</span></td>");
+                          .Append("\" title=\"").Append(B.H((clash.Length > 0 ? clash : ctx.T("booking.admin.blockedTitle") + (reason.Length > 0 ? ": " + reason : "")))).Append("\"><span>")
+                          .Append(B.H(reason.Length > 0 ? reason : ctx.T("booking.admin.blockedLower"))).Append("</span></td>");
                     }
                     d = d.AddDays(span);
                 }
                 sb.Append("</tr>");
             }
         }
-        sb.Append("</tbody></table></div><p class=\"bk-plan-legend\"><span class=\"request\">Anfrage</span><span class=\"offer\">Angebot</span><span class=\"confirmed\">bestätigt</span><span class=\"block\">gesperrt</span></p>");
+        sb.Append("</tbody></table></div><p class=\"bk-plan-legend\">");
+        foreach (var st in new[] { BookingStatus.Request, BookingStatus.Offer, BookingStatus.Confirmed })
+            sb.Append("<span class=\"").Append(st).Append("\">").Append(B.H(BookingStatus.Label(ctx.T, st))).Append("</span>");
+        sb.Append("<span class=\"block\">").Append(B.H(ctx.T("booking.admin.blockedLower"))).Append("</span></p>");
         // the month goes into the page's title: the head's own title is hidden in the back office (the top bar names the page)
-        var title = "Belegungsplan " + B.Month(first);
+        var title = ctx.T("booking.admin.planTitle", B.Month(ctx.T, first));
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(null, title,
-                Ui.Button("‹ " + B.MonthNames[first.AddMonths(-1).Month - 1], R + "plan?monat=" + Month(first.AddMonths(-1)), UiButtonKind.Ghost, small: true),
-                Ui.Button("Heute", R + "plan", UiButtonKind.Ghost, small: true),
-                Ui.Button(B.MonthNames[end.Month - 1] + " ›", R + "plan?monat=" + Month(end), UiButtonKind.Ghost, small: true)),
-            units.Count == 0 ? Ui.Empty("Noch keine buchbare Einheit.") : Ui.Html(sb.ToString())), title);
+                Ui.Button("‹ " + B.MonthName(ctx.T, first.AddMonths(-1).Month), R + "plan?monat=" + Month(first.AddMonths(-1)), UiButtonKind.Ghost, small: true),
+                Ui.Button(ctx.T("booking.admin.today"), R + "plan", UiButtonKind.Ghost, small: true),
+                Ui.Button(B.MonthName(ctx.T, end.Month) + " ›", R + "plan?monat=" + Month(end), UiButtonKind.Ghost, small: true)),
+            units.Count == 0 ? Ui.Empty(ctx.T("booking.admin.noBookableUnit")) : Ui.Html(sb.ToString())), title);
     }
 
     /// <summary>The chart's look — admin variables only, so it follows light and dark.</summary>
@@ -137,9 +140,9 @@ public static class BookingAdminMore
         var bookings = await BookingFlow.ListAsync(ctx.Data, null, ct);
         var cur = BookingPlugin.Currency(ctx);
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Gäste"),
+            Ui.PageHead(null, ctx.T("booking.admin.navGuests")),
             // e-mail and phone share one column: the phone is often empty and had a column of its own
-            Ui.Table(new[] { Ui.Column("Gast"), Ui.Column("Kontakt"), Ui.Column("Aufenthalte", right: true), Ui.Column("Zuletzt"), Ui.Column("Umsatz", right: true) },
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.colGuest")), Ui.Column(ctx.T("booking.admin.colContact")), Ui.Column(ctx.T("booking.admin.stays"), right: true), Ui.Column(ctx.T("booking.admin.colLast")), Ui.Column(ctx.T("booking.admin.colTurnover"), right: true) },
                 guests.Select(g =>
                 {
                     var mine = bookings.Where(b => b.GuestId == g.Id).ToList();
@@ -147,10 +150,10 @@ public static class BookingAdminMore
                     var extra = mine.Count - stays.Count;
                     return Ui.RowFor(g.Name + " " + g.Email + " " + g.Phone, Ui.Link(g.Name.Length > 0 ? g.Name : g.Email, R + "guests/" + g.Id),
                         Ui.Stack(Ui.Text(g.Email), g.Phone.Length > 0 ? Ui.Muted(g.Phone) : null),
-                        B.Num(stays.Count) + (extra > 0 ? " (+" + extra + (extra == 1 ? " Anfrage)" : " Anfragen)") : ""),
+                        B.Num(stays.Count) + (extra > 0 ? " " + (extra == 1 ? ctx.T("booking.admin.plusOneRequest") : ctx.T("booking.admin.plusRequests", extra)) : ""),
                         mine.Count == 0 ? "–" : B.Date(mine.Max(b => b.Arrival)), B.Money(stays.Sum(b => b.Total), cur));
                 }),
-                searchPlaceholder: "Name, E-Mail oder Telefon …", emptyText: "Noch keine Gäste – sie kommen mit der ersten Anfrage.")), "Gäste");
+                searchPlaceholder: ctx.T("booking.admin.guestSearch"), emptyText: ctx.T("booking.admin.noGuests"))), ctx.T("booking.admin.navGuests"));
     }
 
     private static async Task<PluginResult> GuestAsync(IPluginContext ctx, CancellationToken ct)
@@ -165,7 +168,7 @@ public static class BookingAdminMore
             {
                 var today = B.Today;
                 if (bookings.Any(b => b.Holds && b.Departure >= today))
-                    return PluginResult.Redirect(self, "Der Gast hat noch eine offene oder kommende Buchung – erst danach (oder nach einer Stornierung) löschen.", true);
+                    return PluginResult.Redirect(self, ctx.T("booking.admin.guestHasBooking"), true);
                 foreach (var b in bookings)
                 {
                     await ctx.Data.Table(BookingStore.TBookings).UpdateAsync(b.Id, new Dictionary<string, object?>
@@ -176,30 +179,30 @@ public static class BookingAdminMore
                     await BookingFlow.NoteAsync(ctx.Data, b.Id, "Daten des Gastes gelöscht (Name, Kontakt, Nachricht); die Buchung bleibt für die Buchhaltung.", ct);
                 }
                 await ctx.Data.Table(BookingStore.TGuests).DeleteAsync(g.Id, ct);
-                return PluginResult.Redirect(R + "guests", "Gast gelöscht, " + bookings.Count + " Aufenthalt(e) anonymisiert.");
+                return PluginResult.Redirect(R + "guests", ctx.T("booking.admin.guestErased", bookings.Count));
             }
             await ctx.Data.Table(BookingStore.TGuests).UpdateAsync(g.Id, BookingFederation.StampLocal(row, new Dictionary<string, object?>
             {
                 ["name"] = B.Clip(ctx.Request.F("name"), 120), ["phone"] = B.Clip(ctx.Request.F("phone"), 60), ["country"] = B.Clip(ctx.Request.F("country"), 60),
                 ["note"] = B.Clip(ctx.Request.F("note"), 4000), ["updated"] = DateTime.UtcNow
             }, DateTime.UtcNow), ct);
-            return PluginResult.Redirect(self, "Gespeichert.");
+            return PluginResult.Redirect(self, ctx.T("booking.admin.saved"));
         }
         var cur = BookingPlugin.Currency(ctx);
         var units = (await new BookingStore(ctx.Data).UnitsAsync(ct)).ToDictionary(u => u.Id);
         var form = Ui.Form(
-            Ui.Grid(200, Ui.Input("name", "Name", g.Name), Ui.Input("phone", "Telefon", g.Phone, UiInputType.Tel), Ui.Input("country", "Land", g.Country)),
-            Ui.TextArea("note", "Notiz (intern)", g.Note, 3) with { Help = "z. B. Stammgast, Hund" },
-            Ui.FormActions(Ui.Submit("Speichern"),
-                Ui.Submit("Daten löschen", UiButtonKind.Danger, "action", "erase", confirm: "Name, Kontakt und Nachrichten dieses Gastes löschen? Seine Aufenthalte bleiben anonym stehen, seine Links gehen nicht mehr.")));
+            Ui.Grid(200, Ui.Input("name", ctx.T("booking.admin.name"), g.Name), Ui.Input("phone", ctx.T("booking.admin.phone"), g.Phone, UiInputType.Tel), Ui.Input("country", ctx.T("booking.admin.country"), g.Country)),
+            Ui.TextArea("note", ctx.T("booking.admin.noteInternal"), g.Note, 3) with { Help = ctx.T("booking.admin.guestNoteHelp") },
+            Ui.FormActions(Ui.Submit(ctx.T("booking.admin.save")),
+                Ui.Submit(ctx.T("booking.admin.eraseData"), UiButtonKind.Danger, "action", "erase", confirm: ctx.T("booking.admin.confirmErase"))));
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(g.Email, g.Name.Length > 0 ? g.Name : g.Email, Ui.Button("Alle Gäste", R + "guests", UiButtonKind.Ghost, "ti-arrow-left", small: true)),
+            Ui.PageHead(g.Email, g.Name.Length > 0 ? g.Name : g.Email, Ui.Button(ctx.T("booking.admin.allGuests"), R + "guests", UiButtonKind.Ghost, "ti-arrow-left", small: true)),
             Ui.Columns(new UiNode?[]
             {
-                Ui.Card("Aufenthalte", Ui.Table(new[] { Ui.Column("Nr."), Ui.Column("Unterkunft"), Ui.Column("Zeitraum"), Ui.Column("Betrag", right: true), Ui.Column("Status") },
+                Ui.Card(ctx.T("booking.admin.stays"), Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.colNo")), Ui.Column(ctx.T("booking.admin.colStay")), Ui.Column(ctx.T("booking.admin.colPeriod")), Ui.Column(ctx.T("booking.admin.amount"), right: true), Ui.Column(ctx.T("booking.admin.colStatus")) },
                     bookings.Select(b => Ui.Row(Ui.Link(b.Number, R + "bookings/" + b.Id), units.TryGetValue(b.UnitId, out var u) ? u.Name : "–",
-                        B.Date(b.Arrival) + " – " + B.Date(b.Departure), B.Money(b.Total, cur), Ui.Badge(BookingStatus.Label(b.Status), BookingStatus.Tone(b.Status)))),
-                    emptyText: "Keine Aufenthalte."))
-            }, new UiNode?[] { Ui.Card("Gast", form), await BookingAdminFederation.GuestCardAsync(ctx, g.Email, ct) })), g.Name.Length > 0 ? g.Name : g.Email);
+                        B.Date(b.Arrival) + " – " + B.Date(b.Departure), B.Money(b.Total, cur), Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)))),
+                    emptyText: ctx.T("booking.admin.noStays")))
+            }, new UiNode?[] { Ui.Card(ctx.T("booking.admin.colGuest"), form), await BookingAdminFederation.GuestCardAsync(ctx, g.Email, ct) })), g.Name.Length > 0 ? g.Name : g.Email);
     }
 }

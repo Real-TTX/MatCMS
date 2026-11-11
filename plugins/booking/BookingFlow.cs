@@ -29,10 +29,9 @@ public static class BookingStatus
         _ => false
     };
 
-    public static string Label(string s) => s switch
-    {
-        Request => "Anfrage", Offer => "Angebot", Confirmed => "bestätigt", Declined => "abgelehnt", Expired => "abgelaufen", Cancelled => "storniert", _ => s
-    };
+    public static bool Known(string s) => s is Request or Offer or Confirmed or Declined or Expired or Cancelled;
+    public static string Label(string s) => Label(BookingStrings.German, s);
+    public static string Label(Tr t, string s) => Known(s) ? t("booking.status." + s) : s;
 
     public static UiTone Tone(string s) => s switch
     {
@@ -41,7 +40,11 @@ public static class BookingStatus
 }
 
 /// <summary>A refusal a guest or the host can read ("Belegt", "Die Anfrage ist abgelaufen").</summary>
-public sealed class BookingException(string message) : Exception(message);
+/// <remarks>Carries a key of <see cref="BookingStrings"/> (its German text is the Message) or a finished text; <see cref="Text"/> gives it in the request's language.</remarks>
+public sealed class BookingException(string key, params object[] args) : Exception(BookingStrings.German(key, args))
+{
+    public string Text(IPluginContext ctx) => BookingStrings.Has(key) ? ctx.T(key, args) : Message;
+}
 
 /// <summary>
 /// The way of a booking: a guest's request holds the nights for a while, the host offers (possibly at another price) or confirms or declines, the
@@ -128,10 +131,10 @@ public static class BookingFlow
     /// Makes a request: prices it (the server's bill, never the form's), takes its nights for <paramref name="holdHours"/> and numbers it, all in one
     /// transaction — a taken night throws and nothing is kept. Returns the booking and the guest key (shown once: the guest page's address).
     /// </summary>
-    public static async Task<(Booking Booking, string Key)> RequestAsync(IPluginData data, RequestInput input, int holdHours, string currency, CancellationToken ct = default, bool enforceRules = true)
+    public static async Task<(Booking Booking, string Key)> RequestAsync(IPluginData data, RequestInput input, int holdHours, string currency, CancellationToken ct = default, bool enforceRules = true, Tr? tr = null)
     {
         var store = new BookingStore(data);
-        var quote = await store.QuoteAsync(input.Unit.Id, input.Stay, currency, ct) ?? throw new BookingException("Diese Unterkunft ist nicht buchbar.");
+        var quote = await store.QuoteAsync(input.Unit.Id, input.Stay, currency, ct, tr) ?? throw new BookingException("booking.err.notBookable");
         // the host booking by phone may make an exception (a shorter stay in the high season); a guest may not. An impossible stay is refused for both.
         if (input.Stay.Nights <= 0 || input.Stay.Nights > Pricing.MaxNights || (enforceRules && !quote.Ok)) throw new BookingException(string.Join(" ", quote.Problems));
         var key = NewKey();
@@ -158,7 +161,7 @@ public static class BookingFlow
                 return (bid, 0L);
             }, ct);
         }
-        catch (UnavailableException) { throw new BookingException("Der Zeitraum ist leider nicht mehr frei."); }
+        catch (UnavailableException) { throw new BookingException("booking.err.noLongerFree"); }
         return ((await GetAsync(data, id, ct))!, key);
     }
 
@@ -188,9 +191,9 @@ public static class BookingFlow
         await data.InTransactionAsync(async tx =>
         {
             await tx.Table(BookingStore.TMeta).UpdateWhereAsync(DataQuery.Everything.Eq("name", "__lock"), new Dictionary<string, object?> { ["value"] = "" }, ct);
-            var b = await GetAsync(tx, id, ct) ?? throw new BookingException("Diese Buchung gibt es nicht.");
+            var b = await GetAsync(tx, id, ct) ?? throw new BookingException("booking.err.noSuchBooking");
             if (!BookingStatus.CanMove(b.Status, to))
-                throw new BookingException("Nicht möglich: die Buchung ist " + BookingStatus.Label(b.Status) + ".");
+                throw new BookingException("booking.err.cannotMove", BookingStatus.Label(b.Status));
             var values = change ?? new Dictionary<string, object?>();
             values["status"] = to; values["updated"] = DateTime.UtcNow; values["history"] = AddHistory(b, history);
             if (to == BookingStatus.Confirmed) values["confirmed_at"] = DateTime.UtcNow;            // the payment plan counts from here
@@ -210,12 +213,12 @@ public static class BookingFlow
     }
 
     /// <summary>The host's offer: the bill as made, plus an optional adjustment (discount or surcharge, with a text), valid for some days.</summary>
-    public static Task<Booking> OfferAsync(IPluginData data, Booking b, long adjustment, string adjustmentText, int validDays, CancellationToken ct = default)
+    public static Task<Booking> OfferAsync(IPluginData data, Booking b, long adjustment, string adjustmentText, int validDays, CancellationToken ct = default, Tr? tr = null)
     {
         var lines = b.Lines.Where(l => l.Kind != "adjust").ToList();
-        if (adjustment != 0) lines.Add(new QuoteLine("adjust", adjustmentText.Length > 0 ? adjustmentText : adjustment < 0 ? "Nachlass" : "Aufschlag", 1, adjustment, adjustment));
+        if (adjustment != 0) lines.Add(new QuoteLine("adjust", adjustmentText.Length > 0 ? adjustmentText : (tr ?? BookingStrings.German)(adjustment < 0 ? "booking.price.discount" : "booking.price.surcharge"), 1, adjustment, adjustment));
         var total = lines.Sum(l => l.Amount);
-        if (total < 0) throw new BookingException("Der Gesamtbetrag kann nicht unter null liegen.");
+        if (total < 0) throw new BookingException("booking.err.negativeTotal");
         return MoveAsync(data, b.Id, BookingStatus.Offer, "Angebot geschickt" + (adjustment != 0 ? " (" + lines[^1].Text + ")" : ""), new Dictionary<string, object?>
         {
             ["quote"] = QuoteJson(lines), ["total"] = total, ["offer_until"] = DateTime.UtcNow.AddDays(Math.Clamp(validDays, 1, 30))

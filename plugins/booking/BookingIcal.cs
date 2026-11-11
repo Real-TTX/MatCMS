@@ -315,7 +315,7 @@ public static class BookingIcal
     public static async Task<List<string>> ApplyAsync(IPluginData data, Feed feed, IReadOnlyList<IcsEvent> events, CancellationToken ct = default)
     {
         var store = new BookingStore(data);
-        var unit = await store.UnitAsync(feed.UnitId, ct) ?? throw new BookingException("Die Einheit gibt es nicht mehr.");
+        var unit = await store.UnitAsync(feed.UnitId, ct) ?? throw new BookingException("booking.ical.unitGone");
         var units = BookingStore.Occupies(unit, await store.UnitsAsync(ct));
         var today = B.Today;
         var keep = events.Where(e => e.To > today && e.From < today.AddYears(3)).ToList();

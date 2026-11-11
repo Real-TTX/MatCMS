@@ -17,23 +17,26 @@ public sealed class MomentsPlugin : IPlugin
     /// <inheritdoc />
     public void Configure(IPluginBuilder b)
     {
+        MomentsStrings.Register(b);
         MomentsStore.Declare(b.Data);
         MomentsSettings.Declare(b.Settings);
         MomentsPublic.Configure(b);
         MomentsAdmin.Configure(b);
         MomentsMenu.Configure(b);
 
-        b.Block(new BlockSpec(AccessBlock, "Gästebereich (Moments)", "Der Eingang zum Gästebereich: Gäste geben ihren Zugangscode ein; wer angemeldet ist, wird mit Namen begrüßt und sieht die neuesten Fotos.")
+        // name, description, field labels and option texts are keys of the string tables (the block editor looks them up in the admin's language)
+        b.Block(new BlockSpec(AccessBlock, "moments.block.name", "moments.block.description")
         {
             Category = "design",
             IconSvg = "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><circle cx=\"9\" cy=\"10\" r=\"2\"/><path d=\"M21 16l-5-5-8 8\"/>",
             Fields = new[]
             {
-                new FieldSpec("heading", "Überschrift") { Placeholder = "Anmelden", Help = "Über dem Feld für den Zugangscode. Leer = die Überschrift der Galerie." },
-                new FieldSpec("intro", "Text", FieldKind.Textarea) { Help = "Leer = der Text aus den Einstellungen von Moments." },
-                new FieldSpec("preview", "Für angemeldete Gäste", FieldKind.Select)
+                // (a placeholder is shown as written by the editor — not a key)
+                new FieldSpec("heading", "moments.block.heading") { Placeholder = "Anmelden", Help = "moments.block.headingHelp" },
+                new FieldSpec("intro", "moments.block.intro", FieldKind.Textarea) { Help = "moments.block.introHelp" },
+                new FieldSpec("preview", "moments.block.preview", FieldKind.Select)
                 {
-                    Default = "6", Options = new[] { new FieldOption("6", "Begrüßung und die 6 neuesten Fotos"), new FieldOption("12", "Begrüßung und die 12 neuesten Fotos"), new FieldOption("0", "nur die Begrüßung") }
+                    Default = "6", Options = new[] { new FieldOption("6", "moments.block.preview6"), new FieldOption("12", "moments.block.preview12"), new FieldOption("0", "moments.block.preview0") }
                 }
             }
         }, AccessBlockAsync);
@@ -98,17 +101,17 @@ public sealed class MomentsPlugin : IPlugin
         {
             var name = v.Guest?.Name ?? MomentsSettings.Hosts(ctx);
             var uploads = v.Admin || ctx.Settings.GetBool(MomentsSettings.GuestUpload);
-            sb.Append("<div class=\"mo-welcome\"><div><h2>Hallo ").Append(M.H(name)).Append("!</h2><p>").Append(M.Text(ctx.Settings.Get(MomentsSettings.Welcome))).Append("</p></div><div class=\"mo-welcome-actions\">")
-              .Append("<a class=\"mo-btn\" href=\"").Append(MomentsPublic.Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> Zu den Fotos</a>");
-            if (uploads) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(MomentsPublic.Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> Hochladen</a>");
+            sb.Append("<div class=\"mo-welcome\"><div><h2>").Append(ctx.T("moments.hello", M.H(name))).Append("</h2><p>").Append(M.Text(ctx.Settings.Get(MomentsSettings.Welcome))).Append("</p></div><div class=\"mo-welcome-actions\">")
+              .Append("<a class=\"mo-btn\" href=\"").Append(MomentsPublic.Base).Append("\"><i class=\"ti ti-photo\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.toPhotos")).Append("</a>");
+            if (uploads) sb.Append("<a class=\"mo-btn ghost\" href=\"").Append(MomentsPublic.Base).Append("/hochladen\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload")).Append("</a>");
             sb.Append("</div></div>");
             var count = int.TryParse(F("preview"), out var n) ? Math.Clamp(n, 0, 24) : 6;
             if (count > 0)
             {
                 var latest = (await store.PhotosAsync(MomentsStore.Approved, ct)).OrderByDescending(p => p.ApprovedAt ?? p.Created).ThenByDescending(p => p.Id).Take(count).ToList();
-                if (latest.Count > 0) sb.Append("<div class=\"mo-preview\">").Append(string.Concat(latest.Select(p => MomentsPublic.Tile(p, "?sort=neu", null)))).Append("</div>");
+                if (latest.Count > 0) sb.Append("<div class=\"mo-preview\">").Append(string.Concat(latest.Select(p => MomentsPublic.Tile(ctx, p, "?sort=neu", null)))).Append("</div>");
             }
-            if (v.Guest is null) sb.Append("<p class=\"mo-muted small\">Ihr seht das als Gastgeber. Gäste ohne Anmeldung sehen hier das Feld für ihren Zugangscode.</p>");
+            if (v.Guest is null) sb.Append("<p class=\"mo-muted small\">").Append(ctx.T("moments.block.hostNote")).Append("</p>");
         }
         return PluginResult.Fragment(sb.Append("</div></section>").ToString());
     }
@@ -149,13 +152,13 @@ public static class MomentsMenu
         var g = await new MomentsStore(ctx.Data).GuestOfMemberAsync(ctx.Member.Id, ctx.Member.Email, ct);
         if (g is null || !g.Active) return Array.Empty<MenuEntry>();
         const string B = MomentsPublic.Base;
-        var children = new List<MenuEntry> { new("Alle Fotos", B) { Icon = "photo", Order = 1 } };
-        if (ctx.Settings.GetBool(MomentsSettings.GuestUpload)) children.Add(new MenuEntry("Fotos hochladen", B + "/hochladen") { Icon = "camera-plus", Order = 2 });
-        children.Add(new MenuEntry("Meine Fotos", B + "/meine") { Icon = "user-heart", Order = 3 });
+        var children = new List<MenuEntry> { new(ctx.T("moments.allPhotos"), B) { Icon = "photo", Order = 1 } };
+        if (ctx.Settings.GetBool(MomentsSettings.GuestUpload)) children.Add(new MenuEntry(ctx.T("moments.uploadPhotos"), B + "/hochladen") { Icon = "camera-plus", Order = 2 });
+        children.Add(new MenuEntry(ctx.T("moments.myPhotos"), B + "/meine") { Icon = "user-heart", Order = 3 });
         return new[]
         {
             new MenuEntry(MomentsSettings.Menu(ctx), B) { Icon = "photo-heart", Order = 900, Children = children },
-            new MenuEntry("Abmelden", B + "/abmelden") { Icon = "logout", Order = 999 }
+            new MenuEntry(ctx.T("moments.signOut"), B + "/abmelden") { Icon = "logout", Order = 999 }
         };
     });
 }

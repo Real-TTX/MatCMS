@@ -3,7 +3,13 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.12 — UI-Durchgang
+## Stand: 0.13 — Deutsch und Englisch
+
+- **0.13**: zweisprachig (Deutsch/Englisch) wie das Forum: alle Texte als `(Key, De, En)` in `BookingStrings*.cs`, gelesen mit `ctx.T("booking.…")`
+  (Admin in der Sprache des Admins, öffentliche Seiten unter `/en/` englisch). Deutsch unverändert. Deutsch bleiben: Mailvorlagen und ihre Werte,
+  Verlaufseinträge und gespeicherte Fehlermeldungen (Daten), Geld- und Datumsformat. Test `BookingStringsTests`.
+
+## Stand davor: 0.12 — UI-Durchgang
 
 - **0.12**: Erklär-Untertitel und Hinweisabsätze gestrichen (Übersicht, Listen, Kanäle, Meldungen, Reinigung, Verbund, Neue Buchung, Anfrageformular);
   Einstellungen „Allgemein“ (Währung, „Neue Anfragen an“, Haltezeit, Angebot, Zahlungshinweis, Datenschutz) sind wieder erreichbar (eigene Gruppe);

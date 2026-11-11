@@ -31,7 +31,7 @@ public static class BookingAdminBookings
         var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);
         var pdf = BookingPrint.Confirmation(await BookingPrint.LetterheadAsync(ctx, ct), b, unit, house, await BookingPayments.PlanAsync(ctx, b, ct),
             ctx.Settings.Get(BookingPlugin.PaymentInfoKey) ?? "", BookingPlugin.Currency(ctx));
-        return BookingPrint.Result(pdf, "Buchung " + b.Number);
+        return BookingPrint.Result(pdf, ctx.T("booking.bookings.title", b.Number));
     }
 
     private static int Int(string s, int def, int min, int max) => int.TryParse(s.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? Math.Clamp(v, min, max) : def;
@@ -53,7 +53,7 @@ public static class BookingAdminBookings
         var cur = BookingPlugin.Currency(ctx);
         var paid = await BookingPayments.PaidAsync(ctx.Data, ct);
         UiNode? PaidBadge(Booking b) => b.Status != BookingStatus.Confirmed ? null
-            : paid.TryGetValue(b.Id, out var v) && v >= b.Total ? Ui.Badge("bezahlt", UiTone.Success) : v > 0 ? Ui.Badge("angezahlt", UiTone.Info) : Ui.Badge("unbezahlt", UiTone.Warning);
+            : paid.TryGetValue(b.Id, out var v) && v >= b.Total ? Ui.Badge(ctx.T("booking.bookings.paid"), UiTone.Success) : v > 0 ? Ui.Badge(ctx.T("booking.bookings.partPaid"), UiTone.Info) : Ui.Badge(ctx.T("booking.bookings.unpaid"), UiTone.Warning);
         int Count(string t) => t switch
         {
             "offen" => all.Count(b => b.Status is BookingStatus.Request or BookingStatus.Offer),
@@ -62,17 +62,18 @@ public static class BookingAdminBookings
         };
         string TabLabel(string key, string label) => Count(key) is var n and > 0 ? label + " (" + n + ")" : label;
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Anfragen & Buchungen"),
-            Ui.Tabs(Ui.Tab(TabLabel("offen", "Offen"), R + "bookings", tab == "offen"), Ui.Tab(TabLabel("kommend", "Kommend"), R + "bookings?tab=kommend", tab == "kommend"),
-                Ui.Tab("Vergangen", R + "bookings?tab=vergangen", tab == "vergangen"), Ui.Tab("Alle", R + "bookings?tab=alle", tab == "alle")),
+            Ui.PageHead(null, ctx.T("booking.bookings.listTitle")),
+            Ui.Tabs(Ui.Tab(TabLabel("offen", ctx.T("booking.bookings.tabOpen")), R + "bookings", tab == "offen"), Ui.Tab(TabLabel("kommend", ctx.T("booking.bookings.tabComing")), R + "bookings?tab=kommend", tab == "kommend"),
+                Ui.Tab(ctx.T("booking.bookings.tabPast"), R + "bookings?tab=vergangen", tab == "vergangen"), Ui.Tab(ctx.T("booking.bookings.tabAll"), R + "bookings?tab=alle", tab == "alle")),
             // status and payment in two columns: two badges in one cell wrapped and made every row twice as high
-            Ui.Table(new[] { Ui.Column("Nr."), Ui.Column("Gast"), Ui.Column("Unterkunft"), Ui.Column("Zeitraum"), Ui.Column("Betrag", right: true), Ui.Column("Status"), Ui.Column("Zahlung") },
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colNumber")), Ui.Column(ctx.T("booking.bookings.colGuest")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPeriod")),
+                    Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column(ctx.T("booking.bookings.colStatus")), Ui.Column(ctx.T("booking.bookings.colPayment")) },
                 list.Select(b => Ui.RowFor(b.Number + " " + b.Name + " " + b.Email, Ui.Link(b.Number, R + "bookings/" + b.Id), b.Name,
                     units.TryGetValue(b.UnitId, out var u) ? u.Name : "–", B.Date(b.Arrival) + " – " + B.Date(b.Departure) + " (" + b.Nights + ")", B.Money(b.Total, cur),
-                    Ui.Badge(BookingStatus.Label(b.Status), BookingStatus.Tone(b.Status)), PaidBadge(b))),
-                searchPlaceholder: "Name, E-Mail oder Nummer …",
-                emptyText: tab == "offen" ? "Keine offenen Anfragen." : "Keine Buchungen.")
-                with { Below = new UiNode[] { Ui.Button("Neue Buchung", R + "bookings/new", icon: "ti-plus") } }), "Anfragen & Buchungen");
+                    Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)), PaidBadge(b))),
+                searchPlaceholder: ctx.T("booking.bookings.search"),
+                emptyText: tab == "offen" ? ctx.T("booking.bookings.noOpen") : ctx.T("booking.bookings.none"))
+                with { Below = new UiNode[] { Ui.Button(ctx.T("booking.bookings.new"), R + "bookings/new", icon: "ti-plus") } }), ctx.T("booking.bookings.listTitle"));
     }
 
     // ---- by phone ---------------------------------------------------------------------------------------------------
@@ -81,38 +82,38 @@ public static class BookingAdminBookings
     {
         var store = new BookingStore(ctx.Data);
         var units = (await store.UnitsAsync(ct)).Where(u => u.Active).ToList();
-        if (units.Count == 0) return PluginResult.Redirect(R + "units", "Zuerst eine Unterkunft anlegen.", true);
+        if (units.Count == 0) return PluginResult.Redirect(R + "units", ctx.T("booking.bookings.unitFirst"), true);
         if (ctx.Request.IsPost)
         {
             var f = ctx.Request;
             var unit = units.FirstOrDefault(u => B.Num(u.Id) == f.F("unit"));
             if (unit is null || B.Day(f.F("arrival")) is not { } a || B.Day(f.F("departure")) is not { } d || B.Clip(f.F("name"), 120).Length == 0)
-                return PluginResult.Redirect(R + "bookings/new", "Bitte Unterkunft, Anreise, Abreise und Name angeben.", true);
+                return PluginResult.Redirect(R + "bookings/new", ctx.T("booking.bookings.fillIn"), true);
             var stay = new Stay(a, d, Math.Max(1, Int(f.F("adults"), 2, 1, 50)), Int(f.F("children"), 0, 0, 50));
             Booking b; string key;
             try
             {
                 (b, key) = await BookingFlow.RequestAsync(ctx.Data, new BookingFlow.RequestInput(unit, stay, f.F("name"), f.F("email"), f.F("phone"), f.F("note"), "de", "admin"),
-                    BookingPlugin.HoldHours(ctx), BookingPlugin.Currency(ctx), ct, enforceRules: false);
+                    BookingPlugin.HoldHours(ctx), BookingPlugin.Currency(ctx), ct, enforceRules: false, tr: ctx.T);
                 b = await BookingFlow.MoveAsync(ctx.Data, b.Id, BookingStatus.Confirmed, "Direkt bestätigt (im Admin angelegt)", null, ct);
             }
-            catch (BookingException ex) { return PluginResult.Redirect(R + "bookings/new", ex.Message, true); }
+            catch (BookingException ex) { return PluginResult.Redirect(R + "bookings/new", ex.Text(ctx), true); }
             if (B.Checked(f.F("notify")) && b.Email.Contains('@'))
                 await BookingFlow.NoteAsync(ctx.Data, b.Id, "Bestätigung an den Gast: " + await SendAsync(ctx, store, b, BookingMail.Confirmed, key, null, ct), ct);
-            return PluginResult.Redirect(R + "bookings/" + b.Id, "Buchung " + b.Number + " angelegt.");
+            return PluginResult.Redirect(R + "bookings/" + b.Id, ctx.T("booking.bookings.created", b.Number));
         }
         var form = Ui.Form(
             Ui.Grid(180,
-                Ui.Select("unit", "Unterkunft", units.Any(u => B.Num(u.Id) == ctx.Request.Q("unit")) ? ctx.Request.Q("unit") : B.Num(units[0].Id), units.Select(u => Ui.Option(B.Num(u.Id), u.Name)).ToArray()),
-                Ui.Input("arrival", "Anreise", B.Day(ctx.Request.Q("arrival")) is { } qa ? B.Iso(qa) : "", UiInputType.Date),
-                Ui.Input("departure", "Abreise", B.Day(ctx.Request.Q("arrival")) is { } qd ? B.Iso(qd.AddDays(7)) : "", UiInputType.Date),
-                Ui.Input("adults", "Erwachsene", "2", UiInputType.Number), Ui.Input("children", "Kinder", "0", UiInputType.Number)),
-            Ui.Grid(220, Ui.Input("name", "Name"), Ui.Input("email", "E-Mail", "", UiInputType.Email), Ui.Input("phone", "Telefon", "", UiInputType.Tel)),
-            Ui.TextArea("note", "Notiz", "", 3),
-            Ui.Checkbox("notify", "Buchungsbestätigung an den Gast schicken", true),
-            Ui.FormActions(Ui.Submit("Buchung anlegen", icon: "ti-check")));
-        return PluginResult.Page(Ui.Stack(Ui.PageHead(null, "Neue Buchung",
-            Ui.Button("Alle Buchungen", R + "bookings", UiButtonKind.Ghost, "ti-arrow-left", small: true)), Ui.Card(form)), "Neue Buchung");
+                Ui.Select("unit", ctx.T("booking.bookings.colUnit"), units.Any(u => B.Num(u.Id) == ctx.Request.Q("unit")) ? ctx.Request.Q("unit") : B.Num(units[0].Id), units.Select(u => Ui.Option(B.Num(u.Id), u.Name)).ToArray()),
+                Ui.Input("arrival", ctx.T("booking.bookings.arrival"), B.Day(ctx.Request.Q("arrival")) is { } qa ? B.Iso(qa) : "", UiInputType.Date),
+                Ui.Input("departure", ctx.T("booking.bookings.departure"), B.Day(ctx.Request.Q("arrival")) is { } qd ? B.Iso(qd.AddDays(7)) : "", UiInputType.Date),
+                Ui.Input("adults", ctx.T("booking.bookings.adults"), "2", UiInputType.Number), Ui.Input("children", ctx.T("booking.bookings.children"), "0", UiInputType.Number)),
+            Ui.Grid(220, Ui.Input("name", ctx.T("booking.bookings.name")), Ui.Input("email", ctx.T("booking.bookings.email"), "", UiInputType.Email), Ui.Input("phone", ctx.T("booking.bookings.phone"), "", UiInputType.Tel)),
+            Ui.TextArea("note", ctx.T("booking.bookings.note"), "", 3),
+            Ui.Checkbox("notify", ctx.T("booking.bookings.sendConfirmation"), true),
+            Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.create"), icon: "ti-check")));
+        return PluginResult.Page(Ui.Stack(Ui.PageHead(null, ctx.T("booking.bookings.new"),
+            Ui.Button(ctx.T("booking.bookings.all"), R + "bookings", UiButtonKind.Ghost, "ti-arrow-left", small: true)), Ui.Card(form)), ctx.T("booking.bookings.new"));
     }
 
     // ---- one booking ----------------------------------------------------------------------------------------------
@@ -144,10 +145,10 @@ public static class BookingAdminBookings
                     case "offer":
                     {
                         var adj = B.ParseMoney(f.F("adjust")) ?? 0;
-                        b = await BookingFlow.OfferAsync(ctx.Data, b, adj, B.Clip(f.F("adjust_text"), 120), Int(f.F("days"), BookingPlugin.OfferDays(ctx), 1, 30), ct);
+                        b = await BookingFlow.OfferAsync(ctx.Data, b, adj, B.Clip(f.F("adjust_text"), 120), Int(f.F("days"), BookingPlugin.OfferDays(ctx), 1, 30), ct, ctx.T);
                         var key = await BookingFlow.NewKeyAsync(ctx.Data, b.Id, ct);
                         await BookingFlow.NoteAsync(ctx.Data, b.Id, "Angebot an den Gast: " + await SendAsync(ctx, store, b, BookingMail.Offer, key, null, ct), ct);
-                        return PluginResult.Redirect(self, "Angebot geschickt.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.offerSent"));
                     }
                     case "confirm":
                     {
@@ -157,7 +158,7 @@ public static class BookingAdminBookings
                             var key = await BookingFlow.NewKeyAsync(ctx.Data, b.Id, ct);
                             await BookingFlow.NoteAsync(ctx.Data, b.Id, "Bestätigung an den Gast: " + await SendAsync(ctx, store, b, BookingMail.Confirmed, key, null, ct), ct);
                         }
-                        return PluginResult.Redirect(self, "Bestätigt.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.confirmed"));
                     }
                     case "decline":
                     {
@@ -165,7 +166,7 @@ public static class BookingAdminBookings
                         b = await BookingFlow.MoveAsync(ctx.Data, b.Id, BookingStatus.Declined, "Abgelehnt" + (reason.Length > 0 ? ": " + reason : ""), null, ct);
                         if (B.Checked(f.F("notify")))
                             await BookingFlow.NoteAsync(ctx.Data, b.Id, "Absage an den Gast: " + await SendAsync(ctx, store, b, BookingMail.Declined, null, reason, ct), ct);
-                        return PluginResult.Redirect(self, "Abgelehnt – der Zeitraum ist wieder frei.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.declined"));
                     }
                     case "cancel":
                     {
@@ -173,24 +174,24 @@ public static class BookingAdminBookings
                         b = await BookingFlow.MoveAsync(ctx.Data, b.Id, BookingStatus.Cancelled, "Storniert" + (reason.Length > 0 ? ": " + reason : ""), null, ct);
                         if (B.Checked(f.F("notify")))
                             await BookingFlow.NoteAsync(ctx.Data, b.Id, "Stornierung an den Gast: " + await SendAsync(ctx, store, b, BookingMail.Cancelled, null, reason, ct), ct);
-                        return PluginResult.Redirect(self, "Storniert – der Zeitraum ist wieder frei.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.cancelled"));
                     }
                     case "pay":
                     {
                         var amount = B.ParseMoney(f.F("amount")) ?? 0;
                         await BookingPayments.AddAsync(ctx.Data, b.Id, amount, B.Day(f.F("day")) ?? B.Today,
                             BookingPayments.Methods.Contains(f.F("method")) ? f.F("method") : "", f.F("pay_note"), ct);
-                        return PluginResult.Redirect(self, "Zahlung eingetragen.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.paymentAdded"));
                     }
                     case "unpay":
                         if (long.TryParse(f.F("id"), out var pid)) await BookingPayments.RemoveAsync(ctx.Data, b.Id, pid, ct);
-                        return PluginResult.Redirect(self, "Zahlung entfernt.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.paymentRemoved"));
                     case "note":
                         await ctx.Data.Table(BookingStore.TBookings).UpdateAsync(b.Id, new Dictionary<string, object?> { ["host_note"] = B.Clip(f.F("host_note"), 4000) }, ct);
-                        return PluginResult.Redirect(self, "Notiz gespeichert.");
+                        return PluginResult.Redirect(self, ctx.T("booking.bookings.noteSaved"));
                 }
             }
-            catch (BookingException ex) { return PluginResult.Redirect(self, ex.Message, true); }
+            catch (BookingException ex) { return PluginResult.Redirect(self, ex.Text(ctx), true); }
             return PluginResult.Redirect(self);
         }
 
@@ -206,76 +207,76 @@ public static class BookingAdminBookings
         var dialogs = new List<UiNode?>();
         if (open)
         {
-            var offerTitle = b.Status == BookingStatus.Offer ? "Angebot erneut schicken" : "Angebot schicken";
+            var offerTitle = b.Status == BookingStatus.Offer ? ctx.T("booking.bookings.offerAgain") : ctx.T("booking.bookings.sendOffer");
             steps.Add(Ui.Submit(offerTitle, UiButtonKind.Primary, icon: "ti-send", small: true) with { Opens = "offer-dialog" });
-            steps.Add(Ui.Submit("Bestätigen", UiButtonKind.Ghost, icon: "ti-check", small: true) with { Opens = "confirm-dialog" });
-            steps.Add(Ui.Submit("Ablehnen", UiButtonKind.Danger, icon: "ti-x", small: true) with { Opens = "decline-dialog" });
+            steps.Add(Ui.Submit(ctx.T("booking.bookings.confirm"), UiButtonKind.Ghost, icon: "ti-check", small: true) with { Opens = "confirm-dialog" });
+            steps.Add(Ui.Submit(ctx.T("booking.bookings.decline"), UiButtonKind.Danger, icon: "ti-x", small: true) with { Opens = "decline-dialog" });
             dialogs.Add(Ui.Dialog("offer-dialog", offerTitle, Ui.Form(
-                Ui.Grid(160, Ui.Input("adjust", "Nachlass (−) oder Aufschlag", ""), Ui.Input("adjust_text", "Text dazu", "") with { Help = "z. B. „Stammgast-Rabatt“" },
-                    Ui.Input("days", "Gilt Tage", B.Num(BookingPlugin.OfferDays(ctx)), UiInputType.Number)),
-                Ui.FormActions(Ui.Submit("Angebot schicken", UiButtonKind.Primary, "action", "offer", icon: "ti-send")))));
-            dialogs.Add(Ui.Dialog("confirm-dialog", "Direkt bestätigen", Ui.Form(Ui.Checkbox("notify", "Buchungsbestätigung an den Gast schicken", true),
-                Ui.FormActions(Ui.Submit("Bestätigen", UiButtonKind.Primary, "action", "confirm", icon: "ti-check")))));
-            dialogs.Add(Ui.Dialog("decline-dialog", "Ablehnen", Ui.Form(Ui.TextArea("reason", "Grund (steht in der Mail)", "", 2), Ui.Checkbox("notify", "Absage an den Gast schicken", true),
-                Ui.FormActions(Ui.Submit("Ablehnen", UiButtonKind.Danger, "action", "decline", confirm: "Anfrage ablehnen? Der Zeitraum wird wieder frei.")))));
+                Ui.Grid(160, Ui.Input("adjust", ctx.T("booking.bookings.adjust"), ""), Ui.Input("adjust_text", ctx.T("booking.bookings.adjustText"), "") with { Help = ctx.T("booking.bookings.adjustHelp") },
+                    Ui.Input("days", ctx.T("booking.bookings.validDays"), B.Num(BookingPlugin.OfferDays(ctx)), UiInputType.Number)),
+                Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.sendOffer"), UiButtonKind.Primary, "action", "offer", icon: "ti-send")))));
+            dialogs.Add(Ui.Dialog("confirm-dialog", ctx.T("booking.bookings.confirmDirect"), Ui.Form(Ui.Checkbox("notify", ctx.T("booking.bookings.sendConfirmation"), true),
+                Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.confirm"), UiButtonKind.Primary, "action", "confirm", icon: "ti-check")))));
+            dialogs.Add(Ui.Dialog("decline-dialog", ctx.T("booking.bookings.decline"), Ui.Form(Ui.TextArea("reason", ctx.T("booking.bookings.reason"), "", 2), Ui.Checkbox("notify", ctx.T("booking.bookings.sendDecline"), true),
+                Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.decline"), UiButtonKind.Danger, "action", "decline", confirm: ctx.T("booking.bookings.confirmDecline"))))));
         }
         else if (b.Status == BookingStatus.Confirmed)
         {
-            steps.Add(Ui.Submit("Stornieren", UiButtonKind.Danger, icon: "ti-x", small: true) with { Opens = "cancel-dialog" });
-            dialogs.Add(Ui.Dialog("cancel-dialog", "Stornieren", Ui.Form(Ui.TextArea("reason", "Grund (steht in der Mail)", "", 2), Ui.Checkbox("notify", "Stornierung an den Gast schicken", true),
-                Ui.FormActions(Ui.Submit("Stornieren", UiButtonKind.Danger, "action", "cancel", confirm: "Buchung stornieren? Der Zeitraum wird wieder frei.")))));
+            steps.Add(Ui.Submit(ctx.T("booking.bookings.cancel"), UiButtonKind.Danger, icon: "ti-x", small: true) with { Opens = "cancel-dialog" });
+            dialogs.Add(Ui.Dialog("cancel-dialog", ctx.T("booking.bookings.cancel"), Ui.Form(Ui.TextArea("reason", ctx.T("booking.bookings.reason"), "", 2), Ui.Checkbox("notify", ctx.T("booking.bookings.sendCancel"), true),
+                Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.cancel"), UiButtonKind.Danger, "action", "cancel", confirm: ctx.T("booking.bookings.confirmCancel"))))));
         }
-        var headActions = new List<UiNode?> { Ui.Button("Alle Buchungen", R + "bookings", UiButtonKind.Ghost, "ti-arrow-left", small: true) };
-        if (hasPayments) headActions.Add(Ui.Button("Buchungsbestätigung (PDF)", self + "/pdf", UiButtonKind.Ghost, "ti-file-type-pdf", small: true));
+        var headActions = new List<UiNode?> { Ui.Button(ctx.T("booking.bookings.all"), R + "bookings", UiButtonKind.Ghost, "ti-arrow-left", small: true) };
+        if (hasPayments) headActions.Add(Ui.Button(ctx.T("booking.bookings.pdf"), self + "/pdf", UiButtonKind.Ghost, "ti-file-type-pdf", small: true));
         headActions.AddRange(steps);
-        var head = Ui.PageHead((unit?.Name ?? "–") + " · " + B.Date(b.Arrival) + " – " + B.Date(b.Departure), "Buchung " + b.Number, headActions.ToArray());
+        var head = Ui.PageHead((unit?.Name ?? "–") + " · " + B.Date(b.Arrival) + " – " + B.Date(b.Departure), ctx.T("booking.bookings.title", b.Number), headActions.ToArray());
 
-        var facts = Ui.Card("Aufenthalt", Ui.Stack(
-            Ui.Inline(Ui.Badge(BookingStatus.Label(b.Status), BookingStatus.Tone(b.Status)), b.Source == "admin" ? Ui.Badge("im Admin angelegt") : Ui.Badge("Website")),
-            Ui.KeyValue(new[] { ("Unterkunft", (unit?.Name ?? "–") + (house is null ? "" : ", " + house.Name)),
-                ("Anreise", B.Weekday(b.Arrival) + " " + B.Date(b.Arrival)), ("Abreise", B.Weekday(b.Departure) + " " + B.Date(b.Departure)),
-                ("Nächte", B.Num(b.Nights)), ("Gäste", BookingMail.Persons(b.Adults, b.Children)),
-                ("Vorgemerkt bis", b.Status == BookingStatus.Request ? BookingMail.Local(b.HoldUntil) : ""),
-                ("Angebot gilt bis", b.Status == BookingStatus.Offer ? BookingMail.Local(b.OfferUntil) : "") }.Where(x => x.Item2.Length > 0).ToArray()),
-            Ui.Table(new[] { Ui.Column("Posten"), Ui.Column("Berechnung"), Ui.Column("Betrag", right: true) },
+        var facts = Ui.Card(ctx.T("booking.bookings.stay"), Ui.Stack(
+            Ui.Inline(Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)), b.Source == "admin" ? Ui.Badge(ctx.T("booking.bookings.byAdmin")) : Ui.Badge(ctx.T("booking.bookings.website"))),
+            Ui.KeyValue(new[] { (ctx.T("booking.bookings.colUnit"), (unit?.Name ?? "–") + (house is null ? "" : ", " + house.Name)),
+                (ctx.T("booking.bookings.arrival"), B.Weekday(ctx.T, b.Arrival) + " " + B.Date(b.Arrival)), (ctx.T("booking.bookings.departure"), B.Weekday(ctx.T, b.Departure) + " " + B.Date(b.Departure)),
+                (ctx.T("booking.bookings.nights"), B.Num(b.Nights)), (ctx.T("booking.bookings.guests"), BookingMail.Persons(b.Adults, b.Children)),
+                (ctx.T("booking.bookings.heldUntil"), b.Status == BookingStatus.Request ? BookingMail.Local(b.HoldUntil) : ""),
+                (ctx.T("booking.bookings.offerUntil"), b.Status == BookingStatus.Offer ? BookingMail.Local(b.OfferUntil) : "") }.Where(x => x.Item2.Length > 0).ToArray()),
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colItem")), Ui.Column(ctx.T("booking.bookings.colCalc")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true) },
                 b.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : null, B.Money(l.Amount, cur)))
-                    .Append(Ui.Row(Ui.Text("Gesamt"), null, Ui.Text(B.Money(b.Total, cur)))))));
-        var guest = Ui.Card("Gast", Ui.Stack(
-            Ui.KeyValue(new[] { ("Name", b.Name), ("E-Mail", b.Email), ("Telefon", b.Phone) }.Where(x => x.Item2.Length > 0).ToArray()),
-            b.GuestId > 0 ? Ui.Link("Gästekarte", R + "guests/" + b.GuestId) : null,
-            b.Message.Length > 0 ? Ui.Stack(Ui.Heading("Nachricht", 3), Ui.Text(b.Message)) : null,
-            Ui.Form(Ui.TextArea("host_note", "Interne Notiz", (await ctx.Data.Table(BookingStore.TBookings).GetAsync(b.Id, ct))?.Text("host_note") ?? "", 3),
-                Ui.FormActions(Ui.Submit("Notiz speichern", UiButtonKind.Ghost, "action", "note", small: true)))));
+                    .Append(Ui.Row(Ui.Text(ctx.T("booking.bookings.total")), null, Ui.Text(B.Money(b.Total, cur)))))));
+        var guest = Ui.Card(ctx.T("booking.bookings.colGuest"), Ui.Stack(
+            Ui.KeyValue(new[] { (ctx.T("booking.bookings.name"), b.Name), (ctx.T("booking.bookings.email"), b.Email), (ctx.T("booking.bookings.phone"), b.Phone) }.Where(x => x.Item2.Length > 0).ToArray()),
+            b.GuestId > 0 ? Ui.Link(ctx.T("booking.bookings.guestCard"), R + "guests/" + b.GuestId) : null,
+            b.Message.Length > 0 ? Ui.Stack(Ui.Heading(ctx.T("booking.bookings.message"), 3), Ui.Text(b.Message)) : null,
+            Ui.Form(Ui.TextArea("host_note", ctx.T("booking.bookings.hostNote"), (await ctx.Data.Table(BookingStore.TBookings).GetAsync(b.Id, ct))?.Text("host_note") ?? "", 3),
+                Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.saveNote"), UiButtonKind.Ghost, "action", "note", small: true)))));
         UiNode? payments = null;
         if (hasPayments)
         {
             var plan = await BookingPayments.PlanAsync(ctx, b, ct);
             var list = await BookingPayments.ListAsync(ctx.Data, b.Id, ct);
             var two = plan.Deposit > 0 && plan.Deposit < plan.Total;
-            payments = Ui.Card("Zahlungen", Ui.Stack(
-                Ui.Inline(Ui.Badge(plan.State, plan.Tone), Ui.Text(B.Money(plan.Paid, cur) + " von " + B.Money(plan.Total, cur) + " bezahlt")),
+            payments = Ui.Card(ctx.T("booking.bookings.payments"), Ui.Stack(
+                Ui.Inline(Ui.Badge(plan.StateLabel(ctx.T), plan.Tone), Ui.Text(ctx.T("booking.bookings.paidOf", B.Money(plan.Paid, cur), B.Money(plan.Total, cur)))),
                 Ui.KeyValue(new[]
                 {
-                    (two ? "Anzahlung" : "Gesamtbetrag", B.Money(two ? plan.Deposit : plan.Total, cur) + " bis " + B.Date(plan.DepositDue)),
-                    (two ? "Rest" : "", two ? B.Money(plan.Rest, cur) + " bis " + B.Date(plan.RestDue) : "")
+                    (two ? ctx.T("booking.bookings.deposit") : ctx.T("booking.bookings.totalAmount"), ctx.T("booking.bookings.dueBy", B.Money(two ? plan.Deposit : plan.Total, cur), B.Date(plan.DepositDue))),
+                    (two ? ctx.T("booking.bookings.rest") : "", two ? ctx.T("booking.bookings.dueBy", B.Money(plan.Rest, cur), B.Date(plan.RestDue)) : "")
                 }.Where(x => x.Item1.Length > 0).ToArray()),
-                list.Count == 0 ? null : Ui.Table(new[] { Ui.Column("Tag"), Ui.Column("Art"), Ui.Column("Betrag", right: true), Ui.Column("", actions: true) },
-                    list.Select(x => Ui.Row(B.Date(x.Day), x.Method + (x.Note.Length > 0 ? " · " + x.Note : ""), B.Money(x.Amount, cur),
-                        Ui.Action("Entfernen", "unpay", B.Num(x.Id), confirm: "Zahlung entfernen?", icon: "ti-trash")))),
+                list.Count == 0 ? null : Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colDay")), Ui.Column(ctx.T("booking.bookings.colMethod")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column("", actions: true) },
+                    list.Select(x => Ui.Row(B.Date(x.Day), BookingPayments.MethodLabel(ctx.T, x.Method) + (x.Note.Length > 0 ? " · " + x.Note : ""), B.Money(x.Amount, cur),
+                        Ui.Action(ctx.T("booking.bookings.remove"), "unpay", B.Num(x.Id), confirm: ctx.T("booking.bookings.confirmRemovePayment"), icon: "ti-trash")))),
                 Ui.Form(Ui.Grid(140,
-                        Ui.Input("amount", "Betrag", plan.Open > 0 ? B.MoneyField(plan.Paid < plan.Deposit && two ? plan.Deposit - plan.Paid : plan.Open) : ""),
-                        Ui.Input("day", "Eingang am", B.Iso(B.Today), UiInputType.Date),
-                        Ui.Select("method", "Art", BookingPayments.Methods[0], BookingPayments.Methods.Select(m => Ui.Option(m, m)).ToArray()),
-                        Ui.Input("pay_note", "Notiz")),
-                    Ui.FormActions(Ui.Submit("Zahlung eintragen", UiButtonKind.Ghost, "action", "pay", icon: "ti-cash")))));
+                        Ui.Input("amount", ctx.T("booking.bookings.amount"), plan.Open > 0 ? B.MoneyField(plan.Paid < plan.Deposit && two ? plan.Deposit - plan.Paid : plan.Open) : ""),
+                        Ui.Input("day", ctx.T("booking.bookings.receivedOn"), B.Iso(B.Today), UiInputType.Date),
+                        Ui.Select("method", ctx.T("booking.bookings.colMethod"), BookingPayments.Methods[0], BookingPayments.Methods.Select(m => Ui.Option(m, BookingPayments.MethodLabel(ctx.T, m))).ToArray()),
+                        Ui.Input("pay_note", ctx.T("booking.bookings.note"))),
+                    Ui.FormActions(Ui.Submit(ctx.T("booking.bookings.addPayment"), UiButtonKind.Ghost, "action", "pay", icon: "ti-cash")))));
         }
         var checkin = await BookingAdminCheckins.CardAsync(ctx, b, ct);
         // what happened comes first and takes the width; the time is a narrow column at the right
-        var history = Ui.Card("Verlauf", Ui.Table(new[] { Ui.Column("Was"), Ui.Column("Wann", right: true) },
+        var history = Ui.Card(ctx.T("booking.bookings.history"), Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colWhat")), Ui.Column(ctx.T("booking.bookings.colWhen"), right: true) },
             b.History.AsEnumerable().Reverse().Select(h => Ui.Row(h.Text, Ui.Muted(BookingMail.Local(h.At)))), emptyText: "–"));
         var page = new List<UiNode?> { head };
         page.AddRange(dialogs);
         page.Add(Ui.Columns(new UiNode?[] { facts, checkin, history }, new UiNode?[] { payments, guest }));
-        return PluginResult.Page(Ui.Stack(page.ToArray()), "Buchung " + b.Number);
+        return PluginResult.Page(Ui.Stack(page.ToArray()), ctx.T("booking.bookings.title", b.Number));
     }
 }

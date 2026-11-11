@@ -21,7 +21,7 @@ public static class BookingCleaning
     public const string CleanersKey = "cleaners", TokenMeta = "cleaning_token", IcsPath = "/buchung/reinigung/";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(CleanersKey, "Reinigung: Zuständige", SettingKind.TextArea) { Group = "Reinigung", Help = "Ein Name je Zeile (z. B. „Ana – 0385 91 123 456“). Erscheint in der Auswahl der Reinigungsliste." });
+        .Add(new SettingSpec(CleanersKey, "booking.clean.set.cleaners", SettingKind.TextArea) { Group = "booking.clean.set.group", Help = "booking.clean.set.cleanersHelp" });
 
     public static IAdminSection Register(IAdminSection s) => s.Page("cleaning", null, PageAsync).Page("cleaning/pdf", null, PdfAsync);
 
@@ -31,8 +31,9 @@ public static class BookingCleaning
         (ctx.Settings.Get(CleanersKey) ?? "").Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(30).ToList();
 
     /// <summary>The cleanings of [from, to]: per unit (not the "whole house" units) every day a stay ends, with the next arrival after it.</summary>
-    public static async Task<List<CleaningTask>> TasksAsync(IPluginData data, DateOnly from, DateOnly to, CancellationToken ct = default)
+    public static async Task<List<CleaningTask>> TasksAsync(IPluginData data, DateOnly from, DateOnly to, CancellationToken ct = default, Tr? tr = null)
     {
+        var t = tr ?? BookingStrings.German;
         var store = new BookingStore(data);
         var units = (await store.UnitsAsync(ct)).Where(u => u.Active && u.Contains.Count == 0).ToList();
         var nights = await store.NightsAsync(units.Select(u => u.Id), from.AddDays(-1), to.AddDays(60), ct);
@@ -46,8 +47,8 @@ public static class BookingCleaning
 
         // a stay = a booking or a portal's reservation; the owner's own blocks (repairs, own use) need no turnover cleaning
         string? Owner(Night n) => n.BookingId > 0 ? "b" + n.BookingId : blocks.TryGetValue(n.BlockId, out var bl) && bl.Source.StartsWith("feed:", StringComparison.Ordinal) ? "f" + n.BlockId : null;
-        string Label(string owner) => owner[0] == 'b' && bookings.TryGetValue(long.Parse(owner[1..], CultureInfo.InvariantCulture), out var b) ? "Buchung " + b.Number
-            : owner[0] == 'f' && blocks.TryGetValue(long.Parse(owner[1..], CultureInfo.InvariantCulture), out var bl) ? bl.Reason : "Aufenthalt";
+        string Label(string owner) => owner[0] == 'b' && bookings.TryGetValue(long.Parse(owner[1..], CultureInfo.InvariantCulture), out var b) ? t("booking.clean.booking", b.Number)
+            : owner[0] == 'f' && blocks.TryGetValue(long.Parse(owner[1..], CultureInfo.InvariantCulture), out var bl) ? bl.Reason : t("booking.clean.stay");
 
         var list = new List<CleaningTask>();
         foreach (var u in units)
@@ -105,7 +106,7 @@ public static class BookingCleaning
             if (f.Action == "renew")
             {
                 await SetTokenAsync(ctx.Data, BookingIcal.NewToken(), ct);
-                return PluginResult.Redirect(self, "Neue Kalender-Adresse erzeugt – die alte geht nicht mehr.");
+                return PluginResult.Redirect(self, ctx.T("booking.clean.renewed"));
             }
             if (long.TryParse(f.F("unit"), out var unitId) && B.Day(f.F("day")) is { } day)
             {
@@ -119,34 +120,34 @@ public static class BookingCleaning
             }
             return PluginResult.Redirect(self);
         }
-        var tasks = await TasksAsync(ctx.Data, from, to, ct);
+        var tasks = await TasksAsync(ctx.Data, from, to, ct, ctx.T);
         var cleaners = Cleaners(ctx);
         var house = await new BookingStore(ctx.Data).PropertiesAsync(ct) is { Count: > 0 } hs ? hs[0] : null;
         UiNode Assign(CleaningTask t) => cleaners.Count == 0 ? Ui.Muted(t.Assignee.Length > 0 ? t.Assignee : "–") : Ui.Form(
             Ui.Hidden("action", "assign"), Ui.Hidden("unit", B.Num(t.Unit.Id)), Ui.Hidden("day", B.Iso(t.Day)),
-            Ui.Inline(Ui.Select("assignee", "Zuständig", t.Assignee, new[] { Ui.Option("", "– niemand –") }.Concat(cleaners.Select(c => Ui.Option(c, c))).ToArray()),
+            Ui.Inline(Ui.Select("assignee", ctx.T("booking.clean.assignee"), t.Assignee, new[] { Ui.Option("", ctx.T("booking.clean.nobody")) }.Concat(cleaners.Select(c => Ui.Option(c, c))).ToArray()),
                 Ui.Submit("OK", UiButtonKind.Ghost, small: true)));
         UiNode Done(CleaningTask t) => t.Done is null
-            ? Ui.Action("Erledigt", new Dictionary<string, string> { ["action"] = "done", ["unit"] = B.Num(t.Unit.Id), ["day"] = B.Iso(t.Day) }, UiButtonKind.Ghost, icon: "ti-check")
-            : Ui.Inline(Ui.Badge("erledigt", UiTone.Success), Ui.Action("Zurück", new Dictionary<string, string> { ["action"] = "undo", ["unit"] = B.Num(t.Unit.Id), ["day"] = B.Iso(t.Day) }, icon: "ti-arrow-back-up"));
+            ? Ui.Action(ctx.T("booking.clean.done"), new Dictionary<string, string> { ["action"] = "done", ["unit"] = B.Num(t.Unit.Id), ["day"] = B.Iso(t.Day) }, UiButtonKind.Ghost, icon: "ti-check")
+            : Ui.Inline(Ui.Badge(ctx.T("booking.clean.doneBadge"), UiTone.Success), Ui.Action(ctx.T("booking.clean.undo"), new Dictionary<string, string> { ["action"] = "undo", ["unit"] = B.Num(t.Unit.Id), ["day"] = B.Iso(t.Day) }, icon: "ti-arrow-back-up"));
         var token = await TokenAsync(ctx.Data, ct);
         var ics = (ctx.Site.Origin ?? "").TrimEnd('/') + IcsPath + token + ".ics";
         return PluginResult.Page(Ui.Stack(
-            Ui.PageHead(null, "Reinigung",
-                Ui.Button("Als PDF", BookingAdmin.Root + "cleaning/pdf?von=" + B.Iso(from) + "&bis=" + B.Iso(to), UiButtonKind.Ghost, "ti-printer", small: true)),
-            Ui.Form(Ui.Inline(Ui.Input("von", "Von", B.Iso(from), UiInputType.Date), Ui.Input("bis", "Bis", B.Iso(to), UiInputType.Date), Ui.Submit("Anzeigen", UiButtonKind.Ghost)))
+            Ui.PageHead(null, ctx.T("booking.clean.title"),
+                Ui.Button(ctx.T("booking.clean.asPdf"), BookingAdmin.Root + "cleaning/pdf?von=" + B.Iso(from) + "&bis=" + B.Iso(to), UiButtonKind.Ghost, "ti-printer", small: true)),
+            Ui.Form(Ui.Inline(Ui.Input("von", ctx.T("booking.clean.from"), B.Iso(from), UiInputType.Date), Ui.Input("bis", ctx.T("booking.clean.to"), B.Iso(to), UiInputType.Date), Ui.Submit(ctx.T("booking.clean.show"), UiButtonKind.Ghost)))
                 with { Action = BookingAdmin.Root + "cleaning" },
-            Ui.Table(new[] { Ui.Column("Tag"), Ui.Column("Einheit"), Ui.Column("Abreise"), Ui.Column("Danach"), Ui.Column("Zuständig"), Ui.Column("", actions: true) },
+            Ui.Table(new[] { Ui.Column(ctx.T("booking.clean.col.day")), Ui.Column(ctx.T("booking.clean.col.unit")), Ui.Column(ctx.T("booking.clean.col.departure")), Ui.Column(ctx.T("booking.clean.col.next")), Ui.Column(ctx.T("booking.clean.assignee")), Ui.Column("", actions: true) },
                 tasks.Select(t => Ui.Row(
-                    Ui.Stack(Ui.Text(B.Weekday(t.Day) + " " + B.Date(t.Day)), t.Turnover ? Ui.Badge("Wechsel" + (house?.CheckIn is { Length: > 0 } ci ? " bis " + ci + " Uhr" : ""), UiTone.Warning) : null),
+                    Ui.Stack(Ui.Text(B.Weekday(ctx.T, t.Day) + " " + B.Date(t.Day)), t.Turnover ? Ui.Badge(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.clean.turnoverUntil", ci) : ctx.T("booking.clean.turnover"), UiTone.Warning) : null),
                     t.Unit.Name, t.Leaving,
-                    t.NextArrival is { } n ? (n == t.Day ? "heute" : B.Weekday(n) + " " + B.Date(n)) + (t.NextPersons > 0 ? " · " + t.NextPersons + " Pers." : "") + (t.NextExtras.Length > 0 ? " · " + t.NextExtras : "") : "–",
+                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Weekday(ctx.T, n) + " " + B.Date(n)) + (t.NextPersons > 0 ? " · " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? " · " + t.NextExtras : "") : "–",
                     Assign(t), Done(t))),
-                emptyText: "In diesem Zeitraum reist niemand ab."),
-            Ui.Card("Kalender für das Reinigungsteam", Ui.Stack(
-                Ui.KeyValue(("Adresse", ics)),
-                Ui.Muted("Ohne Namen, zum Abonnieren im Handy-Kalender."),
-                Ui.Action("Neue Adresse erzeugen", "renew", confirm: "Die bisherige Kalender-Adresse geht danach nicht mehr. Fortfahren?", icon: "ti-key") with { WithLabel = true }))), "Reinigung");
+                emptyText: ctx.T("booking.clean.empty")),
+            Ui.Card(ctx.T("booking.clean.calendar"), Ui.Stack(
+                Ui.KeyValue((ctx.T("booking.clean.address"), ics)),
+                Ui.Muted(ctx.T("booking.clean.calendarHelp")),
+                Ui.Action(ctx.T("booking.clean.renew"), "renew", confirm: ctx.T("booking.clean.renewConfirm"), icon: "ti-key") with { WithLabel = true }))), ctx.T("booking.clean.title"));
     }
 
     // ---- the team's calendar and the printout -------------------------------------------------------------------------
@@ -201,24 +202,24 @@ public static class BookingCleaning
     private static async Task<PluginResult> PdfAsync(IPluginContext ctx, CancellationToken ct)
     {
         var (from, to) = Range(ctx);
-        var tasks = await TasksAsync(ctx.Data, from, to, ct);
-        var p = new PrintLayout(await BookingPrint.LetterheadAsync(ctx, ct), "Reinigung " + B.Date(from) + " – " + B.Date(to));
-        p.Kicker("Reinigungsliste · " + B.Date(from) + " – " + B.Date(to));
-        p.Title("Reinigung");
-        if (tasks.Count == 0) p.Body("In diesem Zeitraum reist niemand ab.");
+        var tasks = await TasksAsync(ctx.Data, from, to, ct, ctx.T);
+        var p = new PrintLayout(await BookingPrint.LetterheadAsync(ctx, ct), ctx.T("booking.clean.pdfTitle", B.Date(from), B.Date(to)));
+        p.Kicker(ctx.T("booking.clean.pdfKicker", B.Date(from), B.Date(to)));
+        p.Title(ctx.T("booking.clean.title"));
+        if (tasks.Count == 0) p.Body(ctx.T("booking.clean.empty"));
         else
-            p.Table(new[] { "Tag", "Einheit", "Danach", "Zuständig", "Erledigt" }, new[] { 0.2, 0.26, 0.28, 0.16, 0.1 },
+            p.Table(new[] { ctx.T("booking.clean.col.day"), ctx.T("booking.clean.col.unit"), ctx.T("booking.clean.col.next"), ctx.T("booking.clean.assignee"), ctx.T("booking.clean.done") }, new[] { 0.2, 0.26, 0.28, 0.16, 0.1 },
                 tasks.Select(t => new[]
                 {
-                    B.Weekday(t.Day) + " " + B.Date(t.Day) + (t.Turnover ? " (Wechsel)" : ""), t.Unit.Name,
-                    t.NextArrival is { } n ? (n == t.Day ? "heute" : B.Date(n)) + (t.NextPersons > 0 ? ", " + t.NextPersons + " Pers." : "") + (t.NextExtras.Length > 0 ? ", " + t.NextExtras : "") : "–",
-                    t.Assignee, t.Done is null ? "[   ]" : "ja"
+                    B.Weekday(ctx.T, t.Day) + " " + B.Date(t.Day) + (t.Turnover ? " " + ctx.T("booking.clean.turnoverParen") : ""), t.Unit.Name,
+                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Date(n)) + (t.NextPersons > 0 ? ", " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? ", " + t.NextExtras : "") : "–",
+                    t.Assignee, t.Done is null ? "[   ]" : ctx.T("booking.clean.yes")
                 }).ToList());
         foreach (var u in tasks.Select(t => t.Unit).DistinctBy(u => u.Id).Where(u => u.Checklist.Length > 0))
         {
-            p.Heading("Checkliste " + u.Name);
+            p.Heading(ctx.T("booking.clean.checklist", u.Name));
             p.Body(string.Join("\n", u.Checklist.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => "[  ] " + l.Trim())));
         }
-        return BookingPrint.Result(p.ToBytes(), "Reinigung " + B.Iso(from));
+        return BookingPrint.Result(p.ToBytes(), ctx.T("booking.clean.fileName", B.Iso(from)));
     }
 }

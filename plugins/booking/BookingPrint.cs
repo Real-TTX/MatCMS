@@ -14,12 +14,16 @@ public static class BookingPrint
     public const string Logo = "printLogo", Head = "printHead", Foot = "printFoot", Color = "printColor";
 
     public static void Declare(ISettingsBuilder s) => s
-        .Add(new SettingSpec(Logo, "Logo", SettingKind.Image) { Group = "Druckvorlage (PDF)", Help = "Oben links auf der Buchungsbestätigung. Leer = das Logo der Website." })
-        .Add(new SettingSpec(Head, "Briefkopf (rechts oben)", SettingKind.List) { AddLabel = "Zeile", Help = "Die erste Zeile fett – z. B. Name, Anschrift, Telefon, E-Mail. Leer = Name der Website und ihre Adresse." })
-        .Add(new SettingSpec(Foot, "Fußzeile", SettingKind.List) { AddLabel = "Zeile", Help = "Bis zu drei Zeilen unten, z. B. Bankverbindung, Steuernummer, Website." })
-        .Add(new SettingSpec(Color, "Farbe", SettingKind.Color) { Default = "#334155", Help = "Titel, Überschriften und Linien." });
+        .Add(new SettingSpec(Logo, "booking.print.set.logo", SettingKind.Image) { Group = "booking.print.set.group", Help = "booking.print.set.logoHelp" })
+        .Add(new SettingSpec(Head, "booking.print.set.head", SettingKind.List) { AddLabel = "booking.print.set.line", Help = "booking.print.set.headHelp" })
+        .Add(new SettingSpec(Foot, "booking.print.set.foot", SettingKind.List) { AddLabel = "booking.print.set.line", Help = "booking.print.set.footHelp" })
+        .Add(new SettingSpec(Color, "booking.print.set.color", SettingKind.Color) { Default = "#334155", Help = "booking.print.set.colorHelp" });
 
-    internal sealed record Letterhead(string Club, IReadOnlyList<string> Head, IReadOnlyList<string> Foot, (double R, double G, double B) Accent, PluginImage? Logo);
+    internal sealed record Letterhead(string Club, IReadOnlyList<string> Head, IReadOnlyList<string> Foot, (double R, double G, double B) Accent, PluginImage? Logo)
+    {
+        /// <summary>The language of the printout: the request's that made the letterhead (German without one). Every text on the page goes through it.</summary>
+        public Tr T { get; init; } = BookingStrings.German;
+    }
 
     internal static async Task<Letterhead> LetterheadAsync(IPluginContext ctx, CancellationToken ct)
     {
@@ -37,7 +41,7 @@ public static class BookingPrint
             try { logo = await ctx.Site.LoadImageAsync(url.Trim(), 600, ct); } catch { logo = null; }
             if (logo is not null) break;                                       // an SVG or a missing file gives null: try the next
         }
-        return new Letterhead(name, head, foot, (Convert.ToInt32(color.Substring(1, 2), 16) / 255.0, Convert.ToInt32(color.Substring(3, 2), 16) / 255.0, Convert.ToInt32(color.Substring(5, 2), 16) / 255.0), logo);
+        return new Letterhead(name, head, foot, (Convert.ToInt32(color.Substring(1, 2), 16) / 255.0, Convert.ToInt32(color.Substring(3, 2), 16) / 255.0, Convert.ToInt32(color.Substring(5, 2), 16) / 255.0), logo) { T = ctx.T };
     }
 
     private static string SiteLogo(IPluginSite site)
@@ -60,26 +64,27 @@ public static class BookingPrint
     /// <summary>The booking confirmation: the stay, the bill, the payment plan with what is paid, and the payment note.</summary>
     internal static byte[] Confirmation(Letterhead lh, Booking b, Unit? unit, Property? house, PaymentPlan plan, string paymentInfo, string currency)
     {
-        var p = new PrintLayout(lh, "Buchungsbestätigung " + b.Number);
-        p.Kicker("Buchungsbestätigung · Nr. " + b.Number);
-        p.Title(unit?.Name ?? "Unterkunft");
-        p.Facts(("Gast", b.Name), ("Unterkunft", (unit?.Name ?? "") + (house is null ? "" : ", " + house.Name)), ("Adresse", house?.Address.Replace("\n", ", ") ?? ""),
-            ("Anreise", B.Weekday(b.Arrival) + " " + B.Date(b.Arrival) + (house?.CheckIn is { Length: > 0 } ci ? ", ab " + ci + " Uhr" : "")),
-            ("Abreise", B.Weekday(b.Departure) + " " + B.Date(b.Departure) + (house?.CheckOut is { Length: > 0 } co ? ", bis " + co + " Uhr" : "")),
-            ("Nächte", B.Num(b.Nights)), ("Gäste", BookingMail.Persons(b.Adults, b.Children)), ("Status", BookingStatus.Label(b.Status)));
-        p.Heading("Preis");
-        p.Table(new[] { "Posten", "Berechnung", "Betrag" }, new[] { 0.36, 0.44, 0.2 },
-            b.Lines.Select(l => new[] { l.Text, l.Detail, B.Money(l.Amount, currency) }).Append(new[] { "Gesamt", "", B.Money(b.Total, currency) }).ToList());
+        var t = lh.T;
+        var p = new PrintLayout(lh, t("booking.print.title", b.Number));
+        p.Kicker(t("booking.print.kicker", b.Number));
+        p.Title(unit?.Name ?? t("booking.print.accommodation"));
+        p.Facts((t("booking.print.guest"), b.Name), (t("booking.print.accommodation"), (unit?.Name ?? "") + (house is null ? "" : ", " + house.Name)), (t("booking.print.address"), house?.Address.Replace("\n", ", ") ?? ""),
+            (t("booking.print.arrival"), B.Weekday(t, b.Arrival) + " " + B.Date(b.Arrival) + (house?.CheckIn is { Length: > 0 } ci ? ", " + t("booking.print.from", ci) : "")),
+            (t("booking.print.departure"), B.Weekday(t, b.Departure) + " " + B.Date(b.Departure) + (house?.CheckOut is { Length: > 0 } co ? ", " + t("booking.print.until", co) : "")),
+            (t("booking.print.nights"), B.Num(b.Nights)), (t("booking.print.guests"), BookingMail.Persons(t, b.Adults, b.Children)), (t("booking.print.status"), BookingStatus.Label(t, b.Status)));
+        p.Heading(t("booking.print.price"));
+        p.Table(new[] { t("booking.print.item"), t("booking.print.calc"), t("booking.print.amount") }, new[] { 0.36, 0.44, 0.2 },
+            b.Lines.Select(l => new[] { l.Text, l.Detail, B.Money(l.Amount, currency) }).Append(new[] { t("booking.print.total"), "", B.Money(b.Total, currency) }).ToList());
         if (b.Status == BookingStatus.Confirmed)
         {
-            p.Heading("Zahlung");
+            p.Heading(t("booking.print.payment"));
             var rows = new List<string[]>();
-            if (plan.Deposit > 0 && plan.Deposit < b.Total) rows.Add(new[] { "Anzahlung", "fällig am " + B.Date(plan.DepositDue), B.Money(plan.Deposit, currency) });
-            rows.Add(new[] { plan.Deposit > 0 && plan.Deposit < b.Total ? "Restbetrag" : "Gesamtbetrag", "fällig am " + B.Date(plan.Deposit > 0 && plan.Deposit < b.Total ? plan.RestDue : plan.DepositDue), B.Money(b.Total - (plan.Deposit < b.Total ? plan.Deposit : 0), currency) });
-            if (plan.Paid > 0) rows.Add(new[] { "Bereits bezahlt", "", B.Money(plan.Paid, currency) });
-            rows.Add(new[] { "Noch offen", "", B.Money(Math.Max(0, b.Total - plan.Paid), currency) });
-            p.Table(new[] { "", "", "Betrag" }, new[] { 0.36, 0.44, 0.2 }, rows);
-            if (paymentInfo.Trim().Length > 0) p.Body(paymentInfo.Trim() + "\nVerwendungszweck: " + b.Number);
+            if (plan.Deposit > 0 && plan.Deposit < b.Total) rows.Add(new[] { t("booking.print.deposit"), t("booking.print.due", B.Date(plan.DepositDue)), B.Money(plan.Deposit, currency) });
+            rows.Add(new[] { plan.Deposit > 0 && plan.Deposit < b.Total ? t("booking.print.rest") : t("booking.print.fullAmount"), t("booking.print.due", B.Date(plan.Deposit > 0 && plan.Deposit < b.Total ? plan.RestDue : plan.DepositDue)), B.Money(b.Total - (plan.Deposit < b.Total ? plan.Deposit : 0), currency) });
+            if (plan.Paid > 0) rows.Add(new[] { t("booking.print.paid"), "", B.Money(plan.Paid, currency) });
+            rows.Add(new[] { t("booking.print.open"), "", B.Money(Math.Max(0, b.Total - plan.Paid), currency) });
+            p.Table(new[] { "", "", t("booking.print.amount") }, new[] { 0.36, 0.44, 0.2 }, rows);
+            if (paymentInfo.Trim().Length > 0) p.Body(paymentInfo.Trim() + "\n" + t("booking.print.reference", b.Number));
         }
         return p.ToBytes();
     }
@@ -276,14 +281,14 @@ internal sealed class PrintLayout
 
     public byte[] ToBytes()
     {
-        var stand = "Stand: " + B.Date(B.Today);
+        var stand = _lh.T("booking.print.asOf", B.Date(B.Today));
         for (var i = 0; i < _pdf.Pages.Count; i++)
         {
             var p = _pdf.Pages[i];
             p.Line(Left, 792, Right, 792, 0.4, 0.8);
             var y = 804.0;
             foreach (var f in _lh.Foot.SelectMany(f => PdfWriter.Wrap(f, Right - Left - 90, 7.5, false)).Take(3)) { p.Text(Left, y, f, 7.5, false, 0.4); y += 10; }
-            p.TextRight(Right, 804, "Seite " + (i + 1).ToString(CultureInfo.InvariantCulture) + " / " + _pdf.Pages.Count.ToString(CultureInfo.InvariantCulture), 7.5, false, 0.4);
+            p.TextRight(Right, 804, _lh.T("booking.print.page", (i + 1).ToString(CultureInfo.InvariantCulture), _pdf.Pages.Count.ToString(CultureInfo.InvariantCulture)), 7.5, false, 0.4);
             p.TextRight(Right, 814, stand, 7.5, false, 0.4);
         }
         return _pdf.ToBytes();

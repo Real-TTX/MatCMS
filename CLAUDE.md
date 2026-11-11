@@ -290,18 +290,29 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **"MatCMS ships no plugins" still holds for script plugins and the seeder.** What does ship is the *built-in* plugin
   (`Kind = builtin`, `Services/Plugins/BuiltInPlugins.cs`): compiled into the image, written against the same API, enabled on a
   new site, can be switched off, never deleted, exported or overwritten (a bundle or cloud rollout with its key is refused).
-  **The AI bot and the shop LEFT the image (Release B, `docs/builtin-extraction.md`):** they are native packages of the MatCMS Store now —
+  **The AI bot, the shop and the blog LEFT the image (Release B, `docs/builtin-extraction.md`):** they are native packages of the MatCMS Store now —
   `plugins/bot/` and `plugins/shop/` (namespaces unchanged, only `MatCMS.Plugin.Abstractions`), code-signed by Matthias (`tools/StoreSign sign-code`), so
   they run without "Native Plugins erlauben" and the signed package TAKES OVER a site's old `builtin` row (on/off, settings, tables, pages, menu elements
-  keep their names). Their keys stay reserved (`BuiltInPlugins.FormerKeys`, `IsBuiltInKey` still true: an unsigned package under `shop`/`bot` is
+  keep their names). Their keys stay reserved (`BuiltInPlugins.FormerKeys` = blog, shop, bot, `IsBuiltInKey` still true: an unsigned package under `shop`/`bot` is
   refused); a site whose row is still `builtin` after the update shows "Nicht mehr im Image" under Plugins (`BuiltInPlugins.IsGone`), runs nothing of
   it and keeps its data; a restore of an older backup puts on/off and settings onto that row (or the package's). Tests: `AppFactory` installs both
   signed and OFF (`tests/MatCMS.Plugins.Tests/StorePackages.cs`, test key `TestStoreKey`); the test project ALSO compiles against them, so a seam a
   test sets must not be a static field of the plugin (the shop's `HandlerFactory`/`MailSender` live in `AppContext`).
-  The one built-in left is **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
-  table (nothing moved), registers `/blog/{slug}`, the `posts` block, its admin section, the dashboard tile, the sitemap
-  entries and the cloud operation `post.create`. The core no longer knows posts except for the backup, which reads the table
-  through `BlogStore.Table(db)` — so posts are in every backup whether or not the blog is on.
+  **No built-in plugin is left** (`BuiltInPlugins.All` is empty; the machinery stays for leftover `builtin` rows).
+- **The blog left the image (2026-11)** — `plugins/blog` (native, key `blog`, see its README), the MatCMS Store's CODE-SIGNED package: only
+  signed code may *adopt* the core table `Posts`, and only a signed package may take a key of `BuiltInPlugins.FormerKeys` (blog, shop, bot —
+  `IsBuiltInKey` = built in now OR formerly). **`Posts` stays a core table:** the seeder creates it and the backup reads/writes it ITSELF
+  (`Services/PostsTable.cs`, same column list as the plugin's `BlogStore.Columns` — keep them equal; the cleanup books it before its corpus), so a
+  site without the package keeps its posts through every backup and restore. A site whose `blog` row is still `builtin` after the image update
+  keeps that row (`BuiltInPlugins.IsGone`): Admin → Plugins says "Nicht mehr im Image – aus dem Store installieren oder ein Paket importieren",
+  nothing loads, data untouched; the signed package takes the row over with on/off and settings (a restore from an older backup recreates such a
+  waiting row). **The blog is multilingual:** routes without `DefaultLanguageOnly` (`/en/blog`, `/en/blog/{slug}`; 404 for a language the site
+  does not publish in), links via `IPluginSite.LocalePrefix` (API 2.2 — follows "Standardsprache unter /"; never build a prefix by hand), the
+  default language's posts keep `/blog/{slug}`; translations share the new column `TranslationGroup`; `PluginResult.WithAlternates` (API 2.2)
+  hands the post's translations to the site's language switcher (`SiteContext.LanguageLinks`, `AlternatesItemKey`). `SiteContext.CurrentLocale`
+  reads the address's language prefix on a plugin page (the one dynamic endpoint has no `{culture}` route value). Forum source of a non-default
+  post: `blog:{locale}_{slug}`. The template part `post` (`article.html`) stays a CORE part. Tests load the package signed with the run's test key
+  (`TestStoreKey`, `BlogFixture` — import through the real `PluginPackager`, assets included).
 - **Namespaces: `MatCMS.Plugin` is the API** (assembly `MatCMS.Plugin.Abstractions`), **`MatCMS.Plugin.{Name}` is a plugin's own
   code** (`MatCMS.Plugin.Blog`, later `MatCMS.Plugin.Shop`). Consequence: the entity is `MatCMS.Models.Plugin` and a bare
   `Plugin` in host code means the NAMESPACE — write `Models.Plugin` (the compiler says CS0118 where you forgot).
@@ -401,7 +412,8 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   `Serializable` (= `BEGIN IMMEDIATE`) transaction. Plugin transactions (`InTransactionAsync`) are `Serializable` too, and a transaction that reads before it writes should start with a
   write (`ShopStore.LockForWriteAsync`) so it queues instead of being refused. (2) `UseStatusCodePagesWithReExecute` re-runs every EMPTY error response as the status page; for a POST
   that ends as a bare 400 — `PluginPage` therefore always gives an error answer to a POST a short body.
-- **The plugin machinery tests don't start the built-ins** (`new Harness()`); the blog tests do (`new Harness(builtIns: true)`).
+- **The plugin machinery tests don't start the built-ins** (`new Harness()`); the shop tests do (`new Harness(builtIns: true)`); the blog tests
+  import its signed package (`BlogFixture.InstallAsync`).
   `BlueprintTests` load every editor blueprint for real. `AppFactory` + `BlogEndToEndTests` start the whole application in memory over a temp folder (own database, own keys) and drive the blog through HTTP: login, antiforgery, the public pages, switching the plugin off and on.
 
 ## The shop

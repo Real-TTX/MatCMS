@@ -134,7 +134,7 @@ public class ShopSwitchAndBackupTests : IClassFixture<AppFactory>, IAsyncLifetim
         Assert.Equal(MatCMS.Models.PluginKind.Native, MatCMS.Models.PluginKind.Normalize(row.Kind));
         Assert.True(MatCMS.Services.Plugins.NativeTrust.IsSigned(scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), row));
         Assert.False(await db.SiteSettings.AnyAsync(s => s.Key == SettingKeys.AllowNativePlugins && s.Value == "1"));
-        Assert.True((await db.Plugins.AsNoTracking().FirstAsync(p => p.Key == "blog")).Enabled);        // the blog still starts on
+        Assert.False(await db.Plugins.AsNoTracking().AnyAsync(p => p.Key == "blog"));                   // the blog left the image: a fresh site has none
         var visitor = f.Browser();
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/shop")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/konto")).StatusCode);

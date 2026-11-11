@@ -2024,6 +2024,7 @@
   "plugins.jobs.ran": "Aufgabe ausgeführt.",
   "plugins.jobs.notRun": "Die Aufgabe läuft bereits oder ist nicht geladen.",
   "plugins.kind.builtin": "Lieferumfang",
+  "plugins.builtin.goneBadge": "Nicht mehr im Image",
   "plugins.builtin.help": "Dieses Plugin gehört zu MatCMS: es kommt mit dem Programm, ist auf einer neuen Website eingeschaltet und wird mit MatCMS aktualisiert. Ausschalten blendet seine Seiten, Blöcke und Menüpunkte aus — die Daten bleiben erhalten.",
   "plugins.builtin.gone": "Nicht mehr im Image",
   "plugins.builtin.goneHelp": "Nicht mehr im Image – aus dem Store installieren oder ein Paket importieren. Daten und Einstellungen bleiben unverändert erhalten und werden vom Paket übernommen, ebenso ob das Plugin eingeschaltet ist.",

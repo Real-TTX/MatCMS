@@ -1,0 +1,6 @@
+{
+  "Key": "blog",
+  "Name": "Blog",
+  "Version": "2.0",
+  "Description": "Beiträge mit Titelbild, Galerie, Tags und Terminierung, Beitragsseiten unter /blog und der Block „Beiträge“ – mehrsprachig: Beiträge je Sprache unter /en/blog/…, Übersetzungen verknüpft, der Sprachumschalter führt zur Übersetzung. Liegt in der Kerntabelle Posts (Sicherungen tragen die Beiträge auch ohne das Plugin). Signiertes Paket des MatCMS Store."
+}

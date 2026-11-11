@@ -15,7 +15,7 @@ namespace MatCMS.Plugin.Tests;
 /// </summary>
 public class NativeTrustTests
 {
-    /// <summary>One test key for the whole run, trusted IN ADDITION to the real store key (never instead of it) — shared with the store packages.</summary>
+    /// <summary>The run's one test key (<see cref="TestStoreKey"/>), trusted IN ADDITION to the real store key (never instead of it).</summary>
     private static ECDsa Key => TestStoreKey.Key;
     private static string KeyId => TestStoreKey.KeyId;
 

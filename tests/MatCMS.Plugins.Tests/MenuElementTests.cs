@@ -67,7 +67,11 @@ public class MenuElementSiteTests : IClassFixture<AppFactory>, IAsyncLifetime
     private readonly AppFactory _app;
     private ShopApp _shop = null!;
     public MenuElementSiteTests(AppFactory app) { _app = app; PluginPostLimiter.Reset(); }
-    public async Task InitializeAsync() => _shop = await ShopApp.StartAsync(_app);
+    public async Task InitializeAsync()
+    {
+        _shop = await ShopApp.StartAsync(_app);
+        await BlogFixture.InstallAsync(_app.Services);      // the blog's link targets and overview: the store's signed package since it left the image
+    }
     public Task DisposeAsync() => Task.CompletedTask;
 
     private static string Decode(string html) => WebUtility.HtmlDecode(html);

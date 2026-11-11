@@ -2024,6 +2024,7 @@
   "plugins.jobs.ran": "Job ran.",
   "plugins.jobs.notRun": "The job is already running or not loaded.",
   "plugins.kind.builtin": "Built in",
+  "plugins.builtin.goneBadge": "No longer in the image",
   "plugins.builtin.help": "This plugin is part of MatCMS: it ships with the program, is switched on on a new site and is updated with MatCMS. Switching it off hides its pages, blocks and menu entries — the data is kept.",
   "plugins.builtin.gone": "No longer in the image",
   "plugins.builtin.goneHelp": "No longer in the image – install it from the store or import a package. Its data and settings are kept unchanged and taken over by the package, as is whether the plugin is switched on.",

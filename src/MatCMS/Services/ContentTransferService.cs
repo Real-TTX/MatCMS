@@ -407,17 +407,22 @@ public class ContentTransferService
         // Blog posts travel with the full Pages section (not a granular page subset).
         if (options.Pages && (options.PageKeys is null || options.PageKeys.Count == 0))
         {
-            // The posts are the blog's table, read here without the plugin: a backup carries them whether or not the blog is switched on.
-            dto.Posts = (await (await MatCMS.Plugin.Blog.BlogStore.EnsureTableAsync(_pluginData, _db)).QueryAsync(
+            // The posts are a CORE table (the blog plugin adopts it): read here without the plugin, so a backup carries them whether the
+            // blog is installed, switched off or gone. Same fields as ever — a backup keeps its shape (TranslationGroup is new and optional).
+            dto.Posts = (await (await PostsTable.EnsureAsync(_pluginData, _db)).QueryAsync(
                     MatCMS.Plugin.DataQuery.Everything.OrderBy("PublishedAt", descending: true).OrderBy("Id")))
-                .Select(MatCMS.Plugin.Blog.BlogStore.From)
-                .Select(p => new PostDto
+                .Select(r => new PostDto
                 {
-                    Title = p.Title, Slug = p.Slug, TitleImage = p.TitleImage, Excerpt = p.Excerpt,
-                    ContentHtml = p.ContentHtml, Tags = p.Tags, AttachmentsJson = p.AttachmentsJson,
-                    GalleryJson = p.GalleryJson, GalleryLayout = p.GalleryLayout, SourceUrl = p.SourceUrl, SourceName = p.SourceName,
-                    Locale = p.Locale, IsPublished = p.IsPublished,
-                    PublishedAt = p.PublishedAt, CreatedAt = p.CreatedAt, UpdatedAt = p.UpdatedAt
+                    Title = r.Text("Title"), Slug = r.Text("Slug"), TitleImage = r.IsNull("TitleImage") ? null : r.Text("TitleImage"),
+                    Excerpt = r.Text("Excerpt"), ContentHtml = r.Text("ContentHtml"), Tags = r.Text("Tags"),
+                    AttachmentsJson = r.Text("AttachmentsJson") is { Length: > 0 } a ? a : "[]",
+                    GalleryJson = r.Text("GalleryJson") is { Length: > 0 } g ? g : "[]",
+                    GalleryLayout = PostsTable.NormaliseGalleryLayout(r.Text("GalleryLayout")),
+                    SourceUrl = r.IsNull("SourceUrl") ? null : r.Text("SourceUrl"), SourceName = r.IsNull("SourceName") ? null : r.Text("SourceName"),
+                    Locale = r.Text("Locale") is { Length: > 0 } l ? l : "de", IsPublished = r.Bool("IsPublished"),
+                    PublishedAt = r.Timestamp("PublishedAt") ?? DateTime.UtcNow, CreatedAt = r.Timestamp("CreatedAt") ?? DateTime.UtcNow,
+                    UpdatedAt = r.Timestamp("UpdatedAt") ?? DateTime.UtcNow,
+                    TranslationGroup = r.Text("TranslationGroup") is { Length: > 0 } tg ? tg : null
                 }).ToList();
         }
 
@@ -1231,26 +1236,33 @@ public class ContentTransferService
 
         if (dto.Posts is not null)
         {
-            var postsTable = await MatCMS.Plugin.Blog.BlogStore.EnsureTableAsync(_pluginData, _db);
+            // Written by the core, not the blog plugin: a site without the plugin restores its posts all the same.
+            var postsTable = await PostsTable.EnsureAsync(_pluginData, _db);
             await postsTable.DeleteWhereAsync(MatCMS.Plugin.DataQuery.Everything);
+            // (Slug, Locale) is unique in the table: a hand-edited backup naming one twice keeps the first instead of failing the restore.
+            var seenPosts = new HashSet<(string, string)>();
             foreach (var p in dto.Posts)
             {
                 if (string.IsNullOrWhiteSpace(p.Slug)) continue;
-                await postsTable.InsertAsync(MatCMS.Plugin.Blog.BlogStore.ToValues(new MatCMS.Plugin.Blog.BlogPost
+                var postLocale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!;
+                if (!seenPosts.Add((p.Slug!, postLocale))) continue;
+                await postsTable.InsertAsync(new Dictionary<string, object?>
                 {
-                    Title = p.Title ?? "", Slug = p.Slug!, TitleImage = p.TitleImage,
-                    Excerpt = p.Excerpt ?? "", ContentHtml = p.ContentHtml ?? "", Tags = p.Tags ?? "",
-                    AttachmentsJson = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
+                    ["Title"] = p.Title ?? "", ["Slug"] = p.Slug!, ["TitleImage"] = p.TitleImage,
+                    ["Excerpt"] = p.Excerpt ?? "", ["ContentHtml"] = p.ContentHtml ?? "", ["Tags"] = p.Tags ?? "",
+                    ["AttachmentsJson"] = string.IsNullOrWhiteSpace(p.AttachmentsJson) ? "[]" : p.AttachmentsJson!,
                     // Backups older than the gallery carry none of these four — they read as "no gallery, no source".
-                    GalleryJson = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson!,
-                    GalleryLayout = MatCMS.Plugin.Blog.BlogStore.NormaliseGalleryLayout(p.GalleryLayout),
-                    SourceUrl = p.SourceUrl, SourceName = p.SourceName,
-                    Locale = string.IsNullOrWhiteSpace(p.Locale) ? "de" : p.Locale!,
-                    IsPublished = p.IsPublished,
-                    PublishedAt = p.PublishedAt == default ? DateTime.UtcNow : p.PublishedAt,
-                    CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt,
-                    UpdatedAt = p.UpdatedAt == default ? DateTime.UtcNow : p.UpdatedAt
-                }));
+                    ["GalleryJson"] = string.IsNullOrWhiteSpace(p.GalleryJson) ? "[]" : p.GalleryJson!,
+                    ["GalleryLayout"] = PostsTable.NormaliseGalleryLayout(p.GalleryLayout),
+                    ["SourceUrl"] = p.SourceUrl, ["SourceName"] = p.SourceName,
+                    ["Locale"] = postLocale,
+                    ["IsPublished"] = p.IsPublished,
+                    ["PublishedAt"] = p.PublishedAt == default ? DateTime.UtcNow : p.PublishedAt,
+                    ["CreatedAt"] = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt,
+                    ["UpdatedAt"] = p.UpdatedAt == default ? DateTime.UtcNow : p.UpdatedAt,
+                    // Backups from before the multilingual blog have none: every post stands on its own.
+                    ["TranslationGroup"] = string.IsNullOrWhiteSpace(p.TranslationGroup) ? null : p.TranslationGroup!.Trim()
+                });
             }
             summary.Add($"{dto.Posts.Count} Beiträge");
         }
@@ -1301,18 +1313,18 @@ public class ContentTransferService
                     n++;
                     continue;
                 }
-                // A plugin that LEFT the image (shop, bot): a backup from before brings its on/off and settings, never code. Onto the store's
-                // package if it is here already; otherwise into a "builtin" row that waits for the package (Admin → Plugins says so) and hands
-                // both over when the signed package is imported.
-                if (!signedNative && MatCMS.Services.Plugins.BuiltInPlugins.IsFormerKey(key))
+                // A plugin that USED to ship with the CMS and has left the image (the blog): the backup's built-in row brings its state, never
+                // code. Where the store's package already runs here, it takes the state; where nothing is installed yet, the row comes back as
+                // the "no longer in the image" placeholder, so the package that arrives later finds on/off and settings waiting for it.
+                if (!signedNative && MatCMS.Services.Plugins.BuiltInPlugins.IsFormerKey(key) && PluginKind.Normalize(p.Kind) == PluginKind.BuiltIn)
                 {
-                    if (row is not null && PluginKind.Normalize(row.Kind) is not (PluginKind.BuiltIn or PluginKind.Native)) continue;
+                    if (row is not null && PluginKind.Normalize(row.Kind) == PluginKind.Script) continue;
                     if (row is null)
                     {
                         row = new Models.Plugin
                         {
-                            Key = key.ToLowerInvariant(), Name = string.IsNullOrWhiteSpace(p.Name) ? key : p.Name!, Description = p.Description ?? "", Version = p.Version ?? "",
-                            Kind = PluginKind.BuiltIn, Enabled = false, FilesJson = "{}"
+                            Key = key.ToLowerInvariant(), Name = string.IsNullOrWhiteSpace(p.Name) ? key : p.Name!, Description = p.Description ?? "",
+                            Version = p.Version ?? "", Kind = PluginKind.BuiltIn, Enabled = true, FilesJson = "{}"
                         };
                         _db.Plugins.Add(row);
                         existingPlugins.Add(row);
@@ -1736,6 +1748,8 @@ public class ContentTransferService
         public DateTime PublishedAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        /// <summary>Posts that are translations of each other share it (multilingual blog, 2026-11); absent in older backups.</summary>
+        public string? TranslationGroup { get; set; }
     }
 
     private sealed class UserDto

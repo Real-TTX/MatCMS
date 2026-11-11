@@ -37,9 +37,14 @@ public class SiteContext
         get
         {
             if (_currentLocale is not null) return _currentLocale;
-            var routeCulture = _http.HttpContext?.Request.RouteValues.TryGetValue("culture", out var c) == true
+            var http = _http.HttpContext;
+            var routeCulture = http?.Request.RouteValues.TryGetValue("culture", out var c) == true
                 ? c as string
                 : null;
+            // A plugin route has no "{culture}" value (one dynamic endpoint serves them all): there the address's own prefix says it
+            // (/en/blog/x is English) — what the plugin's handler was told too.
+            if (routeCulture is null && http?.Request.RouteValues.TryGetValue("page", out var pg) == true && pg as string == "/PluginPage")
+                MatCMS.Services.Plugins.PluginRouteTransformer.StripCulture(http.Request.Path.Value ?? "/", out routeCulture);
             _currentLocale = Localizer.IsSupported(routeCulture) ? routeCulture! : Localizer.DefaultCulture;
             return _currentLocale;
         }
@@ -133,6 +138,23 @@ public class SiteContext
         }
     }
 
+    /// <summary>Where a plugin page leaves its translations for <see cref="LanguageLinks"/> (<see cref="CleanAlternates"/>).</summary>
+    public const string AlternatesItemKey = "matcms.lang.alternates";
+
+    /// <summary>A plugin's translations, kept only where they are a supported language and a plain LOCAL address.</summary>
+    public static IReadOnlyDictionary<string, string> CleanAlternates(IEnumerable<KeyValuePair<string, string>> alternates)
+    {
+        var clean = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (locale, url) in alternates)
+        {
+            var l = (locale ?? "").Trim().ToLowerInvariant();
+            var u = (url ?? "").Trim();
+            if (!Localizer.IsSupported(l) || !u.StartsWith('/') || u.StartsWith("//") || u.Contains('\\') || u.Any(char.IsControl)) continue;
+            clean.TryAdd(l, u);
+        }
+        return clean;
+    }
+
     /// <summary>A single language-switcher target.</summary>
     public sealed record LocaleLink(string Locale, string Url, bool IsCurrent);
 
@@ -148,6 +170,16 @@ public class SiteContext
 
         var locales = AvailableLocales;
         var links = new List<LocaleLink>(locales.Count);
+
+        // A plugin page named its own translations (PluginResult.WithAlternates — a blog post and its translations): those win; a language
+        // it does not name gets that language's home page as usual.
+        if (_http.HttpContext?.Items[AlternatesItemKey] is IReadOnlyDictionary<string, string> alternates)
+        {
+            foreach (var loc in locales)
+                links.Add(new LocaleLink(loc, alternates.TryGetValue(loc, out var alt) ? alt : LocalizedUrl(loc, "home"), loc == CurrentLocale));
+            _languageLinks = links;
+            return _languageLinks;
+        }
 
         // Single-locale site: no cross-locale lookups needed (switcher renders hidden anyway).
         if (locales.Count <= 1)

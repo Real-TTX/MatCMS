@@ -37,6 +37,8 @@
          of the plugin (StripeClient.HandlerFactory keeps it in AppContext). -->
     <ProjectReference Include="..\..\plugins\shop\Shop.csproj" />
     <ProjectReference Include="..\..\plugins\bot\Bot.csproj" />
+    <!-- The blog (plugins/blog), native since it left the image: imported as a test-signed package (BlogFixture) into harness and application. -->
+    <ProjectReference Include="..\..\plugins\blog\Blog.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,10 +83,14 @@
       <ShopFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\shop\bin\$(Configuration)\net10.0\Shop.dll" />
       <BotFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\bot\bin\$(Configuration)\net10.0\Bot.dll" />
       <BotAssets Include="$(MSBuildProjectDirectory)\..\..\plugins\bot\assets\*" />
-    </ItemGroup>
+          <BlogFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\blog\bin\$(Configuration)\net10.0\Blog.dll" />
+      <BlogAssets Include="$(MSBuildProjectDirectory)\..\..\plugins\blog\assets\*" />
+        </ItemGroup>
     <Copy SourceFiles="@(ShopFiles)" DestinationFolder="$(OutDir)fixtures\shop" />
     <Copy SourceFiles="@(BotFiles)" DestinationFolder="$(OutDir)fixtures\bot" />
     <Copy SourceFiles="@(BotAssets)" DestinationFolder="$(OutDir)fixtures\bot\assets" />
+    <Copy SourceFiles="@(BlogFiles)" DestinationFolder="$(OutDir)fixtures\blog" />
+    <Copy SourceFiles="@(BlogAssets)" DestinationFolder="$(OutDir)fixtures\blog\assets" />
   </Target>
 
 </Project>

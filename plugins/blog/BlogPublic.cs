@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using MatCMS.Content;
+using System.Text.Unicode;
 using MatCMS.Plugin;
 
 namespace MatCMS.Plugin.Blog;
@@ -30,13 +30,20 @@ internal static class BlogPublic
 
     // ---- the post page --------------------------------------------------------------------------
 
+    /// <summary>Whether a visitor may see the post: published AND its date has arrived. An admin always may (preview of drafts and scheduled posts).</summary>
+    private static bool Visible(IPluginContext ctx, BlogPost p) => ctx.User.IsAdmin || IsLive(p);
+
+    private static bool IsLive(BlogPost p) => p.IsPublished && p.PublishedAt <= DateTime.UtcNow;
+
     public static async Task<PluginResult> PostPageAsync(IPluginContext ctx, CancellationToken ct)
     {
+        // The language comes from the address (/en/blog/x → en, /blog/x → the default one); a language the site does not publish in has no blog.
+        var locale = BlogUrls.Current(ctx);
+        if (!BlogUrls.Publishes(ctx, locale)) return PluginResult.NotFound();
         var slug = ctx.Request.R("slug").Trim().ToLowerInvariant();
-        var post = await BlogStore.BySlugAsync(ctx.Data.Table("posts"), slug, "de", ct);
-        // Scheduling: the public sees a post only once it is published AND its PublishedAt has arrived; an admin can always
-        // open it (preview of drafts + scheduled posts).
-        if (post is null || (!ctx.User.IsAdmin && (!post.IsPublished || post.PublishedAt > DateTime.UtcNow))) return PluginResult.NotFound();
+        var posts = ctx.Data.Table("posts");
+        var post = await BlogStore.BySlugAsync(posts, slug, locale, ct);
+        if (post is null || !Visible(ctx, post)) return PluginResult.NotFound();
 
         // The configured canonical address wins over the request: behind a proxy the request says http.
         var origin = ctx.Site.Origin.TrimEnd('/');
@@ -44,7 +51,7 @@ internal static class BlogPublic
         {
             new("og:type", "article"),
             new("og:title", post.Title),
-            new("og:url", origin + "/blog/" + post.Slug),
+            new("og:url", origin + BlogUrls.Post(ctx, post)),
             new("article:published_time", DateTime.SpecifyKind(post.PublishedAt, DateTimeKind.Utc).ToString("yyyy-MM-ddTHH:mm:ssZ")),
         };
         if (!string.IsNullOrWhiteSpace(post.Excerpt)) meta.Add(new("og:description", post.Excerpt));
@@ -122,7 +129,7 @@ internal static class BlogPublic
         var tokens = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["post_image"] = heroHtml,
-            ["post_date"] = Enc(GermanDate.Long(post.PublishedAt.ToLocalTime())),
+            ["post_date"] = Enc(BlogText.LongDate(post.PublishedAt.ToLocalTime(), post.Locale)),
             ["post_title"] = Enc(post.Title),
             ["post_excerpt"] = excerptHtml,
             ["post_body"] = post.ContentHtml ?? "",
@@ -144,23 +151,30 @@ internal static class BlogPublic
         // Plugin code is trusted like the host; a plugin that is off or has nothing to say answers nothing.
         var under = new StringBuilder();
         foreach (var answer in await ctx.Events.CollectAsync("content.discussion",
-                     new JsonObject { ["source"] = "blog:" + post.Slug, ["title"] = post.Title, ["url"] = "/blog/" + post.Slug, ["locale"] = "de" }, ct))
+                     new JsonObject { ["source"] = BlogUrls.Source(ctx, post), ["title"] = post.Title, ["url"] = BlogUrls.Post(ctx, post), ["locale"] = post.Locale }, ct))
             if (answer is JsonObject o && o["html"]?.GetValue<string>() is { Length: > 0 } h) under.Append(h);
 
-        return PluginResult.Page(rendered + under + PostPageStyle, post.Title, post.Excerpt, meta);
+        // The language switcher leads to this post's translations (the live ones; an admin's preview of a draft changes nothing there).
+        var alternates = (await BlogStore.TranslationsAsync(posts, post.TranslationGroup, ct))
+            .Where(t => t.Id != post.Id && IsLive(t) && BlogUrls.Publishes(ctx, t.Locale))
+            .Select(t => new KeyValuePair<string, string>(t.Locale, BlogUrls.Post(ctx, t)))
+            .Prepend(new KeyValuePair<string, string>(post.Locale, BlogUrls.Post(ctx, post)))
+            .ToList();
+        var page = PluginResult.Page(rendered + under + PostPageStyle, post.Title, post.Excerpt, meta);
+        return alternates.Count > 1 ? BlogUrls.WithTranslations(page, alternates) : page;
     }
 
     /// <summary>
     /// Convention <c>content.item</c> {source: "blog:{slug}"} → {title, url}: whether a post exists and is public. Asked by the forum before it opens a
-    /// discussion about a post — so nobody can start discussions about posts that are drafts, scheduled or gone.
+    /// discussion about a post — so nobody can start discussions about posts that are drafts, scheduled or gone. A post in another language than
+    /// the default one is <c>blog:{locale}_{slug}</c> (<see cref="BlogUrls.Source"/>).
     /// </summary>
     public static async Task<JsonNode?> ContentItemAsync(IPluginContext ctx, JsonNode? payload, CancellationToken ct)
     {
-        var source = payload?["source"]?.GetValue<string>() ?? "";
         // By slug, not id: the slug survives a backup and a move, the id does not (a restore inserts the posts anew).
-        if (!source.StartsWith("blog:", StringComparison.Ordinal) || source.Length < 6) return null;
-        if (await BlogStore.BySlugAsync(ctx.Data.Table("posts"), source[5..], "de", ct) is not { } post || !post.IsPublished || post.PublishedAt > DateTime.UtcNow) return null;
-        return new JsonObject { ["title"] = post.Title, ["url"] = "/blog/" + post.Slug };
+        if (BlogUrls.ParseSource(ctx, payload?["source"]?.GetValue<string>()) is not { } src) return null;
+        if (await BlogStore.BySlugAsync(ctx.Data.Table("posts"), src.Slug, src.Locale, ct) is not { } post || !IsLive(post)) return null;
+        return new JsonObject { ["title"] = post.Title, ["url"] = BlogUrls.Post(ctx, post) };
     }
 
     private static List<(string Url, string Extra)> ParseList(string? json, string extraField)
@@ -228,11 +242,11 @@ internal static class BlogPublic
 
         var tag = request.Tag;
         if (!string.IsNullOrWhiteSpace(tag))
-            all = all.Where(p => TagUtil.Split(p.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
+            all = all.Where(p => BlogText.SplitTags(p.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)).ToList();
         if (request.Limit > 0) all = all.Take(request.Limit).ToList();
 
         // Filter chips = tags across the base set (minus the admin pre-filter tag).
-        var filterTags = all.SelectMany(p => TagUtil.Split(p.Tags))
+        var filterTags = all.SelectMany(p => BlogText.SplitTags(p.Tags))
             .Where(t => !string.Equals(t, tag, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
@@ -241,7 +255,7 @@ internal static class BlogPublic
         var activeTag = request.ActiveTag;
         var filtered = string.IsNullOrEmpty(activeTag)
             ? all
-            : all.Where(p => TagUtil.Split(p.Tags).Contains(activeTag, StringComparer.OrdinalIgnoreCase)).ToList();
+            : all.Where(p => BlogText.SplitTags(p.Tags).Contains(activeTag, StringComparer.OrdinalIgnoreCase)).ToList();
 
         var perPage = request.PerPage;
         var pageNum = request.PageNumber;
@@ -255,19 +269,31 @@ internal static class BlogPublic
     /// <summary>The blog's own address: the posts block drawn as a page (the blog layout, tag filter, ten to a page).</summary>
     public static async Task<PluginResult> OverviewAsync(IPluginContext ctx, CancellationToken ct)
     {
+        // One overview per language the site publishes in (/blog, /en/blog …), each with the posts of its language.
+        var locale = BlogUrls.Current(ctx);
+        if (!BlogUrls.Publishes(ctx, locale)) return PluginResult.NotFound();
         // The block's own renderer with the block's values given by hand — a plugin block cannot be asked for through the site's block renderer, which knows only the host's.
         var block = new BlockData { Type = "posts", Values = new JsonObject { ["heading"] = ctx.T("blog.overview"), ["display"] = "blog", ["showFilter"] = "yes", ["perPage"] = "10" } };
-        var drawn = await RenderPostsAsync(ctx, block, ct);
-        return PluginResult.Page(drawn, ctx.T("blog.overview"));
+        // The tag and page links of the overview keep its language prefix (the route sees the address without it).
+        var drawn = await RenderPostsAsync(ctx, block, ct, BlogUrls.Overview(ctx, locale));
+        var page = PluginResult.Page(drawn, ctx.T("blog.overview"));
+        // The switcher leads to the other languages' overviews — those that have a post to show.
+        var posts = ctx.Data.Table("posts");
+        var alternates = new List<KeyValuePair<string, string>>();
+        foreach (var l in BlogUrls.Languages(ctx))
+            if (l == locale || await posts.CountAsync(BlogStore.Live(l), ct) > 0) alternates.Add(new(l, BlogUrls.Overview(ctx, l)));
+        return alternates.Count > 1 ? BlogUrls.WithTranslations(page, alternates) : page;
     }
 
     public static async Task<PluginResult> PostsBlockAsync(IPluginContext ctx, CancellationToken ct) =>
         PluginResult.Fragment(await RenderPostsAsync(ctx, ctx.Block!, ct));
 
-    private static async Task<string> RenderPostsAsync(IPluginContext ctx, BlockData block, CancellationToken ct)
+    // Razor's encoder as the application registers it (all of Unicode let through): the block printed "Größe", not "Gr&#xF6;&#xDF;e".
+    private static readonly HtmlEncoder BlockEncoder = HtmlEncoder.Create(UnicodeRanges.All);
+
+    private static async Task<string> RenderPostsAsync(IPluginContext ctx, BlockData block, CancellationToken ct, string? basePath = null)
     {
-        var encoder = ctx.Unsafe.Services.GetService(typeof(HtmlEncoder)) as HtmlEncoder ?? HtmlEncoder.Default;
-        string H(string? s) => encoder.Encode(s ?? "");
+        string H(string? s) => BlockEncoder.Encode(s ?? "");
         string StrOr(string field, string fallback) => block.Get(field) is { Length: > 0 } v ? v : fallback;
         var heading = block.Get("heading");
         var display = StrOr("display", "cards");           // "cards" | "blog"
@@ -279,7 +305,7 @@ internal static class BlogPublic
         var perPage = int.TryParse(block.Get("perPage"), out var pp) && pp > 0 ? pp : 0;
 
         // Server-side filter + paging (works with paging, unlike the client-side gallery filter).
-        var path = string.IsNullOrEmpty(ctx.Request.Path) ? "/" : ctx.Request.Path;
+        var path = basePath ?? (string.IsNullOrEmpty(ctx.Request.Path) ? "/" : ctx.Request.Path);
         var activeTag = ctx.Request.Q("ptag").Trim();
         var pageNum = int.TryParse(ctx.Request.Q("pseite"), out var pn) && pn > 1 ? pn : 1;
 
@@ -293,7 +319,7 @@ internal static class BlogPublic
         }
 
         // Admins also see scheduled posts (preview); the rest (language, tags, limit, paging) is applied by ListAsync.
-        var locale = string.IsNullOrEmpty(ctx.Locale) ? MatCMS.Services.Localizer.DefaultCulture : ctx.Locale;
+        var locale = BlogUrls.Current(ctx);
         var list = await ListAsync(ctx.Data.Table("posts"), new ListRequest(tag, limit, perPage, activeTag, pageNum, ctx.User.IsAdmin, locale), ct);
         var posts = list.Posts;
         pageNum = list.PageNumber;
@@ -325,17 +351,17 @@ internal static class BlogPublic
                 var img = SafeImg(p.TitleImage);
                 sb.Append("<article class=\"blog-post\">");
                 if (img.Length > 0)
-                    sb.Append("<a href=\"/blog/").Append(H(p.Slug)).Append("\" class=\"blog-post__imglink\"><div class=\"blog-post__img\" style=\"background-image:url('").Append(H(ctx.Site.ImageUrl(img, 1200))).Append("')").Append(FocusCss(ctx, img)).Append("\"></div></a>");
-                sb.Append("<p class=\"blog-post__meta\">").Append(H(GermanDate.Long(p.PublishedAt.ToLocalTime()))).Append("</p>");
-                sb.Append("<h2 class=\"blog-post__title\"><a href=\"/blog/").Append(H(p.Slug)).Append("\">").Append(H(p.Title)).Append("</a></h2>");
+                    sb.Append("<a href=\"").Append(H(BlogUrls.Post(ctx, p))).Append("\" class=\"blog-post__imglink\"><div class=\"blog-post__img\" style=\"background-image:url('").Append(H(ctx.Site.ImageUrl(img, 1200))).Append("')").Append(FocusCss(ctx, img)).Append("\"></div></a>");
+                sb.Append("<p class=\"blog-post__meta\">").Append(H(BlogText.LongDate(p.PublishedAt.ToLocalTime(), p.Locale))).Append("</p>");
+                sb.Append("<h2 class=\"blog-post__title\"><a href=\"").Append(H(BlogUrls.Post(ctx, p))).Append("\">").Append(H(p.Title)).Append("</a></h2>");
                 if (!string.IsNullOrWhiteSpace(p.Tags))
                 {
                     sb.Append("<div class=\"post-card__tags\">");
-                    foreach (var t in TagUtil.Split(p.Tags)) sb.Append("<a class=\"post-tag\" href=\"").Append(H(TagUrl(t))).Append("\">").Append(H(t)).Append("</a>");
+                    foreach (var t in BlogText.SplitTags(p.Tags)) sb.Append("<a class=\"post-tag\" href=\"").Append(H(TagUrl(t))).Append("\">").Append(H(t)).Append("</a>");
                     sb.Append("</div>");
                 }
                 sb.Append("<div class=\"rich blog-post__body\">").Append(p.ContentHtml).Append("</div>");
-                sb.Append("<a class=\"blog-post__more\" href=\"/blog/").Append(H(p.Slug)).Append("\">").Append(H(ctx.T("posts.toPost"))).Append("</a>");
+                sb.Append("<a class=\"blog-post__more\" href=\"").Append(H(BlogUrls.Post(ctx, p))).Append("\">").Append(H(ctx.T("posts.toPost"))).Append("</a>");
                 sb.Append("</article>");
             }
             sb.Append("</div>");
@@ -346,13 +372,13 @@ internal static class BlogPublic
             foreach (var p in posts)
             {
                 var img = SafeImg(p.TitleImage);
-                sb.Append("<article class=\"post-card\"><a class=\"post-card__link\" href=\"/blog/").Append(H(p.Slug)).Append("\">");
+                sb.Append("<article class=\"post-card\"><a class=\"post-card__link\" href=\"").Append(H(BlogUrls.Post(ctx, p))).Append("\">");
                 if (img.Length > 0) sb.Append("<div class=\"post-card__img\" style=\"background-image:url('").Append(H(ctx.Site.ImageUrl(img, 640))).Append("')").Append(FocusCss(ctx, img)).Append("\"></div>");
                 sb.Append("<div class=\"post-card__body\">");
                 if (!string.IsNullOrWhiteSpace(p.Tags))
                 {
                     sb.Append("<div class=\"post-card__tags\">");
-                    foreach (var t in TagUtil.Split(p.Tags)) sb.Append("<span class=\"post-tag\">").Append(H(t)).Append("</span>");
+                    foreach (var t in BlogText.SplitTags(p.Tags)) sb.Append("<span class=\"post-tag\">").Append(H(t)).Append("</span>");
                     sb.Append("</div>");
                 }
                 sb.Append("<h3 class=\"post-card__title\">").Append(H(p.Title)).Append("</h3>");

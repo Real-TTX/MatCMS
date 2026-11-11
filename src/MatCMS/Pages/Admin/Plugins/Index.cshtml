@@ -50,7 +50,7 @@
                         @if (kind == MatCMS.Models.PluginKind.BuiltIn)
                         {
                             <span class="badge badge-new">@T["plugins.kind.builtin"]</span>
-                            @if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p)) { <span class="badge badge-warn">@T["plugins.builtin.gone"]</span> }
+                            @if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p)) { <span class="badge badge-warn">@T["plugins.builtin.goneBadge"]</span> }
                         }
                         else if (kind == MatCMS.Models.PluginKind.Native)
                         {
@@ -79,9 +79,9 @@
                             <span class="badge badge-warn">@T["plugins.matcms.update", newer]</span>
                         }
                     </div>
-                    @if (kind == MatCMS.Models.PluginKind.BuiltIn && MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p))
+                    @if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p))
                     {
-                        @* the shop or the bot after the image dropped them (Release B): their data and settings wait for the store's package *@
+                        @* the blog, the shop or the bot after the image dropped them (Release B): their data and settings wait for the store's package *@
                         <div class="b-sum" data-plugin-gone="@p.Key">@T["plugins.builtin.goneHelp"]</div>
                     }
                     else

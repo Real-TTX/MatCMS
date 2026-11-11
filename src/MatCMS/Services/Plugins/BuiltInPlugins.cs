@@ -10,11 +10,11 @@ namespace MatCMS.Services.Plugins;
 /// <param name="Description">One sentence for the plugin list.</param>
 /// <param name="Version">Its version; changes with the image, never by import.</param>
 /// <param name="Create">Makes the plugin instance.</param>
-/// <param name="EnabledOnNewSite">Whether a site that has never seen the plugin starts it. The blog is on (it is part of what a CMS is).</param>
+/// <param name="EnabledOnNewSite">Whether a site that has never seen the plugin starts it.</param>
 public sealed record BuiltInPlugin(string Key, string Name, string Description, string Version, Func<IPlugin> Create, bool EnabledOnNewSite = true);
 
 /// <summary>
-/// The plugins compiled into the CMS itself — today the blog. They run through the very same API as every other plugin (the same
+/// The plugins compiled into the CMS itself — today the shop and the AI bot. They run through the very same API as every other plugin (the same
 /// builder, registry and state; they can be switched off and have their own settings and tables) but ship in the image, so a site
 /// without a cloud, a store or an import keeps working: <b>MatCMS stays a complete CMS on its own</b>.
 /// <para>What sets them apart: they are <i>enabled</i> on a fresh site and the operator can switch them off but not delete,
@@ -24,16 +24,17 @@ public sealed record BuiltInPlugin(string Key, string Name, string Description, 
 /// </summary>
 public static class BuiltInPlugins
 {
-    /// <summary>All built-in plugins.</summary>
-    public static IReadOnlyList<BuiltInPlugin> All { get; } = new[] { Plugin.Blog.BlogPlugin.Definition };
+    /// <summary>All built-in plugins. None are left: the blog, the shop and the AI bot left the image (Release B, 2026-11,
+    /// <c>docs/builtin-extraction.md</c>) and are signed native packages of the MatCMS Store now. The machinery stays for leftover rows.</summary>
+    public static IReadOnlyList<BuiltInPlugin> All { get; } = Array.Empty<BuiltInPlugin>();
 
     /// <summary>
-    /// Keys of plugins that USED to ship with the CMS and left the image as native packages of the MatCMS Store (docs/builtin-extraction.md,
-    /// Release B): the shop and the AI bot. Their key stays reserved — only the store's signed package takes it (<see cref="PluginPackager"/>),
-    /// nobody may pose as "shop" — and a site that still has their old <c>builtin</c> row (the image was updated before the package arrived)
-    /// keeps it untouched, data and settings included, and is told under Plugins where the code went (<see cref="IsGone"/>).
+    /// Keys of plugins that USED to ship with the CMS (blog, shop, AI bot). Their key stays reserved — only the store's signed package takes
+    /// it (<see cref="PluginPackager"/>), nobody may pose as "shop" — and a site that still has their old <c>builtin</c> row (the image was
+    /// updated before the package arrived) keeps it untouched, data and settings included, and is told under Plugins where the code went
+    /// (<see cref="IsGone"/>).
     /// </summary>
-    public static IReadOnlyList<string> FormerKeys { get; } = new[] { "shop", "bot" };
+    public static IReadOnlyList<string> FormerKeys { get; } = new[] { "blog", "shop", "bot" };
 
     /// <summary>The built-in plugin with this key, or null.</summary>
     public static BuiltInPlugin? Find(string? key) => All.FirstOrDefault(b => string.Equals(b.Key, key, StringComparison.OrdinalIgnoreCase));
@@ -48,6 +49,9 @@ public static class BuiltInPlugins
     /// <summary>True for a <c>builtin</c> row whose code this image no longer carries: it waits for the store's package (a former key) or names a
     /// plugin this version of MatCMS does not know at all.</summary>
     public static bool IsGone(Models.Plugin p) => Models.PluginKind.Normalize(p.Kind) == Models.PluginKind.BuiltIn && Find(p.Key) is null;
+
+    /// <summary>What the plugin list and the load error say about such a row (German; the admin shows its own translation).</summary>
+    public const string GoneMessage = "Nicht mehr im Image – aus dem Store installieren oder ein Paket importieren.";
 
     /// <summary>
     /// Makes sure every built-in plugin has its row: created enabled when missing, kept in line with the image otherwise. A script or

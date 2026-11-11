@@ -10,28 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MatCMS.Plugin.Tests;
 
 /// <summary>
-/// The test run's own store key: trusted IN ADDITION to the real MatCMS Store key (never instead of it), so a test can sign native code the way
-/// <c>tools/StoreSign sign-code</c> does. ONE key for the whole run — two classes each adding their own would race on <see cref="NativeTrust.ExtraKeys"/>.
-/// </summary>
-internal static class TestStoreKey
-{
-    public static readonly ECDsa Key;
-    public static readonly string KeyId;
-
-    static TestStoreKey()
-    {
-        Key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var spki = Key.ExportSubjectPublicKeyInfo();
-        KeyId = StoreSignature.KeyId(spki);
-        NativeTrust.ExtraKeys = new Dictionary<string, string>(NativeTrust.ExtraKeys ?? new Dictionary<string, string>()) { [KeyId] = Convert.ToBase64String(spki) };
-    }
-
-    /// <summary>The code signature of the files in <paramref name="srcDir"/> for this key and version.</summary>
-    public static string Sign(string key, string version, string srcDir) =>
-        StoreSignature.SignCode(key, version, StoreSignature.TreeHash(srcDir), Key, KeyId);
-}
-
-/// <summary>
 /// The plugins that left the image (the shop and the AI bot, docs/builtin-extraction.md) as a site has them from the MatCMS Store: their BUILT DLL
 /// in the plugin folder, signed (so they run without "Native Plugins erlauben", like the store's package), the bot's assets beside it.
 /// </summary>

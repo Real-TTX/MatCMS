@@ -1,8 +1,7 @@
 // Matmon live — the template store: GET {cloud}/api/store/templates (+ /{slug} for the details), as a block for matmon.eu's /templates.
 // The store lives in Matmon Cloud: people submit there (signed in, Templates), the platform admins review there, and every Matmon
 // instance adds a set from its Templates > Store. This block only SHOWS the published sets, read in the background like the
-// partner list. The download goes through this site (/matmon-live/template/{slug}), like the partner logos: a visitor's browser
-// talks to matmon.eu alone, and the cloud still counts the download.
+// partner list. There is no download here (removed in 1.7): a set is added inside Matmon, from its Templates > Store.
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -31,7 +30,6 @@ public static class MmTemplates
     public const string BlockType = "matmon_templates";
     private const int MaxPages = 10;               // 10 × 24 sets; the page filters in the browser, so it holds them all
     private const int MaxDetailFetches = 60;       // per run; the rest follow ten minutes later
-    private const int MaxFileBytes = 4 * 1024 * 1024;
     private static readonly TimeSpan Fresh = TimeSpan.FromMinutes(10);
     private static readonly Regex SlugPattern = new("^[a-z0-9][a-z0-9-]{0,79}$", RegexOptions.CultureInvariant);
 
@@ -54,7 +52,7 @@ public static class MmTemplates
                 new FieldSpec("heading", "mmt.f.heading") { Default = "Ready-made sensor templates" },
                 new FieldSpec("intro", "mmt.f.intro", FieldKind.Textarea)
                 {
-                    Default = "Sets of sensors from the Matmon community. Add them in Matmon under Templates → Store, or download a file and import it."
+                    Default = "Sets of sensors from the Matmon community. Add them in Matmon under Templates → Store."
                 },
                 new FieldSpec("empty", "mmt.f.empty") { Default = "No templates yet — be the first to submit one." },
                 new FieldSpec("submitText", "mmt.f.submitText") { Default = "Submit a template" },
@@ -62,7 +60,6 @@ public static class MmTemplates
             }
         }, RenderAsync);
         b.Job("templates", JobSchedule.EveryInterval(TimeSpan.FromMinutes(10)), ctx => RefreshAsync(ctx, CancellationToken.None));
-        b.Route("/matmon-live/template/{slug}", DownloadAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
     }
 
     private static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s.Trim() : "";
@@ -118,7 +115,7 @@ public static class MmTemplates
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.6");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.7");
             var cloud = MmLive.Cloud(ctx) + "/api/store/templates";
             var all = new List<MmTpl>();
             for (var page = 1; page <= MaxPages; page++)
@@ -155,31 +152,6 @@ public static class MmTemplates
             _fetched = DateTime.UtcNow - Fresh + TimeSpan.FromMinutes(2);         // try again in two minutes
         }
         finally { Gate.Release(); }
-    }
-
-    // ---- the download, passed through -------------------------------------------------------------------------------------
-
-    private static async Task<PluginResult> DownloadAsync(IPluginContext ctx, CancellationToken ct)
-    {
-        var slug = ctx.Request.R("slug") ?? "";
-        // Only a set of the current list: the slug goes into a request to the cloud, so it is checked, not trusted.
-        if (!IsSlug(slug) || _list?.FirstOrDefault(t => t.Slug == slug) is not { } set) return PluginResult.NotFound();
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Matmon-Live/1.6");
-            using var res = await http.GetAsync(MmLive.Cloud(ctx) + "/api/store/templates/" + slug + "/download", HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!res.IsSuccessStatusCode || res.Content.Headers.ContentLength > MaxFileBytes) return PluginResult.NotFound();
-            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
-            if (bytes.Length > MaxFileBytes) return PluginResult.NotFound();
-            var name = "matmon-templates-" + slug + (set.Version.Length > 0 && Regex.IsMatch(set.Version, "^[A-Za-z0-9._-]{1,40}$") ? "-" + set.Version : "") + ".json";
-            return PluginResult.File(bytes, "application/json", name).WithHeader("Cache-Control", "no-store").WithHeader("X-Content-Type-Options", "nosniff");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-        {
-            ctx.Log("Matmon template download: " + ex.Message);
-            return PluginResult.NotFound();
-        }
     }
 
     // ---- the block --------------------------------------------------------------------------------------------------------
@@ -280,9 +252,7 @@ public static class MmTemplates
                     }
                     sb.Append("</details>");
                 }
-                sb.Append("<div class=\"mmt-actions\"><a class=\"btn\" href=\"/matmon-live/template/").Append(E(t.Slug)).Append("\" download>")
-                    .Append("<i class=\"ti ti-download\" aria-hidden=\"true\"></i> ").Append(E(ctx.T("mmt.download"))).Append("</a>")
-                    .Append("<span class=\"mmt-hint\">").Append(E(ctx.T("mmt.inMatmon"))).Append("</span></div></article>");
+                sb.Append("<div class=\"mmt-actions\"><span class=\"mmt-hint\"><i class=\"ti ti-apps\" aria-hidden=\"true\"></i> ").Append(E(ctx.T("mmt.inMatmon"))).Append("</span></div></article>");
             }
             sb.Append("</div><p class=\"mmt-empty mmt-nomatch\" hidden>").Append(E(ctx.T("mmt.noMatch"))).Append("</p>");
         }
@@ -317,7 +287,7 @@ public static class MmTemplates
         + ".mmt .mmt-desc p{margin:8px 0 0}.mmt .mmt-list{margin:0;padding-left:18px;font-size:14px;line-height:1.55}"
         + ".mmt .mmt-list code{font-size:12px;opacity:.75}"
         + ".mmt .mmt-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:6px}"
-        + ".mmt .mmt-actions .btn{padding:8px 14px;font-size:14px}.mmt .mmt-hint{font-size:13px;color:var(--muted,#6b7280)}"
+        + ".mmt .mmt-hint{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted,#6b7280)}"
         + ".mmt .mmt-empty{color:var(--muted,#6b7280)}"
         + "@media (max-width:900px){.mmt .mmt-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:600px){.mmt .mmt-grid{grid-template-columns:minmax(0,1fr)}}</style>";
 }
@@ -326,27 +296,27 @@ public static class MmTemplateText
 {
     public static readonly Dictionary<string, string> En = new()
     {
-        ["mmt.block.name"] = "Matmon: templates", ["mmt.block.desc"] = "The published sets of the Matmon template store, with search, keywords, details and download – from Matmon Cloud.",
+        ["mmt.block.name"] = "Matmon: templates", ["mmt.block.desc"] = "The published sets of the Matmon template store, with search, keywords and details – from Matmon Cloud.",
         ["mmt.f.eyebrow"] = "Line above the heading", ["mmt.f.heading"] = "Heading", ["mmt.f.intro"] = "Introduction",
         ["mmt.f.empty"] = "Text when the store is empty", ["mmt.f.submitText"] = "Submit button: text (empty = no button)",
         ["mmt.f.submitUrl"] = "Submit button: link (empty = the cloud's Templates page)",
         ["mmt.none"] = "No templates yet.", ["mmt.search"] = "Search templates", ["mmt.tag"] = "Keyword", ["mmt.allTags"] = "All keywords",
         ["mmt.sort"] = "Order", ["mmt.sort.new"] = "Newest", ["mmt.sort.pop"] = "Most used", ["mmt.sort.name"] = "Name",
         ["mmt.version"] = "Version", ["mmt.count"] = "{0} templates", ["mmt.count1"] = "{0} template", ["mmt.by"] = "by",
-        ["mmt.details"] = "Details", ["mmt.contains"] = "Contains", ["mmt.versions"] = "Versions", ["mmt.download"] = "Download",
-        ["mmt.inMatmon"] = "or in Matmon: Templates → Store", ["mmt.noMatch"] = "No template matches your search.",
+        ["mmt.details"] = "Details", ["mmt.contains"] = "Contains", ["mmt.versions"] = "Versions",
+        ["mmt.inMatmon"] = "In Matmon: Templates → Store", ["mmt.noMatch"] = "No template matches your search.",
     };
 
     public static readonly Dictionary<string, string> De = new()
     {
-        ["mmt.block.name"] = "Matmon: Templates", ["mmt.block.desc"] = "Die veröffentlichten Sets des Matmon-Template-Stores mit Suche, Schlagwörtern, Details und Download – aus der Matmon Cloud.",
+        ["mmt.block.name"] = "Matmon: Templates", ["mmt.block.desc"] = "Die veröffentlichten Sets des Matmon-Template-Stores mit Suche, Schlagwörtern und Details – aus der Matmon Cloud.",
         ["mmt.f.eyebrow"] = "Zeile über der Überschrift", ["mmt.f.heading"] = "Überschrift", ["mmt.f.intro"] = "Einleitung",
         ["mmt.f.empty"] = "Text, wenn der Store leer ist", ["mmt.f.submitText"] = "Knopf Einreichen: Text (leer = kein Knopf)",
         ["mmt.f.submitUrl"] = "Knopf Einreichen: Link (leer = die Templates-Seite der Cloud)",
         ["mmt.none"] = "Noch keine Templates.", ["mmt.search"] = "Templates suchen", ["mmt.tag"] = "Schlagwort", ["mmt.allTags"] = "Alle Schlagwörter",
         ["mmt.sort"] = "Reihenfolge", ["mmt.sort.new"] = "Neueste", ["mmt.sort.pop"] = "Meistgenutzt", ["mmt.sort.name"] = "Name",
         ["mmt.version"] = "Version", ["mmt.count"] = "{0} Templates", ["mmt.count1"] = "{0} Template", ["mmt.by"] = "von",
-        ["mmt.details"] = "Details", ["mmt.contains"] = "Enthält", ["mmt.versions"] = "Versionen", ["mmt.download"] = "Herunterladen",
-        ["mmt.inMatmon"] = "oder in Matmon: Templates → Store", ["mmt.noMatch"] = "Kein Template passt zur Suche.",
+        ["mmt.details"] = "Details", ["mmt.contains"] = "Enthält", ["mmt.versions"] = "Versionen",
+        ["mmt.inMatmon"] = "In Matmon: Templates → Store", ["mmt.noMatch"] = "Kein Template passt zur Suche.",
     };
 }

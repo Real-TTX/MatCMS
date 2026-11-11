@@ -42,6 +42,7 @@ internal static class StoreApiRoutes
             ["publisherPage"] = pub is null ? "" : ctx.Site.Origin.TrimEnd('/') + StoreUrls.Publisher(pub.Slug), ["publisherVerified"] = pub?.Verified ?? false,
             ["page"] = ctx.Site.Origin.TrimEnd('/') + StoreUrls.Item(item.Key), ["images"] = images, ["tags"] = tags, ["license"] = item.License,
             ["homepage"] = StoreText.SafeUrl(item.Homepage), ["downloads"] = item.Downloads,
+            ["rating"] = await RatingJsonAsync(ctx, item, ct),
             ["sha256"] = latest?.Sha256 ?? "", ["size"] = latest?.Size ?? 0, ["signature"] = latest?.Signature ?? "", ["keyId"] = latest?.KeyId ?? "",
             ["download"] = latest is null ? "" : StoreUrls.Package(item.Key, latest.Version, latest.Kind)
         };
@@ -59,6 +60,12 @@ internal static class StoreApiRoutes
             o["versions"] = arr;
         }
         return o;
+    }
+
+    private static async Task<JsonObject> RatingJsonAsync(IPluginContext ctx, Item item, CancellationToken ct)
+    {
+        var (avg, count) = await StoreReviews.RatingAsync(ctx, item.Id, ct);
+        return new JsonObject { ["average"] = avg, ["count"] = count };
     }
 
     private static PluginResult Json(JsonObject body, int maxAge) =>

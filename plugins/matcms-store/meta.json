@@ -2,5 +2,5 @@
   "Key": "matcms-store",
   "Name": "MatCMS Store",
   "Version": "0.2",
-  "Description": "Der MatCMS Store als Store-Server – läuft nur auf matcms.de: Katalog unter /store mit Suche und Detailseiten, Herausgeber registrieren sich und laden Plugins hoch, jede Version wird im Admin geprüft und erst mit einer Signatur aus dem Signier-Werkzeug freigegeben (der private Schlüssel liegt nicht auf dem Server). API für Clouds und Websites unter /store/api (Katalog, Pakete, Bilder), auch im Wartungsmodus erreichbar. Natives Plugin (braucht „Native Plugins erlauben“)."
+  "Description": "Der MatCMS Store als Store-Server – läuft nur auf matcms.de: Katalog unter /store mit Suche und Detailseiten (Plugins, Templates, Komponenten; Bewertungen mit Antwort des Herausgebers und Melden), Herausgeber registrieren sich und laden Plugins, Templates und Komponenten hoch, jede Version wird im Admin geprüft und erst mit einer Signatur aus dem Signier-Werkzeug freigegeben (der private Schlüssel liegt nicht auf dem Server). API für Clouds und Websites unter /store/api (Katalog, Pakete, Bilder), auch im Wartungsmodus erreichbar. Natives Plugin (braucht „Native Plugins erlauben“)."
 }

@@ -59,7 +59,7 @@ public sealed class MatcmsStoreClient
     /// <summary>One entry of the MatCMS Store, as the store dialog shows it. Picture addresses are the STORE's (relative); the site passes them through.
     /// <paramref name="Accent"/> is a template's accent colour, already checked to be a plain colour (it ends up in a style attribute).</summary>
     public sealed record Entry(string Key, string Name, string Version, string Kind, string Summary, string Description, string Publisher, string PublisherUrl,
-        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images, long Downloads = 0, string? Accent = null);
+        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images, long Downloads = 0, string? Accent = null, string? Rating = null);
 
     private static HttpClient Client(TimeSpan timeout)
     {
@@ -72,6 +72,14 @@ public sealed class MatcmsStoreClient
     private static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
 
     private static readonly System.Text.RegularExpressions.Regex Colour = new("^#[0-9a-fA-F]{3,8}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>"★ 4,2 (12)" from the catalogue's rating, or null without reviews.</summary>
+    private static string? RatingOf(JsonNode? r)
+    {
+        if (r is not JsonObject o || o["count"] is not JsonValue c || !c.TryGetValue<int>(out var count) || count <= 0) return null;
+        var avg = o["average"] is JsonValue a && a.TryGetValue<double>(out var v) ? Math.Clamp(v, 0, 5) : 0;
+        return "★ " + avg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',') + " (" + count + ")";
+    }
 
     private static JsonArray Items(JsonObject? catalog, string group) =>
         catalog?[group switch { GroupTemplate => "templates", GroupComponent => "components", _ => "plugins" }] as JsonArray ?? new JsonArray();
@@ -117,7 +125,7 @@ public sealed class MatcmsStoreClient
             list.Add(new Entry(key, S(p["name"]), S(p["version"]), S(p["kind"]), S(p["summary"]), S(p["description"]), S(p["publisher"]), S(p["publisherUrl"]),
                 p["publisherVerified"] is JsonValue pv && pv.TryGetValue<bool>(out var b) && b, images,
                 p["downloads"] is JsonValue dv && dv.TryGetValue<long>(out var dl) ? dl : 0,
-                Colour.IsMatch(accent) ? accent : null));
+                Colour.IsMatch(accent) ? accent : null, RatingOf(p["rating"])));
         }
         return (list.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList(), null);
     }

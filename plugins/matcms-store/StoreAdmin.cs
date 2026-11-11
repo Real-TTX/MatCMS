@@ -14,7 +14,8 @@ internal static class StoreAdmin
 
     public static async Task<string?> BadgeAsync(IPluginContext ctx, CancellationToken ct)
     {
-        var n = await new StoreDb(ctx.Data).ReviewCountAsync(ct);
+        // versions waiting for review + reported reviews: both wait for the operator
+        var n = await new StoreDb(ctx.Data).ReviewCountAsync(ct) + await StoreReviews.ReportedCountAsync(ctx, ct);
         return n > 0 ? n.ToString(CultureInfo.InvariantCulture) : null;
     }
 

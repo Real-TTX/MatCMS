@@ -4,7 +4,7 @@ namespace MatCMS.Plugin.MatcmsStore;
 internal static class StoreSettings
 {
     public const string Title = "title", Intro = "intro", Registration = "registration", RequireTwoFactor = "requireTwoFactor", NotifyEmail = "notifyEmail",
-        Terms = "terms", ReservedKeys = "reservedKeys", SigningKeys = "signingKeys", MaxPackageMb = "maxPackageMb";
+        Terms = "terms", ReservedKeys = "reservedKeys", SigningKeys = "signingKeys", MaxPackageMb = "maxPackageMb", Reviews = "reviews";
 
     /// <summary>The store key of MATTHIX (tools/StoreSign keygen, 2026-11-10). The same as in MatCMS.Shared/StoreKeys.</summary>
     public const string DefaultSigningKeys =
@@ -28,6 +28,7 @@ internal static class StoreSettings
         s.Add(new SettingSpec(NotifyEmail, "store.set.notify") { Default = "", Help = "store.set.notifyHelp", Group = "store.set.groupReview" });
         s.TextArea(SigningKeys, "store.set.keys", DefaultSigningKeys, "store.set.keysHelp");
         s.Number(MaxPackageMb, "store.set.maxPackage", 90, 1, MaxPackageLimit);
+        s.Add(new SettingSpec(Reviews, "store.set.reviews", SettingKind.Bool) { Default = "true", Help = "store.set.reviewsHelp", Group = "store.set.groupReviews" });
     }
 
     public static string StoreTitle(IPluginContext ctx) => ctx.Settings.Get(Title) is { Length: > 0 } t ? t : "MatCMS Store";
@@ -51,6 +52,8 @@ internal static class StoreUrls
     public static string Item(string key) => Home + "/" + Uri.EscapeDataString(key);
     public static string Publisher(string slug) => Home + "/herausgeber/" + Uri.EscapeDataString(slug);
     public static string AccountItem(string key) => Account + "/eintrag/" + Uri.EscapeDataString(key);
+    public static string Rate(string key) => Item(key) + "/bewerten";
+    public static string Report(string key) => Item(key) + "/melden";
     public static string Bundle(string key, string version) => "/store/api/plugins/" + Uri.EscapeDataString(key) + "/" + Uri.EscapeDataString(version) + "/bundle";
     /// <summary>A template's or component's package (the plugin path would read oddly; both answer for every key).</summary>
     public static string Package(string key, string version, string kind) =>

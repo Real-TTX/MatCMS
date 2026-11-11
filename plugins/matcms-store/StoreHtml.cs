@@ -117,6 +117,22 @@ internal static class StoreHtml
 .mst .mst-facts div:first-child{border-top:0}
 .mst .mst-facts dt{color:var(--muted,#6b7280)}
 .mst .mst-facts dd{margin:0;font-weight:600;text-align:right;overflow-wrap:anywhere}
+.mst .mst-reviews{margin:30px 0 0}
+.mst .mst-reviews h2{font-size:22px}
+.mst .mst-stars{color:var(--accent,#d97706);letter-spacing:1px;white-space:nowrap}
+.mst .mst-stars span{color:var(--text,#4b5563);letter-spacing:0;margin-left:4px}
+.mst .mst-review{padding:12px 0;border-top:1px solid var(--line,#e5e7eb)}
+.mst .mst-review p{margin:6px 0}
+.mst .mst-review-head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.mst .mst-answer{margin:8px 0 0 16px;padding:8px 12px;border-left:3px solid var(--line,#e5e7eb)}
+.mst .mst-report{margin:4px 0 0}
+.mst .mst-link{background:none;border:0;padding:0;color:var(--muted,#6b7280);font-size:13px;text-decoration:underline;cursor:pointer}
+.mst .mst-starpick{border:0;padding:0;margin:0 0 8px;display:inline-flex;flex-direction:row-reverse;gap:2px}
+.mst .mst-starpick legend{float:left;width:100%;font-weight:600;margin-bottom:4px}
+.mst .mst-starpick input{position:absolute;opacity:0;width:1px;height:1px}
+.mst .mst-starpick label{font-size:28px;line-height:1;cursor:pointer;color:var(--line,#d1d5db)}
+.mst .mst-starpick input:checked~label,.mst .mst-starpick label:hover,.mst .mst-starpick label:hover~label{color:var(--accent,#d97706)}
+.mst .mst-starpick input:focus-visible+label{outline:2px solid var(--accent,#d97706);outline-offset:2px}
 .mst .mst-versions{margin:30px 0 0}
 .mst .mst-versions h2{font-size:22px}
 .mst .mst-version{padding:12px 0;border-top:1px solid var(--line,#e5e7eb)}

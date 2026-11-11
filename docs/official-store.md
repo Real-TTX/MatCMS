@@ -1,6 +1,6 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt; Websites laden selbst, wo erlaubt), **S4 im Bau**. Zweite Fassung nach Matthias' Klarstellung.
+Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt; Websites laden selbst, wo erlaubt), **S4 gebaut** (a–c), noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
 
 **Gebaut:**
 - **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug
@@ -51,6 +51,12 @@ Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX
   **Websites:** Templates/Komponenten → „Weitere durchsuchen“ mit Reiter „MatCMS Store“, Installation nur signiert, über denselben Import wie
   eingefügtes JSON (`DesignImport`); ein Template wird nie aktiviert. Noch nicht: Update-Hinweise für Templates/Komponenten (sie haben auf der
   Website keine Versionsnummer), Bilder für Templates in der Cloud.
+- **S4c** — **Bewertungen** auf matcms.de (`plugins/matcms-store/StoreReviews.cs`): jedes angemeldete Konto bewertet einen veröffentlichten Eintrag
+  einmal (1–5 Sterne, Text freiwillig, angezeigter Name frei wählbar; ändern und löschen möglich), nie den eigenen; der Herausgeber antwortet im Konto
+  unter dem Eintrag; jeder kann eine Bewertung melden; Admin → MatCMS Store → **Bewertungen** zeigt gemeldete zuerst (ausblenden, wieder zeigen,
+  Meldung erledigt, löschen; gemeldete zählen in die Plakette). Durchschnitt und Anzahl stehen im Katalog (`rating`) und im Store-Dialog der
+  Websites. Einstellung „Bewertungen erlauben“ (an). Ein gelöschtes Konto nimmt seine Bewertungen mit, der Datenexport listet sie.
+  **Bewusst nicht:** kostenpflichtige Plugins (eigenes Projekt: Zahlung, Lizenzen, Auszahlung, Steuern).
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

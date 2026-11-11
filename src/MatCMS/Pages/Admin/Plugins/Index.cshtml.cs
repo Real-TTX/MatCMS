@@ -103,7 +103,7 @@ public class IndexModel : PageModel
                     PublisherUrl: p.PublisherUrl,
                     Badge: p.Kind == "native" ? t["plugins.kind.native"] : null,
                     Note: inCloud.Contains(p.Key) ? t["plugins.matcmsViaCloud"] : null,
-                    Downloads: p.Downloads,
+                    Downloads: p.Downloads, Rating: p.Rating,
                     Images: p.Images.Select(img => new Shared.StoreImage(
                         Url.Page("/Admin/Plugins/Index", "MatcmsImage", new { key = p.Key, imageId = img.Id })!, img.Caption)).ToList())).ToList(),
                 Error: CatalogError);

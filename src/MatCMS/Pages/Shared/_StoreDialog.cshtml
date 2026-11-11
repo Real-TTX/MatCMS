@@ -94,6 +94,10 @@
                                 {
                                     <span class="muted mono">@item.Version</span>
                                 }
+                                @if (item.Rating is { Length: > 0 } stars)
+                                {
+                                    <span class="muted">@stars</span>
+                                }
                                 @if (item.Downloads is long dl)
                                 {
                                     <span class="muted">@T["store.dialogDownloads", dl.ToString("N0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", ".")]</span>

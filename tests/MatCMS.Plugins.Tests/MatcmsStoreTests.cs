@@ -158,7 +158,7 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         // nothing is public before the review
         Assert.DoesNotContain("acme-hello", await guest.GetStringAsync("/store"));
         Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync("/store/acme-hello")).StatusCode);
-        Assert.Empty(JsonNode.Parse(await guest.GetStringAsync("/store/api/catalog"))!["plugins"]!.AsArray());
+        Assert.DoesNotContain(JsonNode.Parse(await guest.GetStringAsync("/store/api/catalog"))!["plugins"]!.AsArray(), p => (string?)p!["key"] == "acme-hello");
 
         var admin = _s.App.Browser();
         await AppFactory.LoginAsync(admin);
@@ -188,7 +188,7 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         Assert.Contains("data-lightbox", page);
 
         var catalog = JsonNode.Parse(await guest.GetStringAsync("/store/api/catalog"))!;
-        var entry = catalog["plugins"]!.AsArray().OfType<JsonObject>().Single();
+        var entry = catalog["plugins"]!.AsArray().OfType<JsonObject>().Single(p => (string?)p["key"] == "acme-hello");
         Assert.Equal(("acme-hello", "1.0", "script", sha, _s.KeyId, sig), ((string?)entry["key"], (string?)entry["version"], (string?)entry["kind"],
             (string?)entry["sha256"], (string?)entry["keyId"], (string?)entry["signature"]));
         Assert.Equal("Acme Plugins", (string?)entry["publisher"]);
@@ -253,6 +253,60 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         Assert.True(StoreSignature.VerifyPackage(file, "template", key, "1.0", sha, (string?)entry["signature"], _s.KeyId, _s.Keys));
         Assert.Contains("Grüne Wiese 2", WebUtility.HtmlDecode(await guest.GetStringAsync("/store?art=template")));
         Assert.DoesNotContain("Grüne Wiese 2", WebUtility.HtmlDecode(await guest.GetStringAsync("/store?art=component")));
+    }
+
+    private static async Task<HttpResponseMessage> PostFormAsync(HttpClient c, string page, string url, Dictionary<string, string> fields)
+    {
+        fields["__RequestVerificationToken"] = await TokenOf(c, page);
+        return await c.PostAsync(url, new FormUrlEncodedContent(fields));
+    }
+
+    [Fact]
+    public async Task Accounts_review_published_entries_the_publisher_answers_anybody_reports_and_the_operator_hides()
+    {
+        await _s.InstallAsync();
+        var pub = await PublisherAsync(_s, "Review Labs", "labs@store.example");
+        var package = Package("labs-rated", "1.0", "Bewertbar");
+        Assert.Equal(HttpStatusCode.Redirect, (await UploadAsync(pub, package)).StatusCode);
+        var admin = _s.App.Browser();
+        await AppFactory.LoginAsync(admin);
+        var vid = VersionIdIn(await admin.GetStringAsync("/admin/p/matcms-store/review"), "Bewertbar 1.0");
+        var sig = StoreSignature.Sign(StoreSignature.Text("script", "labs-rated", "1.0", StoreSignature.Sha256Hex(package)), _s.Key);
+        Assert.Equal(HttpStatusCode.Redirect, (await DecideAsync(admin, vid, "approve", _s.KeyId + ":" + sig)).StatusCode);
+
+        // a guest is asked to sign in; the publisher cannot rate the own entry
+        var guest = _s.App.Browser();
+        Assert.Contains("/anmelden?returnUrl=", await guest.GetStringAsync("/store/labs-rated"));
+        // (the publisher sees no form on the own entry; the token comes from another page of the same session)
+        var own = await PostFormAsync(pub, "/store/konto/hochladen", "/store/labs-rated/bewerten", new() { ["stars"] = "5", ["name"] = "Ich", ["action"] = "save" });
+        Assert.Contains("rev=own", own.Headers.Location?.OriginalString);
+
+        // another account rates (and changes its mind — one review per account)
+        var fan = await PublisherAsync(_s, "Fan Account", "fan@store.example");
+        Assert.Contains("rev=invalid", (await PostFormAsync(fan, "/store/labs-rated", "/store/labs-rated/bewerten", new() { ["stars"] = "9", ["name"] = "Fan", ["action"] = "save" })).Headers.Location?.OriginalString);
+        await PostFormAsync(fan, "/store/labs-rated", "/store/labs-rated/bewerten", new() { ["stars"] = "2", ["name"] = "Fan", ["text"] = "<b>geht so</b>", ["action"] = "save" });
+        await PostFormAsync(fan, "/store/labs-rated", "/store/labs-rated/bewerten", new() { ["stars"] = "4", ["name"] = "Fan", ["text"] = "<b>doch gut</b>", ["action"] = "save" });
+        var page = await guest.GetStringAsync("/store/labs-rated");
+        Assert.Contains("&lt;b&gt;doch gut&lt;/b&gt;", page);                                                   // text, never markup
+        Assert.DoesNotContain("geht so", page);
+        var item = JsonNode.Parse(await guest.GetStringAsync("/store/api/plugins/labs-rated"))!;
+        Assert.Equal((4.0, 1), ((double)item["rating"]!["average"]!, (int)item["rating"]!["count"]!));
+
+        // the publisher answers from the account page
+        var account = await pub.GetStringAsync("/store/konto/eintrag/labs-rated");
+        var reviewId = Regex.Match(account, "name=\"id\" value=\"(\\d+)\"><label for=\"st-ans-").Groups[1].Value;
+        Assert.NotEmpty(reviewId);
+        await PostFormAsync(pub, "/store/konto/eintrag/labs-rated", "/store/konto/eintrag/labs-rated", new() { ["action"] = "answer", ["id"] = reviewId, ["answer"] = "Danke!" });
+        Assert.Contains("Danke!", await guest.GetStringAsync("/store/labs-rated"));
+
+        // a visitor reports it, the operator sees it in the badge and hides it
+        Assert.Contains("rev=reported", (await PostFormAsync(guest, "/store/labs-rated", "/store/labs-rated/melden", new() { ["id"] = reviewId })).Headers.Location?.OriginalString);
+        var list = await admin.GetStringAsync("/admin/p/matcms-store/reviews");
+        Assert.Contains("doch gut", WebUtility.HtmlDecode(list));
+        await admin.PostAsync("/admin/p/matcms-store/reviews", new FormUrlEncodedContent(new Dictionary<string, string>
+            { ["action"] = "hide", ["id"] = reviewId, ["__RequestVerificationToken"] = AppFactory.Token(list)! }));
+        Assert.DoesNotContain("doch gut", await guest.GetStringAsync("/store/labs-rated"));
+        Assert.Equal(0, (int)JsonNode.Parse(await guest.GetStringAsync("/store/api/plugins/labs-rated"))!["rating"]!["count"]!);
     }
 
     [Fact]

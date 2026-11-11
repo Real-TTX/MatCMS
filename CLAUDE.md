@@ -233,6 +233,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   Two route options came with it: `PublicRouteOptions.DuringMaintenance` (the maintenance middleware asks `PluginRouteTransformer.AnswersDuringMaintenance`) and
   `MaxBodyMegabytes` (members' forms only — the builder refuses it without `RequireMember` + `Antiforgery`; `PluginPage` raises Kestrel's and the form reader's
   limits after the member check, before the antiforgery check reads the body).
+  Since S4 the store also carries **templates and components** (one JSON file each, see below) and **reviews** (`StoreReviews.cs`: one per account and
+  entry, 1–5 stars + text, never the publisher's own entry; the publisher answers on the account page; anybody reports (`/store/{key}/melden`), the
+  operator hides/deletes under Bewertungen — reported ones count into the section's badge; `rating` {average, count} in the catalogue; setting
+  `reviews`; an erased account takes its reviews, an export lists them). Downloads count once per address, version and day (`download_marks`).
+  The entry page carries the review forms, so its route has antiforgery on; a redirect never carries a `#fragment` (SafeLocal), so the answer
+  to a review action is a notice at the TOP of the page (`StoreReviews.NoticeFor`).
 - **Sites install from the MatCMS Store themselves** (`Services/MatcmsStoreClient.cs`, docs/official-store.md S3): Admin → Plugins → "Weitere durchsuchen"
   gets a "MatCMS Store" tab next to the cloud's store (the dialog's tabs are links, `?browse=matcms`, so only the store looked at is asked; pictures are fetched
   and served by the SITE, `?handler=MatcmsImage`). Install = package only from the store server, `StoreSignature.VerifyPackage` against `StoreKeys.Known`

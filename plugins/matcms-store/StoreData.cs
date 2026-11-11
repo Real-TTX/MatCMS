@@ -63,6 +63,7 @@ internal sealed class StoreDb
         // One row per (address, version, day) that was counted — a hash, never the address itself; deleted after two days. So a cloud
         // or site that retries, or a script that pulls the same package again and again, counts once a day and the public number means something.
         d.Table("download_marks", t => t.Text("mark", required: true, unique: true).Text("day", required: true).Index("day"));
+        StoreReviews.Declare(d);
         d.Table("pictures", t => t
             .Int("item_id", required: true).Text("file", required: true).Text("type", def: "image/png").Text("caption", def: "").Int("sort", def: "0")
             .Index("item_id"));

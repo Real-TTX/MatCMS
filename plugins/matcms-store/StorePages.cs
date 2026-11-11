@@ -91,7 +91,10 @@ internal static class StorePages
             sb.Append("<div class=\"mst-by\">").Append(E(ctx.T("store.by"))).Append(" <a href=\"").Append(E(StoreUrls.Publisher(pub.Slug))).Append("\">").Append(E(pub.Name))
               .Append("</a>").Append(pub.Verified ? "<span class=\"mst-check\" title=\"" + E(ctx.T("store.verified")) + "\">✓</span>" : "").Append("</div>");
         sb.Append("</div>").Append(KindBadge(ctx, item.LatestKind)).Append("</div>");
+        sb.Append(StoreReviews.NoticeFor(ctx));
         if (item.Summary.Length > 0) sb.Append("<p class=\"mst-intro\">").Append(E(item.Summary)).Append("</p>");
+        if (StoreReviews.Summary(ctx, await StoreReviews.RatingAsync(ctx, item.Id, ct)) is { Length: > 0 } rating)
+            sb.Append("<p><a href=\"#bewertungen\">").Append(rating).Append("</a></p>");
 
         if (pics.Count > 0)
         {
@@ -149,7 +152,10 @@ internal static class StorePages
             }
             sb.Append("</div>");
         }
-        return Page(ctx, item.Name + " – " + StoreSettings.StoreTitle(ctx), sb.ToString(), item.Summary.Length > 0 ? item.Summary : StoreText.Cut(item.Description, 160));
+        sb.Append(await StoreReviews.SectionAsync(ctx, item, pub, ct));
+        // A page that shows the visitor's own review form (or a notice for them) is theirs — never the same page for everybody.
+        return Page(ctx, item.Name + " – " + StoreSettings.StoreTitle(ctx), sb.ToString(), item.Summary.Length > 0 ? item.Summary : StoreText.Cut(item.Description, 160),
+            noIndex: ctx.Request.Q("rev").Length > 0);
     }
 
     public static async Task<PluginResult> PublisherAsync(IPluginContext ctx, CancellationToken ct)

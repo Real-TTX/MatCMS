@@ -20,7 +20,7 @@ public sealed record StoreItem(
     string Title, string Sub, string Description, string RouteValue,
     string? InstalledVersion = null, string? Version = null, string? Accent = null,
     IReadOnlyList<StoreImage>? Images = null, string? Publisher = null, string? PublisherUrl = null,
-    string? Note = null, string? Badge = null, long? Downloads = null)
+    string? Note = null, string? Badge = null, long? Downloads = null, string? Rating = null)
 {
     /// <summary>The publisher's address when it is safe to link (absolute http/https), else null — it came from the cloud, not from us.</summary>
     public string? SafePublisherUrl => Uri.TryCreate(PublisherUrl ?? "", UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.ToString() : null;

@@ -50,7 +50,7 @@ public class IndexModel : PageModel
                 Items: (Matcms ?? new()).Select(e => new Shared.StoreItem(
                     Title: e.Name, Sub: e.Name, Description: e.Summary.Length > 0 ? e.Summary : e.Description, RouteValue: e.Key,
                     InstalledVersion: Items.Any(i => StoreItemPackage.Key(i.Name) == e.Key) ? "" : null, Version: e.Version, Accent: e.Accent,
-                    Publisher: e.Publisher + (e.PublisherVerified ? " ✓" : ""), PublisherUrl: e.PublisherUrl, Downloads: e.Downloads,
+                    Publisher: e.Publisher + (e.PublisherVerified ? " ✓" : ""), PublisherUrl: e.PublisherUrl, Downloads: e.Downloads, Rating: e.Rating,
                     Note: inCloud.Contains(e.Key) ? t["plugins.matcmsViaCloud"] : null,
                     Images: e.Images.Select(img => new Shared.StoreImage(Url.Page("/Admin/Templates/Index", "MatcmsImage", new { key = e.Key, imageId = img.Id })!, img.Caption)).ToList()
                 )).ToList(),

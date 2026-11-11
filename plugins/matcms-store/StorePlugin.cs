@@ -38,8 +38,11 @@ public sealed class StorePlugin : IPlugin
         b.Route(StoreUrls.Upload, StoreAccount.UploadAsync, member with { MaxBodyMegabytes = StoreSettings.MaxPackageLimit + 5 });
         b.Route("/store/konto/eintrag/{key}", StoreAccount.ItemAsync, member with { MaxBodyMegabytes = 30 });
         b.Route("/store/herausgeber/{slug}", StorePages.PublisherAsync, read);
+        b.Route("/store/{key}/bewerten", StoreReviews.RateAsync, member);
+        b.Route("/store/{key}/melden", StoreReviews.ReportAsync, form with { PostsPerMinute = 10 });
         b.Route(StoreUrls.Home, StorePages.IndexAsync, read);
-        b.Route("/store/{key}", StorePages.ItemAsync, read);
+        // The entry page carries the review and report forms (they post to their own routes), so it needs the antiforgery token.
+        b.Route("/store/{key}", StorePages.ItemAsync, form);
 
         // ---- back office ---------------------------------------------------------------------------------------------
         b.Admin.Section("store.nav", "ti-building-store", AdminGroup.Content, 40)
@@ -49,10 +52,12 @@ public sealed class StorePlugin : IPlugin
             .Page("items", "store.admin.items", StoreAdmin.ItemsAsync)
             .Page("items/{id}", null, StoreAdmin.ItemAsync)
             .Page("publishers", "store.admin.publishers", StoreAdmin.PublishersAsync)
+            .Page("reviews", "store.rev.title", StoreReviews.AdminAsync)
             .Badge(StoreAdmin.BadgeAsync)
             .Link("store.admin.review", "review", "ti-checklist", badge: true)
             .Link("store.admin.items", "items", "ti-package")
             .Link("store.admin.publishers", "publishers", "ti-users")
+            .Link("store.rev.title", "reviews", "ti-star")
             .Link("store.admin.settings", "_settings", "ti-settings");
 
         // ---- the rest of the site ------------------------------------------------------------------------------------
@@ -61,6 +66,8 @@ public sealed class StorePlugin : IPlugin
         b.Sitemap(SitemapAsync);
         b.LinkTargets("store.links.group", LinksAsync);
         b.On("site.search", SiteSearchAsync);
+        b.On("host.member.erase", StoreReviews.EraseAsync);
+        b.On("host.member.export", StoreReviews.ExportAsync);
         b.Job("download-marks", JobSchedule.Daily(new TimeOnly(3, 17)), ctx => new StoreDb(ctx.Data).PruneDownloadMarksAsync(CancellationToken.None));
     }
 

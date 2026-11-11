@@ -366,6 +366,8 @@ internal static class StoreAccount
                     var all = (await db.PicturesOfAsync(item.Id, ct)).OrderBy(p => p.Id == pic.Id ? 0 : 1).ThenBy(p => p.Sort).ToList();
                     for (var i = 0; i < all.Count; i++) await db.Pictures.UpdateAsync(all[i].Id, new Dictionary<string, object?> { ["sort"] = (long)(i + 1) * 10 }, ct);
                     return PluginResult.Redirect(here + "?ok=saved");
+                case "answer":
+                    return PluginResult.Redirect(here + "?ok=" + (await StoreReviews.AnswerAsync(ctx, item, ct) ? "saved" : "nothing"));
                 case "delpic" when pic is not null:
                     await db.Pictures.DeleteAsync(pic.Id, ct);
                     await ctx.Files.DeleteAsync(pic.File, ct);
@@ -419,6 +421,7 @@ internal static class StoreAccount
               .Append("<input type=\"file\" name=\"pictures\" accept=\"image/png,image/jpeg,image/webp\" multiple><p class=\"mst-hint\">")
               .Append(E(ctx.T("store.field.picturesHint", MaxPictures))).Append("</p><div class=\"mst-actions\"><button class=\"btn btn-outline\" type=\"submit\">")
               .Append(E(ctx.T("store.addPictures"))).Append("</button></div></form>");
+        sb.Append(await StoreReviews.PublisherSectionAsync(ctx, item, ct));
         return AccountPage(ctx, item.Name, sb.ToString());
     }
 }

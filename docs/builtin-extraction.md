@@ -79,3 +79,24 @@ geladen werden**, und **bei jedem Laden** geprüft werden (wie heute die Prüfsu
 2. API-Ergänzungen + Posts-Sicherung im Kern.
 3. Bot herausziehen (klein, erprobt den Weg), dann Shop, dann Blog (+ mehrsprachig).
 4. Release A, Pakete signieren (Matthias), Store, Rollout; danach Release B.
+
+## Stand
+
+- **Schritt 1 erledigt:** Code-Signatur, Laden ohne Schalter, Übernahme eingebauter Keys, Abzeichen „Signiert“, `StoreSign sign-code`.
+- **Schritt 2 erledigt:** Plugin-API 2.1 (`DefaultCulture`, `SanitizeHtml`, `PluginText.Slugify`) und 2.2 (`IPluginSite.LocalePrefix`,
+  `IPluginSite.ImportFromLinkAsync` + `LinkImport`, `PluginResult.WithAlternates` für den Sprachumschalter); Posts-Sicherung im Kern
+  (`Services/PostsTable.cs`, `ContentTransferService` liest und schreibt `Posts` selbst, `CleanupService` bucht die Tabelle vor dem Korpus).
+- **Blog herausgezogen (2026-11-11):** `plugins/blog` (Version 2.0, nur Abstractions), aus `BuiltInPlugins.All` entfernt; `/js/blog-editor.js`
+  und eine Kopie von `ai-seo-field.js` sind Plugin-Assets; „KI: Teaser“ über `AskAiAsync` (Anweisung wörtlich wie im Kern), „Aus Link übernehmen“
+  über `ImportFromLinkAsync` (`PostImportService` bleibt im Kern, die Einstellungen → Social Media brauchen ihn auch); `TagUtil`/`GermanDate`/
+  `SiteSearch`-Helfer als Kopie in `BlogText`. **Mehrsprachig:** Routen ohne `DefaultLanguageOnly` (`/en/blog`, `/en/blog/{slug}`, 404 für
+  eine Sprache, in der die Website nicht veröffentlicht), Übersicht/Sitemap/Link-Ziele/`site.search` je Sprache, Spalte `TranslationGroup`
+  (Plugin UND Kern deklarieren sie; Sicherung trägt sie), Sprachumschalter → Übersetzung, Admin „Übersetzung anlegen“ + Sprachfilter,
+  Cloud-Operation `post.create` mit `locale`/`translationOf` (ohne bleibt alles wie bisher in der Standardsprache). `SiteContext.CurrentLocale`
+  liest auf Plugin-Seiten den Sprachpräfix der Adresse (vorher immer Standardsprache).
+  `BuiltInPlugins.FormerKeys` = blog, shop, bot (`IsBuiltInKey` = eingebaut ODER früher eingebaut → nur signiert); eine liegengebliebene
+  `builtin`-Zeile ohne Code zeigt „Nicht mehr im Image – aus dem Store installieren oder ein Paket importieren“ (de/en), lädt nichts, Daten
+  bleiben; das signierte Paket übernimmt Zeile, Ein/Aus und Einstellungen. Ein Restore aus einer Sicherung mit eingebautem Blog legt genau
+  diese wartende Zeile an. Tests: `BlogPluginTests`, `BlogEndToEndTests` (+ `BlogMultilingualTests`, `BlogDefaultRouteTests`) laden das
+  mit dem Testschlüssel signierte Paket (`TestStoreKey`/`BlogFixture`).
+- **Offen:** Blog-Paket signieren (Matthias, `tools/StoreSign sign-code`) und in den Store; Shop und Bot (parallel); Release A/B.

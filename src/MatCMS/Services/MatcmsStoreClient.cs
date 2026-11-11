@@ -206,7 +206,7 @@ public sealed class MatcmsStoreClient
 
     /// <summary>
     /// Installs (or updates) one plugin from the MatCMS Store: only signed (see <see cref="FetchSignedAsync"/>), and only when the package's own
-    /// manifest names the same key and version. Arrives switched off, like every import.
+    /// manifest names the same key and version. A new plugin arrives switched off, like every import; an update keeps its on/off.
     /// </summary>
     public async Task<(bool Ok, string Message, int? PluginId)> InstallAsync(string key, CancellationToken ct = default)
     {
@@ -217,10 +217,10 @@ public sealed class MatcmsStoreClient
             return (false, "Das Paket nennt einen anderen Plugin-Schlüssel oder eine andere Version als der Store – nichts installiert.", null);
 
         using var stream = new MemoryStream(bytes, writable: false);
-        var (plugin, updated, importError) = await PluginPackager.ImportAsync(stream, _env, _db);
+        var (plugin, updated, importError) = await PluginPackager.ImportAsync(stream, _env, _db, keepStateOnUpdate: true);
         if (plugin is null) return (false, importError ?? "Import fehlgeschlagen.", null);
         return (true, updated
-            ? $"Plugin „{plugin.Name}“ aus dem MatCMS Store auf {plugin.Version} aktualisiert (Signatur geprüft). Es ist deaktiviert, bis du es freischaltest."
+            ? $"Plugin „{plugin.Name}“ aus dem MatCMS Store auf {plugin.Version} aktualisiert (Signatur geprüft){(plugin.Enabled ? "" : ". Es ist deaktiviert, bis du es freischaltest")}."
             : $"Plugin „{plugin.Name}“ {plugin.Version} aus dem MatCMS Store installiert (Signatur geprüft). Es ist deaktiviert, bis du es freischaltest.", plugin.Id);
     }
 

@@ -114,13 +114,12 @@ public class CloudCatalogService
                 return (false, refused);
 
             using var stream = new MemoryStream(bytes, writable: false);
-            // The instance's own importer, exactly as for a manual upload — which also means the
-            // plugin arrives DISABLED and somebody has to switch it on.
-            var (plugin, updated, error) = await PluginPackager.ImportAsync(stream, _env, _db);
+            // The instance's own importer: a NEW plugin arrives DISABLED and somebody has to switch it on; an update keeps its on/off.
+            var (plugin, updated, error) = await PluginPackager.ImportAsync(stream, _env, _db, keepStateOnUpdate: true);
             if (plugin is null) return (false, error ?? "Import fehlgeschlagen.");
 
             return (true, updated
-                ? $"Plugin \"{plugin.Name}\" aktualisiert. Es ist deaktiviert, bis du es freischaltest."
+                ? $"Plugin \"{plugin.Name}\" aktualisiert{(plugin.Enabled ? "" : ". Es ist deaktiviert, bis du es freischaltest")}."
                 : $"Plugin \"{plugin.Name}\" installiert. Es ist deaktiviert, bis du es freischaltest.");
         }
         catch (Exception ex)

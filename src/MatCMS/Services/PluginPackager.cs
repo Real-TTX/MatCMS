@@ -166,8 +166,12 @@ public static class PluginPackager
     /// the new version deliberately dropped. That also means importing an OLD, single-file bundle over
     /// a multi-file plugin reduces it to that one file — which is what that bundle says the plugin is.</para>
     /// </summary>
+    /// <param name="keepStateOnUpdate">An UPDATE keeps the plugin's on/off instead of switching it off. For the automated ways an operator already
+    /// chose a plugin and its source — the cloud's profile rollout, the cloud's store, the MatCMS Store with its checked signature — never for a
+    /// file somebody uploads by hand. A plugin that is NEW here still arrives off: switching on stays a person's decision. (Without this, every
+    /// rollout of a new version switched the plugin off on every site — Villa Nika's bookings vanished that way on 2026-11-11.)</param>
     public static async Task<(Models.Plugin? plugin, bool updated, string? error)> ImportAsync(
-        Stream zipStream, IWebHostEnvironment env, AppDbContext db)
+        Stream zipStream, IWebHostEnvironment env, AppDbContext db, bool keepStateOnUpdate = false)
     {
         // Copy to a seekable buffer (upload streams are often non-seekable; ZipArchive read needs seek).
         using var ms = new MemoryStream();
@@ -292,7 +296,7 @@ public static class PluginPackager
                     ApplyKind(existing, isNative, stage, meta);
                     // Imported code is untrusted and waits for the operator — except when the store's signed package takes the place of
                     // the built-in plugin it replaces: for the site nothing changes, so on stays on (the operator chose that already).
-                    if (previousKind != Models.PluginKind.BuiltIn) existing.Enabled = false;
+                    if (previousKind != Models.PluginKind.BuiltIn && !keepStateOnUpdate) existing.Enabled = false;
                     plugin = existing;
                     updated = true;
                 }

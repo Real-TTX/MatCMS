@@ -769,8 +769,9 @@ public class CloudSyncService
     /// <summary>
     /// Downloads and imports a bundle only when the installed version differs — a profile with a
     /// dozen plugins otherwise re-imports everything on every revision bump.
-    /// <para>Imported plugins stay DISABLED (that is <c>PluginPackager.ImportAsync</c>'s own rule):
-    /// plugin code runs server-side, so it takes a human on the instance to switch it on.</para>
+    /// <para>A plugin NEW to the instance arrives DISABLED (<c>PluginPackager.ImportAsync</c>'s own rule): plugin code runs server-side, so it
+    /// takes a human on the instance to switch it on. An UPDATE keeps the on/off the site had — the operator rolled the new version out
+    /// on purpose, and a rollout that switches every site's plugin off is an outage, not caution.</para>
     /// </summary>
     private async Task<int> ApplyPluginsAsync(
         List<ConfigPlugin> plugins, bool overwrite,
@@ -825,7 +826,7 @@ public class CloudSyncService
             }
 
             using var ms = new MemoryStream(bundle);
-            var (plugin, updated, error) = await PluginPackager.ImportAsync(ms, _env, _db);
+            var (plugin, updated, error) = await PluginPackager.ImportAsync(ms, _env, _db, keepStateOnUpdate: true);
             if (plugin is null)
             {
                 Report("plugin", key, "failed", error ?? "Import fehlgeschlagen.");

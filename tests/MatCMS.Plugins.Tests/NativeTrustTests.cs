@@ -15,19 +15,9 @@ namespace MatCMS.Plugin.Tests;
 /// </summary>
 public class NativeTrustTests
 {
-    /// <summary>One test key for the whole run, trusted IN ADDITION to the real store key (never instead of it).</summary>
-    private static readonly ECDsa Key = MakeKey(out KeyId);
-    private static readonly string KeyId;
-
-    private static ECDsa MakeKey(out string id)
-    {
-        var ec = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var spki = ec.ExportSubjectPublicKeyInfo();
-        id = StoreSignature.KeyId(spki);
-        var extra = new Dictionary<string, string>(NativeTrust.ExtraKeys ?? new Dictionary<string, string>()) { [id] = Convert.ToBase64String(spki) };
-        NativeTrust.ExtraKeys = extra;
-        return ec;
-    }
+    /// <summary>One test key for the whole run, trusted IN ADDITION to the real store key (never instead of it) — shared with the store packages.</summary>
+    private static ECDsa Key => TestStoreKey.Key;
+    private static string KeyId => TestStoreKey.KeyId;
 
     private static string Fixture => Path.Combine(AppContext.BaseDirectory, "fixtures", "refplugin");
 

@@ -70,7 +70,7 @@ internal static class ShopAdminAttributes
             {
                 if (id == 0)
                 {
-                    var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? name : f.F("slug"));
+                    var slug = PluginText.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? name : f.F("slug"));
                     if (string.IsNullOrWhiteSpace(slug)) slug = "eigenschaft";
                     var baseSlug = slug; var n = 2;
                     while (await store.AttributeBySlugAsync(slug, ct) is not null) slug = baseSlug + "-" + n++;

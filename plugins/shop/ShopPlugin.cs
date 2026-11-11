@@ -2,23 +2,19 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services.Plugins;
 using static MatCMS.Plugin.Shop.ShopHtml;
 
 namespace MatCMS.Plugin.Shop;
 
 /// <summary>
-/// The shop, as a plugin that ships with the CMS and is OFF until an operator switches it on: products (physical and digital, with variants and stock), a cart and
-/// checkout, payment by Stripe or bank transfer, orders with their history, invoices, downloads, customer accounts and everything the back office needs to run it.
-/// <para>It is written against the same API as every other plugin — and that API grew for it: customer accounts, a raw-body webhook route, cookies, atomic counters,
-/// private files, plugin mail templates. Nothing in the core knows the shop.</para>
+/// The shop: products (physical and digital, with variants and stock), a cart and checkout, payment by Stripe, PayPal or bank transfer, orders with their history,
+/// invoices, downloads, customer accounts and everything the back office needs to run it.
+/// <para>A native plugin from the MatCMS Store. It used to ship with the CMS and kept its key, tables, settings, pages and menu elements, so a site that ran the
+/// built-in shop goes on with the package unchanged (docs/builtin-extraction.md). It is written against the same API as every other plugin — and that API grew
+/// for it: customer accounts, a raw-body webhook route, cookies, atomic counters, private files, plugin mail templates. Nothing in the core knows the shop.</para>
 /// </summary>
 public sealed class ShopPlugin : IPlugin
 {
-    /// <summary>The plugin's identity in the list of built-in plugins. Off on a new site: a site that does not sell anything carries none of this.</summary>
-    public static BuiltInPlugin Definition { get; } = new("shop", "Shop",
-        "Produkte (physisch und digital), Warenkorb, Kasse mit Stripe und Vorkasse, Bestellungen, Rechnungen, Downloads und Kundenkonto.", "1.0", () => new ShopPlugin(), EnabledOnNewSite: false);
-
 
     /// <inheritdoc />
     public void Configure(IPluginBuilder b)
@@ -178,7 +174,7 @@ public sealed class ShopPlugin : IPlugin
             var store = new ShopStore(ctx.Data);
             if ((await store.RatesAsync()).Count == 0)
                 // Named in the SITE's language (this runs in whatever language the operator's browser used, which says nothing about the shop).
-                await store.SaveRateAsync(new ShippingRate { Name = MatCMS.Services.Localizer.DefaultCulture == "en" ? "Standard shipping Germany" : "Standardversand Deutschland", Countries = "DE", PriceCents = 490, FreeFromCents = 5000 });
+                await store.SaveRateAsync(new ShippingRate { Name = ctx.Site.DefaultCulture == "en" ? "Standard shipping Germany" : "Standardversand Deutschland", Countries = "DE", PriceCents = 490, FreeFromCents = 5000 });
         });
     }
 }

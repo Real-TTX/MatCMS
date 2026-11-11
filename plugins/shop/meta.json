@@ -1,0 +1,6 @@
+{
+  "Key": "shop",
+  "Name": "Shop",
+  "Version": "2.0",
+  "Description": "Produkte (physisch und digital, mit Varianten, Eigenschaften und Marken), Warenkorb, Kasse mit Stripe, PayPal und Vorkasse, Bestellungen, Rechnungen und Gutschriften als PDF, Downloads, Gutscheine, EU-OSS, Kundenkonto, Widerrufsbutton und eine ERP-Schnittstelle. Natives Plugin aus dem MatCMS Store (signiert: läuft ohne „Native Plugins erlauben“)."
+}

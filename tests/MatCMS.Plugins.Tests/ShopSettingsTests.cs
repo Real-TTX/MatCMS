@@ -123,14 +123,17 @@ public class ShopSwitchAndBackupTests : IClassFixture<AppFactory>, IAsyncLifetim
     }
 
     [Fact]
-    public async Task A_fresh_site_has_the_shop_switched_off_and_listed_as_a_built_in_that_cannot_be_deleted()
+    public async Task A_site_with_the_store_package_has_the_shop_switched_off_and_running_signed_without_the_native_switch()
     {
         using var f = new AppFactory();
         using var scope = f.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var row = await db.Plugins.AsNoTracking().FirstAsync(p => p.Key == "shop");
         Assert.False(row.Enabled);
-        Assert.Equal(MatCMS.Models.PluginKind.BuiltIn, MatCMS.Models.PluginKind.Normalize(row.Kind));
+        // The shop left the image (Release B): it is the MatCMS Store's signed native package, and its signature — not "Native Plugins erlauben" — lets it run.
+        Assert.Equal(MatCMS.Models.PluginKind.Native, MatCMS.Models.PluginKind.Normalize(row.Kind));
+        Assert.True(MatCMS.Services.Plugins.NativeTrust.IsSigned(scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>(), row));
+        Assert.False(await db.SiteSettings.AnyAsync(s => s.Key == SettingKeys.AllowNativePlugins && s.Value == "1"));
         Assert.True((await db.Plugins.AsNoTracking().FirstAsync(p => p.Key == "blog")).Enabled);        // the blog still starts on
         var visitor = f.Browser();
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/shop")).StatusCode);
@@ -138,7 +141,7 @@ public class ShopSwitchAndBackupTests : IClassFixture<AppFactory>, IAsyncLifetim
     }
 
     [Fact]
-    public async Task An_operator_switches_the_shop_on_and_off_in_the_plugin_list_and_cannot_delete_it()
+    public async Task An_operator_switches_the_shop_on_and_off_in_the_plugin_list()
     {
         using var f = new AppFactory();
         var admin = f.Browser();
@@ -159,11 +162,96 @@ public class ShopSwitchAndBackupTests : IClassFixture<AppFactory>, IAsyncLifetim
         await PostAsync("Toggle");
         Assert.Equal(HttpStatusCode.OK, (await visitor.GetAsync("/shop")).StatusCode);                  // on: the catalogue answers
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync("/admin/p/shop")).StatusCode);            // and the back office has its section
-        await PostAsync("Delete");                                                                       // refused for a built-in
-        Assert.Equal(HttpStatusCode.OK, (await visitor.GetAsync("/shop")).StatusCode);
-        using (var scope = f.Services.CreateScope()) Assert.True(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AnyAsync(p => p.Key == "shop"));
         await PostAsync("Toggle");
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/shop")).StatusCode);            // off again
+        using (var scope = f.Services.CreateScope()) Assert.True(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AnyAsync(p => p.Key == "shop"));
+    }
+
+    [Fact]
+    public async Task A_site_whose_image_dropped_the_shop_before_the_package_came_keeps_its_data_and_settings_and_says_so_and_the_package_takes_them_over()
+    {
+        using var f = new AppFactory();
+        int id;
+        // The state after the update to Release B on a site that ran the built-in shop: its row is still "builtin", on, with its settings and a table of its own.
+        using (var scope = f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = await db.Plugins.FirstAsync(p => p.Key == "shop");
+            row.Kind = MatCMS.Models.PluginKind.BuiltIn; row.Entry = ""; row.Sha256 = ""; row.CodeSignature = ""; row.Version = "1.0";
+            row.Enabled = true; row.ConfigJson = "{\"seller.name\":\"Alte Werkstatt\"}";
+            await db.SaveChangesAsync();
+            await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS p_shop_legacy_probe (id INTEGER PRIMARY KEY, v TEXT); INSERT INTO p_shop_legacy_probe (v) VALUES ('bleibt');");
+            id = row.Id;
+            await scope.ServiceProvider.GetRequiredService<MatCMS.Services.PluginRunner>().RunAllAsync();
+            var registry = scope.ServiceProvider.GetRequiredService<PluginRegistry>();
+            Assert.False(registry.IsLoaded("shop"));                                    // nothing of it runs …
+            Assert.False(registry.Errors.ContainsKey(id));                              // … and that is a state, not a fault
+        }
+        var visitor = f.Browser();
+        Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/shop")).StatusCode);
+
+        var admin = f.Browser();
+        await AppFactory.LoginAsync(admin);
+        await admin.PostAsync("/set-language?culture=de", new StringContent(""));
+        var list = await admin.GetStringAsync("/admin/plugins");
+        Assert.Contains("data-plugin-gone=\"shop\"", list);
+        Assert.Contains("Nicht mehr im Image", System.Net.WebUtility.HtmlDecode(list));
+        Assert.Contains("aus dem Store installieren oder ein Paket importieren", System.Net.WebUtility.HtmlDecode(list));
+        Assert.Contains("data-plugin-gone=\"shop\"", await admin.GetStringAsync($"/admin/plugins/builtin/{id}"));
+        await admin.PostAsync("/set-language?culture=en", new StringContent(""));
+        Assert.Contains("No longer in the image", System.Net.WebUtility.HtmlDecode(await admin.GetStringAsync("/admin/plugins")));
+
+        // The store's signed package arrives (a hand import is enough): it takes the row over — on stays on, the settings stay, the data is untouched.
+        using (var scope = f.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var env = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+            var (plugin, updated, error) = await PluginPackager.ImportAsync(SignedShopBundle(), env, db);
+            Assert.Null(error);
+            Assert.True(updated);
+            Assert.Equal(id, plugin!.Id);
+            Assert.Equal(MatCMS.Models.PluginKind.Native, plugin.Kind);
+            Assert.True(plugin.Enabled);
+            Assert.Equal("{\"seller.name\":\"Alte Werkstatt\"}", plugin.ConfigJson);
+            await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(id);
+            Assert.True(scope.ServiceProvider.GetRequiredService<PluginRegistry>().IsLoaded("shop"));
+            var conn = db.Database.GetDbConnection();
+            await conn.OpenAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT v FROM p_shop_legacy_probe";
+            Assert.Equal("bleibt", (string?)await cmd.ExecuteScalarAsync());
+        }
+        Assert.Equal(HttpStatusCode.OK, (await visitor.GetAsync("/shop")).StatusCode);
+        Assert.DoesNotContain("data-plugin-gone=\"shop\"", await admin.GetStringAsync("/admin/plugins"));
+    }
+
+    /// <summary>The shop's package as the store hands it out: the built DLL under src/, the manifest, and the code signature (test key).</summary>
+    private static MemoryStream SignedShopBundle()
+    {
+        var dll = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "fixtures", "shop", "Shop.dll"));
+        var tmp = Path.Combine(Path.GetTempPath(), "matcms-shop-sign-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmp);
+        string signature;
+        try
+        {
+            File.WriteAllBytes(Path.Combine(tmp, "Shop.dll"), dll);
+            signature = TestStoreKey.Sign("shop", "2.0", tmp);
+        }
+        finally { Directory.Delete(tmp, true); }
+        var manifest = new System.Text.Json.Nodes.JsonObject
+        {
+            ["Format"] = 2, ["Name"] = "Shop", ["Key"] = "shop", ["Version"] = "2.0", ["Description"] = "", ["Code"] = MatCMS.Shared.PluginBundle.NativeGuardCode, ["Mapping"] = "",
+            ["Kind"] = "native", ["Api"] = typeof(IPlugin).Assembly.GetName().Version!.Major.ToString(), ["Entry"] = "Shop.dll",
+            ["Sha256"] = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(dll)).ToLowerInvariant(), ["CodeSignature"] = signature
+        };
+        var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using (var w = new StreamWriter(zip.CreateEntry("plugin.json").Open())) w.Write(manifest.ToJsonString());
+            using (var s = zip.CreateEntry("src/Shop.dll").Open()) s.Write(dll);
+        }
+        ms.Position = 0;
+        return ms;
     }
 
     [Fact]

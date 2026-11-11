@@ -16,6 +16,10 @@
     @if (!string.IsNullOrWhiteSpace(p.Description)) { <p class="muted">@p.Description</p> }
 </div>
 
+@if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p))
+{
+    <div class="alert alert-warning" data-plugin-gone="@p.Key"><strong>@T["plugins.builtin.gone"]:</strong> @T["plugins.builtin.goneHelp"]</div>
+}
 @if (!string.IsNullOrWhiteSpace(Model.RunError))
 {
     <div class="alert alert-error"><strong>@T["plugins.runError"]:</strong> <span class="mono">@Model.RunError</span></div>

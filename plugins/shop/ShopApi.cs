@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -172,7 +171,7 @@ internal static class ShopApi
             var title = Str(o, "title");
             if (title.Length == 0) return Fail(400, "Ein neues Produkt braucht einen Titel (title).");
             if (Cents(o, "price", out _) is not true) return Fail(400, "Ein neues Produkt braucht einen Preis (price_cents oder price).");
-            var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(Str(o, "slug") is { Length: > 0 } s ? s : title);
+            var slug = PluginText.Slugify(Str(o, "slug") is { Length: > 0 } s ? s : title);
             if (slug.Length == 0 || ShopPublic.ReservedSlugs.Contains(slug)) slug = "produkt";
             var baseSlug = slug;
             for (var i = 2; await store.SlugTakenAsync(slug, 0, ct); i++) slug = baseSlug + "-" + i;
@@ -181,7 +180,7 @@ internal static class ShopApi
 
         if (Has(o, "title")) { if (Str(o, "title").Length == 0) return Fail(400, "title darf nicht leer sein."); p = p with { Title = Str(o, "title") }; }
         if (Has(o, "summary")) p = p with { Summary = Str(o, "summary") };
-        if (Has(o, "description_html")) p = p with { DescriptionHtml = SafeHtml.Sanitize(o["description_html"]?.ToString()) };
+        if (Has(o, "description_html")) p = p with { DescriptionHtml = ctx.Site.SanitizeHtml(o["description_html"]?.ToString()) };
         switch (Cents(o, "price", out var price)) { case false: return Fail(400, "price_cents / price ist kein gültiger Preis."); case true: p = p with { PriceCents = price }; break; }
         switch (Cents(o, "compare", out var cmp)) { case false: return Fail(400, "compare_cents / compare ist kein gültiger Preis."); case true: p = p with { CompareCents = cmp }; break; }
         if (Has(o, "tax_percent"))
@@ -278,7 +277,7 @@ internal static class ShopApi
     private static async Task<string?> ResolveCategoryAsync(ShopStore store, string value, CancellationToken ct)
     {
         if (await store.CategoryBySlugAsync(value.ToLowerInvariant(), ct) is { } byslug) return byslug.Slug;
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(value);
+        var slug = PluginText.Slugify(value);
         return slug.Length > 0 && await store.CategoryBySlugAsync(slug, ct) is { } c ? c.Slug : null;
     }
 
@@ -390,7 +389,7 @@ internal static class ShopApi
     private static async Task<PluginResult> UpsertCategoryAsync(IPluginContext ctx, CancellationToken ct)
     {
         if (ctx.Request.Json() is not JsonObject o) return BadBody();
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(ctx.Request.R("slug"));
+        var slug = PluginText.Slugify(ctx.Request.R("slug"));
         if (slug.Length == 0) return Fail(400, "Die Adresse (slug) der Kategorie fehlt.");
         var store = new ShopStore(ctx.Data);
         var existing = await store.CategoryBySlugAsync(slug, ct);

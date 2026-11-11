@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -89,7 +88,6 @@ internal static class ShopAiOps
         return o[moneyKey] is { } m && Money.TryParse(m.ToString(), out var parsed) ? parsed : null;
     }
 
-    private static readonly JsonSerializerOptions Json = new() { IncludeFields = false };
 
     private static async Task<Product?> FindProductAsync(ShopStore store, JsonObject o, CancellationToken ct)
     {
@@ -139,11 +137,11 @@ internal static class ShopAiOps
         var store = new ShopStore(ctx.Data);
         if (await FindProductAsync(store, o, ct) is not { } p) return Answer("failed", "Produkt nicht gefunden.");
         // The undo writes the stored row back, not the translated view a read may give.
-        var before = JsonSerializer.SerializeToNode(p, Json)!;
+        var before = JsonSerializer.SerializeToNode(p, ShopJson.Default.Product)!;
         var n = p;
         if (Str(o, "title") is { } t) { if (t.Trim().Length == 0) return Answer("failed", "Ein Produkt braucht einen Titel."); n = n with { Title = t.Trim() }; }
         if (Str(o, "summary") is { } su) n = n with { Summary = su.Trim() };
-        if ((Str(o, "description_html") ?? Str(o, "descriptionHtml")) is { } d) n = n with { DescriptionHtml = SafeHtml.Sanitize(d) };
+        if ((Str(o, "description_html") ?? Str(o, "descriptionHtml")) is { } d) n = n with { DescriptionHtml = ctx.Site.SanitizeHtml(d) };
         if (Cents(o, "price_cents", "price") is { } price) { if (price < 0) return Answer("failed", "Der Preis darf nicht negativ sein."); n = n with { PriceCents = price }; }
         if (Cents(o, "compare_cents", "compare_price") is { } cmp) n = n with { CompareCents = Math.Max(0, cmp) };
         if (o.ContainsKey("image")) n = n with { Image = ShopPublic.SafeUrl(Str(o, "image")) };
@@ -176,7 +174,7 @@ internal static class ShopAiOps
 
     public static async Task<JsonNode?> RestoreProductAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
     {
-        var p = args.Deserialize<Product>(Json) ?? throw new InvalidOperationException("Kein Produkt.");
+        var p = args.Deserialize(ShopJson.Default.Product) ?? throw new InvalidOperationException("Kein Produkt.");
         var store = new ShopStore(ctx.Data);
         if (await store.ProductAsync(p.Id, ct) is null) return Answer("failed", "Das Produkt gibt es nicht mehr.");
         await store.SaveProductAsync(p, ct);
@@ -215,10 +213,10 @@ internal static class ShopAiOps
         var store = new ShopStore(ctx.Data);
         var existing = await store.ResolveBrandAsync(key, false, ct);
         var x = existing ?? new Brand { Name = key, Active = true, Sort = (await store.BrandsAsync(false, ct)).Count };
-        var before = existing is null ? null : JsonSerializer.SerializeToNode(existing, Json);
+        var before = existing is null ? null : JsonSerializer.SerializeToNode(existing, ShopJson.Default.Brand);
         if (Str(o, "name") is { } name && name.Trim().Length > 0) x = x with { Name = name.Trim() };
         if (Str(o, "summary") is { } su) x = x with { Summary = su.Trim() };
-        if ((Str(o, "details_html") ?? Str(o, "detailsHtml")) is { } d) x = x with { DetailsHtml = SafeHtml.Sanitize(d) };
+        if ((Str(o, "details_html") ?? Str(o, "detailsHtml")) is { } d) x = x with { DetailsHtml = ctx.Site.SanitizeHtml(d) };
         if (o.ContainsKey("logo")) x = x with { Logo = ShopPublic.SafeUrl(Str(o, "logo")) };
         if (o.ContainsKey("image")) x = x with { Image = ShopPublic.SafeUrl(Str(o, "image")) };
         if (Str(o, "website") is { } w) x = x with { Website = ShopBrands.SafeWebsite(w) };
@@ -240,7 +238,7 @@ internal static class ShopAiOps
 
     public static async Task<JsonNode?> RestoreBrandAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
     {
-        var x = args.Deserialize<Brand>(Json) ?? throw new InvalidOperationException("Keine Marke.");
+        var x = args.Deserialize(ShopJson.Default.Brand) ?? throw new InvalidOperationException("Keine Marke.");
         var store = new ShopStore(ctx.Data);
         if (await store.BrandAsync(x.Id, ct) is null) return Answer("failed", "Die Marke gibt es nicht mehr.");
         await store.SaveBrandAsync(x, ct);
@@ -274,7 +272,7 @@ internal static class ShopAiOps
         var o = args as JsonObject ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
         var name = (Str(o, "name") ?? "").Trim();
         if (name.Length == 0) return Answer("failed", "Eine Kategorie braucht einen Namen.");
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(Str(o, "slug") ?? name);
+        var slug = PluginText.Slugify(Str(o, "slug") ?? name);
         if (slug.Length == 0) return Answer("failed", "Keine gültige Adresse.");
         var store = new ShopStore(ctx.Data);
         if (await store.CategoryBySlugAsync(slug, ct) is not null) return Answer("skipped-exists", $"Die Kategorie „{slug}“ gibt es schon.");
@@ -296,7 +294,7 @@ internal static class ShopAiOps
         var store = new ShopStore(ctx.Data);
         var key = (Str(o, "category") ?? Str(o, "slug") ?? "").Trim();
         if (await store.CategoryBySlugAsync(key, ct) is not { } c) return Answer("failed", $"Die Kategorie „{key}“ gibt es nicht.");
-        var before = JsonSerializer.SerializeToNode(c, Json)!;
+        var before = JsonSerializer.SerializeToNode(c, ShopJson.Default.Category)!;
         var n = c;
         if (Str(o, "name") is { } name && name.Trim().Length > 0) n = n with { Name = name.Trim() };
         if (o.ContainsKey("image")) n = n with { Image = ShopPublic.SafeUrl(Str(o, "image")) };
@@ -310,7 +308,7 @@ internal static class ShopAiOps
 
     public static async Task<JsonNode?> RestoreCategoryAsync(IPluginContext ctx, JsonNode? args, CancellationToken ct)
     {
-        var c = args.Deserialize<Category>(Json) ?? throw new InvalidOperationException("Keine Kategorie.");
+        var c = args.Deserialize(ShopJson.Default.Category) ?? throw new InvalidOperationException("Keine Kategorie.");
         await new ShopStore(ctx.Data).SaveCategoryAsync(c, ct);
         return Answer("applied", $"Kategorie „{c.Name}“ wiederhergestellt.");
     }

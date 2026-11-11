@@ -1,6 +1,5 @@
 using System.Globalization;
 using MatCMS.Plugin;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -123,7 +122,7 @@ internal static class ShopAdminBrands
             var website = f.F("website").Trim();
             current = current with
             {
-                Name = name, Summary = Clip(f.F("summary").Trim(), 600), DetailsHtml = SafeHtml.Sanitize(f.F("details")), Logo = ShopPublic.SafeUrl(f.F("logo")), Image = ShopPublic.SafeUrl(f.F("image")),
+                Name = name, Summary = Clip(f.F("summary").Trim(), 600), DetailsHtml = ctx.Site.SanitizeHtml(f.F("details")), Logo = ShopPublic.SafeUrl(f.F("logo")), Image = ShopPublic.SafeUrl(f.F("image")),
                 Website = ShopBrands.SafeWebsite(website), SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
                 Active = f.Form.ContainsKey("active"), Featured = f.Form.ContainsKey("featured"), Badge = ShopBrands.CleanBadge(f.F("badge")),
                 Sort = int.TryParse(f.F("sort"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var so) ? Math.Clamp(so, 0, 100000) : 0

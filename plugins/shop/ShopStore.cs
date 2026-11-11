@@ -81,16 +81,15 @@ internal sealed partial class ShopStore
 
     private static string Js(JsonNode? n) => n?.ToJsonString() ?? "null";
 
-    private static T? Parse<T>(string json) where T : class
+    // Source-generated (ShopJson), never reflection over the shop's own types: that would keep the plugin's load context alive after an unload.
+    private static Address? ParseAddress(string json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
+        try { return JsonSerializer.Deserialize(json, ShopJson.Default.Address); }
         catch (JsonException) { return null; }
     }
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-    private static string ToJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
+    private static string ToJson(Address value) => JsonSerializer.Serialize(value, ShopJson.Default.Address);
 
     // ---- products --------------------------------------------------------------------------------------
 
@@ -409,7 +408,7 @@ internal sealed partial class ShopStore
     {
         Id = r.Id, Number = r.Text("number"), Status = r.Text("status"), CancelReason = r.Text("cancel_reason"), MemberId = r.Int("member_id"),
         Email = r.Text("email"), Name = r.Text("name"), Phone = r.Text("phone"),
-        Billing = Parse<Address>(r.Text("billing")) ?? new Address(), Shipping = Parse<Address>(r.Text("shipping")) ?? new Address(),
+        Billing = ParseAddress(r.Text("billing")) ?? new Address(), Shipping = ParseAddress(r.Text("shipping")) ?? new Address(),
         ShippingMethod = r.Text("shipping_method"), SubtotalCents = r.Int("subtotal"), ShippingCents = r.Int("shipping_cents"), TaxCents = r.Int("tax"),
         TotalCents = r.Int("total"), RefundedCents = r.Int("refunded"), Currency = r.Text("currency") is { Length: > 0 } c ? c : "EUR",
         PaymentProvider = r.Text("payment_provider"), PaymentRef = r.Text("payment_ref"), PaymentIntent = r.Text("payment_intent"), PaidUtc = r.Timestamp("paid"),

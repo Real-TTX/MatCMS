@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services.Plugins;
 
 namespace MatCMS.Plugin.Bot;
 
 /// <summary>
-/// The AI bot: a chat assistant for a site's visitors, built into the CMS and OFF until the operator switches it on. It answers from what the site publishes
+/// The AI bot: a chat assistant for a site's visitors, OFF until the operator switches it on. A native plugin from the MatCMS Store — it used to be
+/// built into the CMS, and kept its key, settings and tables, so a site's configuration carries over (docs/builtin-extraction.md). It answers from what the site publishes
 /// and — only where the operator allows it and only for the signed-in member — from that member's own data (the shop's orders). Name, look, behaviour and
 /// limits are its settings; the model is the site's AI connection (an own AI profile or the cloud), the bot never holds a key.
 /// <para>Written against the plugin API only. What it needed and the API did not have became API for every plugin: <see cref="IPluginSite.AskAiAsync"/>,
@@ -15,12 +15,7 @@ namespace MatCMS.Plugin.Bot;
 /// </summary>
 public sealed class BotPlugin : IPlugin
 {
-    /// <summary>The plugin's identity in the list of built-in plugins.</summary>
-    public static BuiltInPlugin Definition { get; } = new("bot", "KI-Bot",
-        "Chat-Assistent für Besucher: antwortet aus den Inhalten der Website und angemeldeten Kunden zu ihren eigenen Bestellungen. Name, Aussehen und Token-Grenzen einstellbar.",
-        "1.0", () => new BotPlugin(), EnabledOnNewSite: false);
-
-    /// <summary>Changes with every build of the CMS, so a browser never keeps an old widget script.</summary>
+    /// <summary>Changes with every build of the plugin, so a browser never keeps an old widget script.</summary>
     private static readonly string AssetVersion = typeof(BotPlugin).Assembly.ManifestModule.ModuleVersionId.ToString("N")[..12];
 
     private const string SvgChat = @"<path d=""M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.4A8 8 0 1 1 21 12z""/><path d=""M8.5 11h.01M12 11h.01M15.5 11h.01""/>";
@@ -33,7 +28,9 @@ public sealed class BotPlugin : IPlugin
         BotStore.Declare(b.Data);
 
         // The widget: one script on every public page. It asks /ai-bot/config what to draw (the chat bubble, or only the panels the block placed).
-        b.Body($"<script src=\"/js/ai-bot.js?v={AssetVersion}\" defer></script>");
+        // Script and stylesheet are the plugin's assets (the package's assets/ folder, served at /plugin-assets/bot/); the script finds its stylesheet
+        // next to itself.
+        b.Body($"<script src=\"/plugin-assets/bot/ai-bot.js?v={AssetVersion}\" defer></script>");
         b.Route("/ai-bot/config", ConfigAsync, new PublicRouteOptions { Methods = PluginMethod.Get });
         // Anonymous like a contact form: nothing to forge (the answer goes back to the page that asked; a member's cookie is SameSite=Lax and not sent with a
         // cross-site POST), rate-limited per address on top of the bot's own daily limits.

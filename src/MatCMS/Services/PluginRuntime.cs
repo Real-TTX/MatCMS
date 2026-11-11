@@ -498,6 +498,14 @@ public class PluginRunner
         var def = BuiltInPlugins.Find(p.Key);
         if (def is null)
         {
+            // The shop and the bot left the image (Release B): their row, settings and data stay as they are until the store's signed package takes
+            // the row over. Not a fault — Admin → Plugins says what to do (BuiltInPlugins.IsGone); nothing of theirs runs meanwhile.
+            if (BuiltInPlugins.IsFormerKey(p.Key))
+            {
+                _registry.ClearError(p.Id);
+                _registry.AddLog(p.Key, "Nicht mehr im Image – wartet auf das Paket aus dem MatCMS Store (Daten und Einstellungen bleiben).");
+                return;
+            }
             _registry.SetError(p.Id, "Dieses eingebaute Plugin kennt diese Version von MatCMS nicht.");
             return;
         }

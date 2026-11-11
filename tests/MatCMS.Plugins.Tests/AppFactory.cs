@@ -37,6 +37,17 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         if (ExtraServices is { } extra) builder.ConfigureServices(extra);
     }
 
+    /// <summary>
+    /// Starts the application and puts the shop and the AI bot in, both off — they left the image as native packages of the MatCMS Store, and the tests
+    /// that switch them on find them where a site has them (<see cref="StorePackages"/>).
+    /// </summary>
+    protected override Microsoft.Extensions.Hosting.IHost CreateHost(Microsoft.Extensions.Hosting.IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+        StorePackages.InstallAsync(host.Services).GetAwaiter().GetResult();
+        return host;
+    }
+
     /// <summary>A browser: keeps cookies, follows nothing on its own.</summary>
     public HttpClient Browser() => CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
 

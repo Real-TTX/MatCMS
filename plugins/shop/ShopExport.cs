@@ -155,7 +155,7 @@ internal static class ShopExport
                 string Cell(string col) { var i = Array.IndexOf(header, col); return i >= 0 && i < row.Length ? row[i].Trim() : ""; }
                 bool Has(string col) => Array.IndexOf(header, col) >= 0;
                 var title = Cell("title");
-                var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(Cell("slug").Length > 0 ? Cell("slug") : title);
+                var slug = PluginText.Slugify(Cell("slug").Length > 0 ? Cell("slug") : title);
                 var subject = title.Length > 0 ? title : slug;
                 if (slug.Length == 0) { lines.Add(new(r + 1, subject, "übersprungen: weder Titel noch Adresse", false)); skipped++; continue; }
                 if (ShopPublic.ReservedSlugs.Contains(slug)) slug += "-1";
@@ -167,7 +167,7 @@ internal static class ShopExport
                 if (Has("title") && title.Length > 0) p = p with { Title = title };
                 if (existing is null && p.Title.Length == 0) problem = "es fehlt der Titel";
                 if (Has("summary")) p = p with { Summary = Cell("summary") };
-                if (Has("description")) p = p with { DescriptionHtml = MatCMS.Services.SafeHtml.Sanitize(row.Length > Array.IndexOf(header, "description") ? row[Array.IndexOf(header, "description")] : "") };
+                if (Has("description")) p = p with { DescriptionHtml = ctx.Site.SanitizeHtml(row.Length > Array.IndexOf(header, "description") ? row[Array.IndexOf(header, "description")] : "") };
                 if (Has("price") && Cell("price").Length > 0)
                 {
                     if (Money.TryParse(Cell("price"), out var price) && price >= 0) p = p with { PriceCents = price }; else problem ??= $"„{Cell("price")}“ ist kein Preis";
@@ -201,7 +201,7 @@ internal static class ShopExport
                     var bt = Cell("brand");
                     if (bt.Length == 0) p = p with { Brand = "" };
                     else if (await store.ResolveBrandAsync(bt, !dryRun, ct) is { } br) p = p with { Brand = br.Slug };
-                    else p = p with { Brand = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(bt) };
+                    else p = p with { Brand = PluginText.Slugify(bt) };
                 }
                 if (Has("extra_categories")) p = p with { ExtraCategories = string.Join(",", (await Task.WhenAll(Cell("extra_categories").Split('|', StringSplitOptions.RemoveEmptyEntries).Select(x => CategoryFor(x.Trim(), r + 1)))).Where(x => x.Length > 0 && x != p.Category).Distinct()) };
 
@@ -223,7 +223,7 @@ internal static class ShopExport
                     {
                         var row = vt[r];
                         string Cell(string col) { var i = Array.IndexOf(vh, col); return i >= 0 && i < row.Length ? row[i].Trim() : ""; }
-                        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(Cell("product")); var name = Cell("name");
+                        var slug = PluginText.Slugify(Cell("product")); var name = Cell("name");
                         var product = await store.ProductBySlugAsync(slug, ct);
                         var inFile = seen.Contains(slug);
                         if (name.Length == 0 || name.Length > ShopVariants.MaxName) { lines.Add(new(r + 1, $"{slug} / {name}", "Variante übersprungen: Name fehlt oder ist zu lang", false)); skipped++; continue; }
@@ -251,7 +251,7 @@ internal static class ShopExport
         {
             var hit = cats.FirstOrDefault(c => string.Equals(c.Slug, text, StringComparison.OrdinalIgnoreCase)) ?? cats.FirstOrDefault(c => string.Equals(c.Name, text, StringComparison.OrdinalIgnoreCase));
             if (hit is not null) return hit.Slug;
-            var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(text);
+            var slug = PluginText.Slugify(text);
             if (slug.Length == 0 || ShopPublic.ReservedSlugs.Contains(slug)) return "";
             if (!dryRun) await store.AddCategoryAsync(slug, text, cats.Count, ct);
             cats.Add(new Category { Id = -cats.Count - 1, Slug = slug, Name = text });

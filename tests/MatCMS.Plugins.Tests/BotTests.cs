@@ -253,7 +253,10 @@ public class BotTests : IClassFixture<BotFixture>
     public async Task The_widget_is_on_every_page_and_conversations_are_kept_only_when_asked()
     {
         var c = Visitor();
-        Assert.Contains("/js/ai-bot.js?v=", await c.GetStringAsync("/oeffnungszeiten"));
+        Assert.Contains("/plugin-assets/bot/ai-bot.js?v=", await c.GetStringAsync("/oeffnungszeiten"));
+        // The widget is the package's asset now (it left the image with the bot): script and stylesheet are served from the plugin's folder.
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync("/plugin-assets/bot/ai-bot.js")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync("/plugin-assets/bot/ai-bot.css")).StatusCode);
         var config = (JsonObject)JsonNode.Parse(await c.GetStringAsync("/ai-bot/config?lang=de"))!;
         Assert.True(config["on"]!.GetValue<bool>());
         Assert.True(config["bubble"]!.GetValue<bool>());

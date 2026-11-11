@@ -63,7 +63,7 @@ internal sealed partial class ShopStore
     /// <summary>A free slug for a new brand made from <paramref name="wanted"/> (a name or an address): "-2", "-3" … when it is taken. Empty when nothing usable is left.</summary>
     public async Task<string> FreeBrandSlugAsync(string wanted, CancellationToken ct = default)
     {
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(wanted);
+        var slug = PluginText.Slugify(wanted);
         if (slug.Length == 0) return "";
         var baseSlug = slug; var n = 2;
         while (await T("brands").FindByAsync("slug", slug, ct) is not null) slug = baseSlug + "-" + n++;
@@ -81,7 +81,7 @@ internal sealed partial class ShopStore
         if (await BrandBySlugAsync(t, ct) is { } bySlug) return bySlug;
         var all = await BrandsAsync(false, ct);
         if (all.FirstOrDefault(b => string.Equals(b.Name, t, StringComparison.OrdinalIgnoreCase)) is { } byName) return byName;
-        if (all.FirstOrDefault(b => b.Slug == MatCMS.Pages.Admin.Pages.IndexModel.Slugify(t)) is { } bySlugOfName) return bySlugOfName;
+        if (all.FirstOrDefault(b => b.Slug == PluginText.Slugify(t)) is { } bySlugOfName) return bySlugOfName;
         if (!create) return null;
         var slug = await FreeBrandSlugAsync(t, ct);
         if (slug.Length == 0) return null;

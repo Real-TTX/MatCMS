@@ -9,6 +9,8 @@
 
     var script = document.currentScript;
     var vm = script && /[?&]v=([^&]+)/.exec(script.src), version = vm ? vm[1] : "1";
+    // The stylesheet is the plugin asset next to this script (/plugin-assets/bot/ai-bot.css).
+    var cssUrl = (script && script.src ? script.src.replace(/ai-bot\.js(\?.*)?$/, "ai-bot.css") : "/plugin-assets/bot/ai-bot.css") + "?v=" + version;
     var lang = (document.documentElement.getAttribute("lang") || "de").slice(0, 2).toLowerCase();
     var KEY = "matbot";
     var cfg = null, state = load(), panels = [], busy = false;
@@ -202,7 +204,7 @@
                 if (!c || !c.t) return;
                 cfg = c;
                 if (!cfg.bubble && inline.length === 0) return;
-                var css = document.createElement("link"); css.rel = "stylesheet"; css.href = "/css/ai-bot.css?v=" + version; document.head.appendChild(css);
+                var css = document.createElement("link"); css.rel = "stylesheet"; css.href = cssUrl; document.head.appendChild(css);
                 if (cfg.color) document.documentElement.style.setProperty("--mb-c", cfg.color);
                 inline.forEach(function (host) { host.appendChild(buildPanel(false).root); });
                 if (cfg.bubble && cfg.on) mountBubble();

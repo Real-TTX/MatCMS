@@ -1,0 +1,6 @@
+{
+  "Key": "bot",
+  "Name": "KI-Bot",
+  "Version": "2.0",
+  "Description": "Chat-Assistent für Besucher: antwortet aus den Inhalten der Website und angemeldeten Kunden zu ihren eigenen Bestellungen. Name, Aussehen, Einwilligung und Token-Grenzen einstellbar; nutzt die KI-Verbindung der Website. Natives Plugin aus dem MatCMS Store (signiert: läuft ohne „Native Plugins erlauben“)."
+}

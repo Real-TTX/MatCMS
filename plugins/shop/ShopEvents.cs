@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -104,7 +103,7 @@ internal static class ShopEvents
         if (o["price_cents"] is JsonValue pc && pc.TryGetValue<long>(out var c)) cents = c;
         else if (!Money.TryParse(o["price"]?.ToString(), out cents)) return Answer("failed", "Der Preis fehlt (price_cents oder price).");
         if (cents < 0) return Answer("failed", "Der Preis darf nicht negativ sein.");
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(o["slug"]?.GetValue<string>() ?? title);
+        var slug = PluginText.Slugify(o["slug"]?.GetValue<string>() ?? title);
         if (slug.Length == 0 || ShopPublic.ReservedSlugs.Contains(slug)) slug = "produkt-" + Guid.NewGuid().ToString("N")[..6];
         var store = new ShopStore(ctx.Data);
         if (await store.ProductBySlugAsync(slug, ct) is not null) return Answer("skipped-exists", $"Es gibt schon ein Produkt „{slug}“.");
@@ -114,7 +113,7 @@ internal static class ShopEvents
         var category = "";
         if ((o["category"]?.GetValue<string>() ?? "").Trim() is { Length: > 0 } catName)
         {
-            var catSlug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(catName);
+            var catSlug = PluginText.Slugify(catName);
             if (catSlug.Length > 0)
             {
                 if (await store.CategoryBySlugAsync(catSlug, ct) is null) await store.AddCategoryAsync(catSlug, catName, (await store.CategoriesAsync(ct)).Count, ct);
@@ -130,7 +129,7 @@ internal static class ShopEvents
         var newId = await store.SaveProductAsync(new Product
         {
             Category = category, Brand = brand, Tags = ShopTags.Normalise(tags), Featured = o["featured"] is JsonValue fv && fv.TryGetValue<bool>(out var feat) && feat,
-            Slug = slug, Title = title, Summary = (o["summary"]?.GetValue<string>() ?? "").Trim(), DescriptionHtml = SafeHtml.Sanitize(o["description_html"]?.GetValue<string>()),
+            Slug = slug, Title = title, Summary = (o["summary"]?.GetValue<string>() ?? "").Trim(), DescriptionHtml = ctx.Site.SanitizeHtml(o["description_html"]?.GetValue<string>()),
             Kind = ProductKind.Normalise(o["kind"]?.GetValue<string>()), PriceCents = cents, CompareCents = compare > cents ? compare : 0, TaxBp = bp, Sku = o["sku"]?.GetValue<string>() ?? "",
             TrackStock = stock is not null, Stock = stock ?? 0, Active = o["publish"]?.GetValue<bool>() ?? true
         }, ct);
@@ -173,7 +172,7 @@ internal static class ShopEvents
         var category = "";
         if ((o["category"]?.GetValue<string>() ?? "").Trim() is { Length: > 0 } cat)
         {
-            var catSlug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(cat);
+            var catSlug = PluginText.Slugify(cat);
             if (await store.CategoryBySlugAsync(catSlug, ct) is null) return Answer("failed", $"Die Kategorie „{cat}“ gibt es nicht.");
             category = catSlug;
         }

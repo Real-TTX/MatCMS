@@ -1301,6 +1301,28 @@ public class ContentTransferService
                     n++;
                     continue;
                 }
+                // A plugin that LEFT the image (shop, bot): a backup from before brings its on/off and settings, never code. Onto the store's
+                // package if it is here already; otherwise into a "builtin" row that waits for the package (Admin → Plugins says so) and hands
+                // both over when the signed package is imported.
+                if (!signedNative && MatCMS.Services.Plugins.BuiltInPlugins.IsFormerKey(key))
+                {
+                    if (row is not null && PluginKind.Normalize(row.Kind) is not (PluginKind.BuiltIn or PluginKind.Native)) continue;
+                    if (row is null)
+                    {
+                        row = new Models.Plugin
+                        {
+                            Key = key.ToLowerInvariant(), Name = string.IsNullOrWhiteSpace(p.Name) ? key : p.Name!, Description = p.Description ?? "", Version = p.Version ?? "",
+                            Kind = PluginKind.BuiltIn, Enabled = false, FilesJson = "{}"
+                        };
+                        _db.Plugins.Add(row);
+                        existingPlugins.Add(row);
+                    }
+                    if (p.Enabled is bool formerOn) row.Enabled = formerOn;
+                    row.ConfigJson = string.IsNullOrWhiteSpace(p.ConfigJson) ? "{}" : p.ConfigJson!;
+                    if (row.Enabled) enabled++;
+                    n++;
+                    continue;
+                }
                 if (row is null)
                 {
                     row = new Models.Plugin { Key = key, Enabled = false, CreatedAt = p.CreatedAt == default ? DateTime.UtcNow : p.CreatedAt };

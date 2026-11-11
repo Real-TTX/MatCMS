@@ -31,6 +31,12 @@
     <ProjectReference Include="..\..\plugins\moments\Moments.csproj" ReferenceOutputAssembly="false" Private="false" />
     <!-- Holiday homes (plugins/booking), native: BookingTests run it inside the whole application. -->
     <ProjectReference Include="..\..\plugins\booking\Booking.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- The shop and the AI bot (plugins/shop, plugins/bot), native since they left the image: AppFactory installs both (signed with the test key, off)
+         into every application, as a site that has them from the store. The tests ALSO compile against them — their store, model and pure rules —
+         so the test assembly has its own copy next to the one the application loads; a seam a test sets must therefore not live in a static field
+         of the plugin (StripeClient.HandlerFactory keeps it in AppContext). -->
+    <ProjectReference Include="..\..\plugins\shop\Shop.csproj" />
+    <ProjectReference Include="..\..\plugins\bot\Bot.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -71,6 +77,14 @@
       <BookingFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\booking\bin\$(Configuration)\net10.0\Booking.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(BookingFiles)" DestinationFolder="$(OutDir)fixtures\booking" />
+    <ItemGroup>
+      <ShopFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\shop\bin\$(Configuration)\net10.0\Shop.dll" />
+      <BotFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\bot\bin\$(Configuration)\net10.0\Bot.dll" />
+      <BotAssets Include="$(MSBuildProjectDirectory)\..\..\plugins\bot\assets\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ShopFiles)" DestinationFolder="$(OutDir)fixtures\shop" />
+    <Copy SourceFiles="@(BotFiles)" DestinationFolder="$(OutDir)fixtures\bot" />
+    <Copy SourceFiles="@(BotAssets)" DestinationFolder="$(OutDir)fixtures\bot\assets" />
   </Target>
 
 </Project>

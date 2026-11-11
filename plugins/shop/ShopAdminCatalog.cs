@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -122,14 +121,14 @@ internal static class ShopAdminCatalog
                         if (options.Count == 0) error = ctx.T("shop.adm.var.errNoOptions");
                         else if (!ShopVariants.AddMissing(variantRows, ShopVariants.Combinations(options), out created)) error = ctx.T("shop.adm.var.errMany", ShopVariants.MaxVariants);
                     }
-                    postedTranslations = ShopAdminTranslations.Read(f, otherLocales);
+                    postedTranslations = ShopAdminTranslations.Read(ctx, f, otherLocales);
                     translations = postedTranslations;
                     // The further categories ticked in the form (the main one is never also a further one).
                     var extra = string.Join(",", allCats.Where(c => f.Form.ContainsKey("xcat_" + c.Slug) && c.Slug != read.Category).Select(c => c.Slug));
                     product = read with { VariantOptions = ShopVariants.OptionsToJson(options), ExtraCategories = extra };
                     if (error is null)
                     {
-                        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? f.F("title") : f.F("slug"));
+                        var slug = PluginText.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? f.F("title") : f.F("slug"));
                         if (string.IsNullOrWhiteSpace(slug)) slug = "produkt";
                         if (ShopPublic.ReservedSlugs.Contains(slug)) slug += "-1";
                         var baseSlug = slug; var n = 2;
@@ -292,10 +291,10 @@ internal static class ShopAdminCatalog
         var kind = ProductKind.Normalise(f.F("kind"));
         return current with
         {
-            Title = f.F("title").Trim(), Summary = f.F("summary").Trim(), DescriptionHtml = SafeHtml.Sanitize(f.F("description")), Image = ShopPublic.SafeUrl(f.F("image")),
+            Title = f.F("title").Trim(), Summary = f.F("summary").Trim(), DescriptionHtml = ctx.Site.SanitizeHtml(f.F("description")), Image = ShopPublic.SafeUrl(f.F("image")),
             ImageFocus = f.Form.ContainsKey("image_focus") ? ShopImages.Clean(f.F("image_focus")) : current.ImageFocus,
             GalleryJson = CleanGallery(f.F("gallery")), Kind = kind, PriceCents = Math.Max(0, price), CompareCents = Math.Max(0, compare), TaxBp = bp, Sku = f.F("sku").Trim(), Category = f.F("category").Trim(),
-            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"), Brand = f.Form.ContainsKey("brand") ? MatCMS.Pages.Admin.Pages.IndexModel.Slugify(f.F("brand")) : current.Brand,
+            Tags = ShopTags.Normalise(f.F("tags")), Featured = f.Form.ContainsKey("featured"), Brand = f.Form.ContainsKey("brand") ? PluginText.Slugify(f.F("brand")) : current.Brand,
             SeoTitle = Clip(f.F("seo_title").Trim(), 120), SeoDescription = Clip(f.F("seo_description").Trim(), 320),
             TrackStock = f.Form.ContainsKey("track_stock"), PickupOnly = kind != ProductKind.Digital && f.Form.ContainsKey("pickup_only"),
             Stock = Num("stock"), WeightGrams = kind == ProductKind.Digital ? 0 : (int)Math.Min(Num("weight"), int.MaxValue), MaxPerOrder = (int)Math.Min(Num("max"), 100000), Sort = (int)Math.Min(Num("sort"), 100000),
@@ -447,7 +446,7 @@ internal static class ShopAdminCatalog
             if (name.Length == 0) error = ctx.T("shop.adm.errCategoryName");
             else if (id == 0)
             {
-                var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? name : f.F("slug"));
+                var slug = PluginText.Slugify(string.IsNullOrWhiteSpace(f.F("slug")) ? name : f.F("slug"));
                 if (string.IsNullOrWhiteSpace(slug)) slug = "kategorie";
                 if (ShopPublic.ReservedSlugs.Contains(slug)) slug += "-1";
                 var baseSlug = slug; var n = 2;

@@ -400,7 +400,7 @@ public sealed partial class AssistantTools
         Compiled(code, files, mapping);
         var baseKey = Pages.Admin.Pages.IndexModel.Slugify(name) is { Length: > 0 } k ? k : "plugin";
         var key = baseKey;
-        for (var n = 2; await _db.Plugins.AnyAsync(p => p.Key == key, ct) || MatCMS.Services.Plugins.BuiltInPlugins.Find(key) is not null; n++) key = baseKey + "-" + n;
+        for (var n = 2; await _db.Plugins.AnyAsync(p => p.Key == key, ct) || MatCMS.Services.Plugins.BuiltInPlugins.IsBuiltInKey(key); n++) key = baseKey + "-" + n;
         var plugin = new Models.Plugin { Name = Cap(name, 120), Key = key, Description = Cap(Str(args["description"]).Trim(), 1000), Code = code, FilesJson = files, MappingJson = mapping, Enabled = false, Version = "1.0" };
         _db.Plugins.Add(plugin);
         await _db.SaveChangesAsync(ct);

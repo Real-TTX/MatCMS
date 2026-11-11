@@ -167,7 +167,7 @@ internal static class ShopOps
         var store = new ShopStore(ctx.Data);
         var name = Str(o, "name");
         if (name.Length == 0) return Answer("failed", "Eine Eigenschaft braucht einen Namen.");
-        var slug = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(Str(o, "slug").Length > 0 ? Str(o, "slug") : name);
+        var slug = PluginText.Slugify(Str(o, "slug").Length > 0 ? Str(o, "slug") : name);
         if (slug.Length == 0) return Answer("failed", "Aus dem Namen lässt sich keine Adresse ableiten.");
         if (await store.AttributeBySlugAsync(slug, ct) is not null) return Answer("skipped-exists", $"Es gibt schon eine Eigenschaft „{slug}“.");
         var kind = AttributeKind.Normalise(Str(o, "kind"));
@@ -176,7 +176,7 @@ internal static class ShopOps
         if (category.Length > 0)
         {
             var named = category;
-            category = MatCMS.Pages.Admin.Pages.IndexModel.Slugify(category);
+            category = PluginText.Slugify(category);
             if (await store.CategoryBySlugAsync(category, ct) is null) return Answer("failed", $"Die Kategorie „{named}“ gibt es nicht.");
         }
         if (kind == AttributeKind.Choice && ShopAttributes.SplitOptions(options).Count == 0) return Answer("failed", "Eine Auswahl-Eigenschaft braucht options.");
@@ -201,7 +201,7 @@ internal static class ShopOps
         var notes = new List<string>(); var set = 0;
         foreach (var (key, node) in values)
         {
-            if (await store.AttributeBySlugAsync(MatCMS.Pages.Admin.Pages.IndexModel.Slugify(key), ct) is not { } attr) { notes.Add($"„{key}“ ist keine Eigenschaft"); continue; }
+            if (await store.AttributeBySlugAsync(PluginText.Slugify(key), ct) is not { } attr) { notes.Add($"„{key}“ ist keine Eigenschaft"); continue; }
             if (!ShopAttributes.AppliesTo(attr, cats, product.Category)) { notes.Add($"„{attr.Slug}“ gilt nicht für die Kategorie des Produkts"); continue; }
             string? text = node switch
             {

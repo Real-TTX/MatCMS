@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using MatCMS.Plugin;
-using MatCMS.Services;
 
 namespace MatCMS.Plugin.Shop;
 
@@ -18,15 +17,15 @@ internal static class ShopBotData
 
     public static async Task<JsonNode?> SearchAsync(IPluginContext ctx, JsonNode? payload, CancellationToken ct)
     {
-        var terms = SiteSearch.Terms(payload?["q"]?.GetValue<string>() ?? "");
+        var terms = ShopSearchText.Terms(payload?["q"]?.GetValue<string>() ?? "");
         if (terms.Count == 0) return null;
         var max = Math.Clamp(payload?["max"] is JsonValue m && m.TryGetValue<int>(out var n) ? n : 5, 1, 20);
         var cfg = ShopConfig.From(ctx.Settings);
         var (products, _) = await ShopStore.Public(ctx).FindProductsAsync(new ProductQuery { ActiveOnly = true, Take = 2000 }, ct);
         var items = new JsonArray();
         foreach (var x in products
-                     .Select(p => (P: p, Text: SiteSearch.Plain(p.Summary + " " + p.DescriptionHtml + " " + p.Sku + " " + p.Category)))
-                     .Select(x => (x.P, x.Text, Score: SiteSearch.Score(x.P.Title.ToLowerInvariant(), x.Text.ToLowerInvariant(), terms)))
+                     .Select(p => (P: p, Text: ShopSearchText.Plain(p.Summary + " " + p.DescriptionHtml + " " + p.Sku + " " + p.Category)))
+                     .Select(x => (x.P, x.Text, Score: ShopSearchText.Score(x.P.Title.ToLowerInvariant(), x.Text.ToLowerInvariant(), terms)))
                      .Where(x => x.Score > 0).OrderByDescending(x => x.Score).Take(max))
         {
             var p = x.P;
@@ -36,7 +35,7 @@ internal static class ShopBotData
             items.Add(new JsonObject
             {
                 ["title"] = p.Title, ["url"] = ShopUrls.Product(p.Slug), ["score"] = x.Score, ["kind"] = ctx.T("shop.bot.kind"),
-                ["text"] = facts + ". " + SiteSearch.ExcerptOf(System.Text.RegularExpressions.Regex.Replace(x.Text, @"\s+", " ").Trim(), terms)
+                ["text"] = facts + ". " + ShopSearchText.ExcerptOf(System.Text.RegularExpressions.Regex.Replace(x.Text, @"\s+", " ").Trim(), terms)
             });
         }
         return items.Count == 0 ? null : new JsonObject { ["items"] = items };

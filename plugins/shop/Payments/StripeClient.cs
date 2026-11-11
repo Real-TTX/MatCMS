@@ -22,8 +22,13 @@ internal sealed class StripeClient
     /// <summary>The API address. A test points it at a fake.</summary>
     public static string ApiBase { get; set; } = "https://api.stripe.com";
 
-    /// <summary>Gives the message handler to use instead of a real connection (tests only).</summary>
-    public static Func<HttpMessageHandler>? HandlerFactory { get; set; }
+    /// <summary>Gives the message handler to use instead of a real connection (tests only). Kept in <see cref="AppContext"/>, not in a field: the
+    /// application loads its OWN copy of this assembly, a test sets the seam on the copy it was compiled against — both read the one process-wide slot.</summary>
+    public static Func<HttpMessageHandler>? HandlerFactory
+    {
+        get => AppContext.GetData("MatCMS.Plugin.Shop.StripeHandler") as Func<HttpMessageHandler>;
+        set => AppContext.SetData("MatCMS.Plugin.Shop.StripeHandler", value);
+    }
 
     private static readonly HttpClient Shared = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }) { Timeout = TimeSpan.FromSeconds(30) };
     private readonly string _key;

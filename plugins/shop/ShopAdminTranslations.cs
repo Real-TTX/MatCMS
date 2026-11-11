@@ -16,11 +16,11 @@ internal static class ShopAdminTranslations
     }
 
     /// <summary>What the form posted, by language (empty ones are kept so a translation can be cleared).</summary>
-    public static Dictionary<string, Translation> Read(RequestData f, IEnumerable<string> locales)
+    public static Dictionary<string, Translation> Read(IPluginContext ctx, RequestData f, IEnumerable<string> locales)
     {
         var map = new Dictionary<string, Translation>(StringComparer.OrdinalIgnoreCase);
         foreach (var l in locales)
-            map[l] = new Translation(f.F($"tr_{l}_title").Trim(), f.F($"tr_{l}_summary").Trim(), MatCMS.Services.SafeHtml.Sanitize(f.F($"tr_{l}_description")), f.F($"tr_{l}_seo_title").Trim(), f.F($"tr_{l}_seo_description").Trim());
+            map[l] = new Translation(f.F($"tr_{l}_title").Trim(), f.F($"tr_{l}_summary").Trim(), ctx.Site.SanitizeHtml(f.F($"tr_{l}_description")), f.F($"tr_{l}_seo_title").Trim(), f.F($"tr_{l}_seo_description").Trim());
         return map;
     }
 

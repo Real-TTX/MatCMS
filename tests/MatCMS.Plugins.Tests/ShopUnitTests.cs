@@ -255,7 +255,9 @@ public class ShopUnitTests
     {
         var have = ShopStrings.All.Select(r => r.Key).ToHashSet();
         var used = new HashSet<string>();
-        foreach (var file in Directory.GetFiles(Path.Combine(RepoRoot(), "src", "MatCMS", "Plugin", "Shop"), "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ShopStrings.cs")))
+        var shop = Path.Combine(RepoRoot(), "plugins", "shop");
+        bool Built(string f) => Path.GetRelativePath(shop, f).Split(Path.DirectorySeparatorChar)[0] is "bin" or "obj";
+        foreach (var file in Directory.GetFiles(shop, "*.cs", SearchOption.AllDirectories).Where(f => !f.EndsWith("ShopStrings.cs") && !Built(f)))
         {
             var text = File.ReadAllText(file);
             // (In the ShopStore files, T(...) is the table accessor, not a text.)

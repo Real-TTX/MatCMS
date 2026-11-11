@@ -17,8 +17,13 @@ internal static class ShopReminders
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(14);
     public const int PerRun = 25;
 
-    /// <summary>Takes the place of the real mail send (tests only): to, values, items.</summary>
-    internal static Func<string, IReadOnlyDictionary<string, string>, IReadOnlyList<IReadOnlyDictionary<string, string>>, Task<MailResult>>? MailSender { get; set; }
+    /// <summary>Takes the place of the real mail send (tests only): to, values, items. Kept in <see cref="AppContext"/> for the same reason as
+    /// <see cref="StripeClient.HandlerFactory"/>: the test and the application each have their own copy of this assembly.</summary>
+    internal static Func<string, IReadOnlyDictionary<string, string>, IReadOnlyList<IReadOnlyDictionary<string, string>>, Task<MailResult>>? MailSender
+    {
+        get => AppContext.GetData("MatCMS.Plugin.Shop.ReminderMail") as Func<string, IReadOnlyDictionary<string, string>, IReadOnlyList<IReadOnlyDictionary<string, string>>, Task<MailResult>>;
+        set => AppContext.SetData("MatCMS.Plugin.Shop.ReminderMail", value);
+    }
 
     private static readonly MailLoop ItemsLoop = new("items", "Einmal je Artikel im Warenkorb",
         new MailPlaceholder[] { new("title", "Name des Artikels (mit Variante)"), new("qty", "Menge"), new("line", "Zeilensumme") });

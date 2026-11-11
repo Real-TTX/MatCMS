@@ -19,8 +19,13 @@ internal sealed class PayPalException(string message, int status, string code) :
 /// </summary>
 internal sealed class PayPalClient
 {
-    /// <summary>Gives the message handler to use instead of a real connection (tests only).</summary>
-    public static Func<HttpMessageHandler>? HandlerFactory { get; set; }
+    /// <summary>Gives the message handler to use instead of a real connection (tests only). Kept in <see cref="AppContext"/> for the same reason
+    /// as <see cref="StripeClient.HandlerFactory"/>: the test and the application each have their own copy of this assembly.</summary>
+    public static Func<HttpMessageHandler>? HandlerFactory
+    {
+        get => AppContext.GetData("MatCMS.Plugin.Shop.PayPalHandler") as Func<HttpMessageHandler>;
+        set => AppContext.SetData("MatCMS.Plugin.Shop.PayPalHandler", value);
+    }
 
     private static readonly HttpClient Shared = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }) { Timeout = TimeSpan.FromSeconds(30) };
 

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The AI bot as a NATIVE plugin. It used to be compiled into the CMS (docs/builtin-extraction.md); signed by the MatCMS Store it runs
+       without "Native Plugins erlauben" and takes the place of the old built-in row — key "bot": on/off, settings and the tables p_bot_*
+       carry over. The settings below keep it loadable and unloadable (docs/plugin-system-v2.md, section 7). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>MatCMS.Plugin.Bot</RootNamespace>
+    <AssemblyName>Bot</AssemblyName>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- assets/ (the widget's script and stylesheet, served at /plugin-assets/bot/) is packed by pack-native.ps1, not compiled. -->
+    <None Remove="assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tests use the bot's own types next to the copy the application loads. -->
+    <InternalsVisibleTo Include="MatCMS.Plugins.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

@@ -15,7 +15,22 @@ internal static class ShopCoupons
 
     /// <summary>A code like SOMMER10 can be guessed. Wrong tries are counted per address; after ten in ten minutes the address is told to wait (the route's own limit is far too loose for this).</summary>
     private const int MaxFailures = 10;
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)> Attempts = new();
+    // Kept process-wide in AppContext (framework types only, so nothing of the plugin is held): a reload of the shop — a new copy of this assembly —
+    // must not hand a guesser ten fresh tries, and a test resets the count through its own copy.
+    private static System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)> Attempts =>
+        AppContext.GetData(AttemptsSlot) as System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)> ?? NewAttempts();
+    private const string AttemptsSlot = "MatCMS.Plugin.Shop.CouponAttempts";
+    private static readonly object AttemptsGate = new();
+    private static System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)> NewAttempts()
+    {
+        lock (AttemptsGate)
+        {
+            if (AppContext.GetData(AttemptsSlot) is System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)> known) return known;
+            var made = new System.Collections.Concurrent.ConcurrentDictionary<string, (long Window, int Fails)>();
+            AppContext.SetData(AttemptsSlot, made);
+            return made;
+        }
+    }
     private static long Window() => DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 600;
 
     public static bool AttemptAllowed(string client) => !Attempts.TryGetValue(client, out var a) || a.Window != Window() || a.Fails < MaxFailures;

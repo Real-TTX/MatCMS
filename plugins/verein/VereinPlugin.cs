@@ -27,6 +27,7 @@ public sealed class VereinPlugin : IPlugin
         VereinMenu.Configure(b);
         VereinIcal.Configure(b);
         VereinEvents.Configure(b);
+        VereinPages.Register(b);
 
         b.Block(new BlockSpec(EventsBlock, "verein.block.name", "verein.block.description")
         {

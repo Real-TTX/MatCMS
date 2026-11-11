@@ -260,5 +260,30 @@ public static class VereinCss
 .vm .vm-grid2>*,.vm .vm-row2>*,.vm .vm-people>*,.vm .vm-main>*{min-width:0}
 .vm .vm-facts dd,.vm .vm-person-more a{overflow-wrap:break-word;min-width:0}
 .vm .vm-reply h3{margin-top:22px}
+/* the calendar (/mitglied/kalender): a month grid on a wide screen, the list on a phone — both from the site's own variables */
+.vm .vm-cal{display:grid;gap:16px}
+.vm .vm-cal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.vm .vm-cal-nav{display:flex;align-items:center;gap:8px}.vm .vm-cal-nav h2{margin:0 6px;font-size:1.35rem;min-width:9em;text-align:center}
+.vm .vm-cal-grid{border:1px solid var(--vm-line);border-radius:14px;overflow:hidden;background:#fff}
+.vm .vm-cal-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.vm .vm-cal-row+.vm-cal-row{border-top:1px solid var(--vm-line)}
+.vm .vm-cal-dow span{padding:8px;font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--vm-muted);text-align:center;background:var(--vm-soft)}
+.vm .vm-cal-day{min-height:96px;padding:6px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.vm .vm-cal-day+.vm-cal-day{border-left:1px solid var(--vm-line)}
+.vm .vm-cal-day.out{background:var(--vm-soft)}.vm .vm-cal-day.out .vm-cal-num{opacity:.5}
+.vm .vm-cal-num{font-size:13px;font-weight:700;width:26px;height:26px;display:grid;place-items:center;border-radius:50%}
+.vm .vm-cal-day.today .vm-cal-num{background:var(--vm-accent);color:#fff}
+.vm .vm-cal-item{display:block;font-size:12.5px;line-height:1.3;padding:3px 6px;border-radius:7px;text-decoration:none;color:inherit;background:color-mix(in srgb,var(--vm-accent) 10%,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vm .vm-cal-item:hover{background:color-mix(in srgb,var(--vm-accent) 18%,#fff)}
+.vm .vm-cal-item .ti{color:var(--vm-accent)}
+.vm .vm-cal-item.t-sitzungen{background:var(--vm-soft)}
+.vm .vm-cal-item.t-geburtstage,.vm .vm-cal-item.t-eintritte{background:transparent;border:1px dashed var(--vm-line)}
+.vm .vm-cal-item.is-round{border-color:var(--vm-accent);font-weight:600}
+.vm .vm-cal-item.is-cancelled{text-decoration:line-through;opacity:.65}
+.vm .vm-cal-list:not(.is-list){display:none}
+.vm .vm-agenda-text .ti{color:var(--vm-accent)}
+@media (max-width:700px){.vm .vm-cal-grid{display:none}.vm .vm-cal-list:not(.is-list){display:block}.vm .vm-cal-nav h2{min-width:0;font-size:1.15rem}}
+/* a piece of the member area placed by the block "Verein: Baustein" on a page the editors laid out */
+.vm.verein-slot{display:grid;gap:18px}
 """;
 }

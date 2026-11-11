@@ -1,6 +1,6 @@
 {
   "Key": "verein",
   "Name": "Verein",
-  "Version": "1.17",
-  "Description": "Vereinsverwaltung für die Website: Mitglieder mit Rollen (Vorsitz, Kasse, Schriftführung …), ein eigener Mitgliederbereich unter /mitglied, Dokumente zum Bestätigen oder Unterschreiben mit Nachweis (wer, wann, Name, Adresse) – z. B. Datenschutz-Einwilligung oder Bildfreigabe –, E-Mail bei jedem neuen Dokument und Erinnerungen, Sitzungen mit Tagesordnung, Zu-/Absagen und Protokoll, Vorlagen für Dokumente, Tagesordnungen und Protokolle, Bilder und Material, die Mitglieder hochladen, Teilnahme-Abfrage bei Terminen, Profilbilder, PDF-Druck von Dokumenten, Einladungen, Protokollen und Teilnehmerlisten auf dem Briefkopf des Vereins. Natives Plugin (braucht „Native Plugins erlauben“)."
+  "Version": "1.18",
+  "Description": "Vereinsverwaltung für die Website: Mitglieder mit Rollen (Vorsitz, Kasse, Schriftführung …), ein eigener Mitgliederbereich unter /mitglied, Dokumente zum Bestätigen oder Unterschreiben mit Nachweis (wer, wann, Name, Adresse) – z. B. Datenschutz-Einwilligung oder Bildfreigabe –, E-Mail bei jedem neuen Dokument und Erinnerungen, Sitzungen mit Tagesordnung, Zu-/Absagen und Protokoll, Vorlagen für Dokumente, Tagesordnungen und Protokolle, Bilder und Material, die Mitglieder hochladen, Teilnahme-Abfrage bei Terminen, Kalenderansicht (Termine, Sitzungen, Geburtstage, Jubiläen) mit Filter und iCal-Abo, Mitgliederbereich im Block-Editor gestaltbar, Profilbilder, PDF-Druck von Dokumenten, Einladungen, Protokollen und Teilnehmerlisten auf dem Briefkopf des Vereins. Natives Plugin (braucht „Native Plugins erlauben“)."
 }

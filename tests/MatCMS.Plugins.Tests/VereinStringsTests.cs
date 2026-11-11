@@ -74,7 +74,7 @@ public class VereinLanguageTests : IClassFixture<VereinApp>
         Assert.DoesNotContain("\"verein.", en);
         // every main page of the section: no raw key and none of the German words the pages used to carry
         foreach (var url in new[] { "members", "members/new", "children/new", "docs", "docs/new", "meetings", "meetings/new", "events", "events/new",
-                     "events/export", "events/export?tab=kalender", "events/export?tab=instagram", "uploads", "templates" })
+                     "events/export", "events/export?tab=kalender", "events/export?tab=instagram", "uploads", "templates", "calendar", "calendar?typ=geburtstage" })
         {
             var page = System.Net.WebUtility.HtmlDecode(await c.GetStringAsync("/admin/p/verein/" + url));
             Assert.DoesNotMatch(@"[>""]verein\.[a-z]", page.Replace("group=verein.", ""));

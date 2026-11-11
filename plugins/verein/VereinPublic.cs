@@ -8,7 +8,7 @@ namespace MatCMS.Plugin.Verein;
 /// of the area sends a visitor who is not signed in back to /mitglied — never to the site's general sign-in page. Only accounts the club has a record
 /// for (and has not switched off) get in. Everything a person typed is encoded on output.
 /// </summary>
-public static class VereinPublic
+public static partial class VereinPublic
 {
     public const string Base = "/mitglied";
 
@@ -24,6 +24,7 @@ public static class VereinPublic
         b.Route(Base + "/dokumente/{id}/pdf", DocPdfAsync, read);
         b.Route(Base + "/termine", DatesAsync, form);         // form: its list answers "Dabei" / "Nicht dabei" with the token of this page
         b.Route(Base + "/termine/{id}", EventAsync, form);
+        b.Route(Base + "/kalender", CalendarAsync, read);
         b.Route(Base + "/sitzungen/{id}", MeetingAsync, form);
         b.Route(Base + "/sitzungen/{id}/pdf", MeetingPdfAsync, read);
         b.Route(Base + "/dateien", FilesAsync, form);
@@ -70,8 +71,10 @@ public static class VereinPublic
 
     // ---- page frame ---------------------------------------------------------------------------------------------
 
-    private static PluginResult Bare(IPluginContext ctx, string body, string title) =>
-        PluginResult.Page("<style>" + VereinCss.Css + "</style><section class=\"section vm\"><div class=\"container\">" + body + "</div></section>", title);
+    private static PluginResult Bare(IPluginContext ctx, string body, string title) => PluginResult.Page(Frame(body), title);
+
+    /// <summary>The member area's band around a page's content — what every page was before the block editor, and what <c>page_html</c> still is.</summary>
+    private static string Frame(string body) => "<style>" + VereinCss.Css + "</style><section class=\"section vm\"><div class=\"container\">" + body + "</div></section>";
 
     private static string LogoutForm(IPluginContext ctx) =>
         "<form method=\"post\" action=\"/anmelden?handler=Logout\" class=\"vm-logout\">" + ctx.Antiforgery +
@@ -81,14 +84,31 @@ public static class VereinPublic
     /// The frame of every member page. Its navigation is the SITE's menu ("Mitglieder" with the pages under it, see <see cref="VereinMenu"/>) — an own
     /// side menu next to it showed every link twice. What is left: where you are, the page's title, who is signed in.
     /// </summary>
-    private static Task<PluginResult> ShellAsync(IPluginContext ctx, Who who, string active, string title, string body, CancellationToken ct)
+    private static async Task<PluginResult> ShellAsync(IPluginContext ctx, Who who, string active, string title, string body, CancellationToken ct)
+    {
+        var p = who.Person;
+        var values = AreaValues(ctx, title, active, p.Name, p.First.Length > 0 ? p.First : p.Name, Initials(p), who.Board,
+            VereinPhoto.Avatar(p, Base + "/foto/" + p.Id, Initials(p), 36), body);
+        // the page the editors laid out in the block editor (Seiten → "Verein – Mitgliederbereich"); none = the frame as it always was
+        var blocks = await VereinPages.RenderAsync(ctx, VereinPages.Area, values, ct);
+        return PluginResult.Page(blocks ?? values["page_html"], title);
+    }
+
+    /// <summary>
+    /// The variables of the member area's page (role <c>area</c>): the words, and the pieces the plugin builds — the head (where you are, the title, who is
+    /// signed in), the page's content, and the whole page exactly as it was before (<c>page_html</c>, the starting layout's one slot).
+    /// </summary>
+    internal static Dictionary<string, string> AreaValues(IPluginContext ctx, string title, string active, string name, string first, string initials, bool board, string avatar, string body)
     {
         var crumb = active == "home" ? V.H(ctx.T("verein.pub.area")) : "<a href=\"" + Base + "\">" + V.H(ctx.T("verein.pub.area")) + "</a>";
-        var html = "<header class=\"vm-head\"><div><p class=\"vm-kicker\">" + crumb + "<span class=\"vm-club\"> · " + V.H(VereinSettings.Club(ctx)) + "</span></p><h1>" + V.H(title) + "</h1></div>" +
-                   "<a class=\"vm-me\" href=\"" + Base + "/profil\" title=\"" + V.H(ctx.T("verein.pub.myProfile")) + "\">" + VereinPhoto.Avatar(who.Person, Base + "/foto/" + who.Person.Id, Initials(who.Person), 36) +
-                   "<span>" + V.H(who.Person.First.Length > 0 ? who.Person.First : who.Person.Name) + "</span></a></header>" +
-                   "<div class=\"vm-main\">" + body + "</div>";
-        return Task.FromResult(Bare(ctx, html, title));
+        var me = "<a class=\"vm-me\" href=\"" + Base + "/profil\" title=\"" + V.H(ctx.T("verein.pub.myProfile")) + "\">" + avatar + "<span>" + V.H(first) + "</span></a>";
+        var head = "<header class=\"vm-head\"><div><p class=\"vm-kicker\">" + crumb + "<span class=\"vm-club\"> · " + V.H(VereinSettings.Club(ctx)) + "</span></p><h1>" + V.H(title) + "</h1></div>" + me + "</header>";
+        var content = "<div class=\"vm-main\">" + body + "</div>";
+        return new Dictionary<string, string>
+        {
+            ["title"] = title, ["page"] = active, ["club"] = VereinSettings.Club(ctx), ["name"] = name, ["first_name"] = first, ["initials"] = initials, ["board"] = board ? "1" : "",
+            ["page_html"] = Frame(head + content), ["head_html"] = head, ["content_html"] = content, ["me_html"] = me
+        };
     }
 
     /// <summary>Sign out from the menu ("Mitglieder → Abmelden"): a plain link, then back to the start page.</summary>
@@ -145,20 +165,36 @@ public static class VereinPublic
 
     // ---- start / sign-in ----------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// The variables of the sign-in page (role <c>signin</c>): the words, the card with the form (<c>form_html</c> — the form stays whole: it posts to the
+    /// site's own sign-in with its token and comes back here) and the whole page exactly as it was before (<c>page_html</c>).
+    /// </summary>
+    internal static Dictionary<string, string> SignInValues(IPluginContext ctx, bool failed)
+    {
+        var intro = ctx.Settings.Get(VereinSettings.LoginIntro);
+        var card = "<div class=\"vm-card vm-login\"><p class=\"vm-kicker\">" + V.H(VereinSettings.Club(ctx)) + "</p><h1>" + V.H(ctx.T("verein.pub.area")) + "</h1>" +
+            (string.IsNullOrWhiteSpace(intro) ? "" : V.Paragraphs(intro)) + (failed ? Err(ctx.T("verein.pub.loginFailed")) : "") +
+            "<form method=\"post\" action=\"/anmelden\" class=\"vm-form\">" + ctx.Antiforgery + "<input type=\"hidden\" name=\"returnUrl\" value=\"" + Base + "\">" +
+            "<label class=\"vm-field\"><span>" + V.H(ctx.T("verein.pub.email")) + "</span><input name=\"username\" type=\"email\" autocomplete=\"username\" required></label>" +
+            "<label class=\"vm-field\"><span>" + V.H(ctx.T("verein.pub.password")) + "</span><input name=\"password\" type=\"password\" autocomplete=\"current-password\" required></label>" +
+            "<label class=\"vm-check\"><input type=\"checkbox\" name=\"remember\" value=\"true\"> <span>" + V.H(ctx.T("verein.pub.remember")) + "</span></label>" +
+            "<button class=\"vm-btn\" type=\"submit\">" + V.H(ctx.T("verein.pub.signIn")) + "</button></form>" +
+            "<p class=\"vm-muted\"><a href=\"/anmelden/vergessen\">" + V.H(ctx.T("verein.pub.forgot")) + "</a></p></div>";
+        return new Dictionary<string, string>
+        {
+            ["title"] = ctx.T("verein.pub.area"), ["club"] = VereinSettings.Club(ctx), ["intro"] = intro ?? "", ["failed"] = failed ? "1" : "",
+            ["page_html"] = Frame(card), ["form_html"] = card
+        };
+    }
+
     private static async Task<PluginResult> HomeAsync(IPluginContext ctx, CancellationToken ct)
     {
         if (ctx.Member is null)
         {
-            var intro = ctx.Settings.Get(VereinSettings.LoginIntro);
-            var failed = ctx.Request.Q("fehler") == "1";
-            return Bare(ctx, "<div class=\"vm-card vm-login\"><p class=\"vm-kicker\">" + V.H(VereinSettings.Club(ctx)) + "</p><h1>" + V.H(ctx.T("verein.pub.area")) + "</h1>" +
-                (string.IsNullOrWhiteSpace(intro) ? "" : V.Paragraphs(intro)) + (failed ? Err(ctx.T("verein.pub.loginFailed")) : "") +
-                "<form method=\"post\" action=\"/anmelden\" class=\"vm-form\">" + ctx.Antiforgery + "<input type=\"hidden\" name=\"returnUrl\" value=\"" + Base + "\">" +
-                "<label class=\"vm-field\"><span>" + V.H(ctx.T("verein.pub.email")) + "</span><input name=\"username\" type=\"email\" autocomplete=\"username\" required></label>" +
-                "<label class=\"vm-field\"><span>" + V.H(ctx.T("verein.pub.password")) + "</span><input name=\"password\" type=\"password\" autocomplete=\"current-password\" required></label>" +
-                "<label class=\"vm-check\"><input type=\"checkbox\" name=\"remember\" value=\"true\"> <span>" + V.H(ctx.T("verein.pub.remember")) + "</span></label>" +
-                "<button class=\"vm-btn\" type=\"submit\">" + V.H(ctx.T("verein.pub.signIn")) + "</button></form>" +
-                "<p class=\"vm-muted\"><a href=\"/anmelden/vergessen\">" + V.H(ctx.T("verein.pub.forgot")) + "</a></p></div>", ctx.T("verein.pub.area"));
+            var values = SignInValues(ctx, ctx.Request.Q("fehler") == "1");
+            // the sign-in page the editors laid out (Seiten → "Verein – Anmeldung"); none = the card as it always was
+            var blocks = await VereinPages.RenderAsync(ctx, VereinPages.SignIn, values, ct);
+            return PluginResult.Page(blocks ?? values["page_html"], ctx.T("verein.pub.area"));
         }
         var (who, deny) = await GateAsync(ctx, ct);
         if (deny is not null) return deny;
@@ -549,6 +585,7 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
                 : m.MinutesStatus == VereinStore.Final ? "<span class=\"vm-badge ok\">" + V.H(ctx.T("verein.pub.minutes")) + "</span>" : "") + "</a>";
 
         var sb = new StringBuilder(Notice(ctx));
+        sb.Append("<p class=\"vm-actions\"><a class=\"vm-btn ghost small\" href=\"").Append(Base).Append("/kalender\"><i class=\"ti ti-calendar-month\" aria-hidden=\"true\"></i> ").Append(V.H(ctx.T("verein.cal.open"))).Append("</a></p>");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-calendar-event\"></i> ").Append(V.H(ctx.T("verein.pub.dates"))).Append("</h2>").Append(await AgendaAsync(ctx, store, who.Person, events, "termine", ct)).Append("</section>");
         sb.Append("<section class=\"vm-card\"><h2><i class=\"ti ti-users-group\"></i> ").Append(V.H(ctx.T("verein.pub.meetings"))).Append("</h2>");
         if (upcoming.Count == 0) sb.Append("<p class=\"vm-muted\">").Append(V.H(ctx.T("verein.pub.noMeeting"))).Append("</p>");

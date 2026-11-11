@@ -47,15 +47,23 @@ public static class StoreApi
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             var (entries, problem) = await matcms.ListAsync(refresh == true, ctx.RequestAborted);
-            return Results.Ok(new { store = await matcms.BaseUrlAsync(ctx.RequestAborted), error = problem, plugins = entries });
+            return Results.Ok(new
+            {
+                store = await matcms.BaseUrlAsync(ctx.RequestAborted), error = problem,
+                plugins = entries.Where(e => e.Group == MatcmsStoreService.GroupPlugin),
+                templates = entries.Where(e => e.Group == MatcmsStoreService.GroupTemplate),
+                components = entries.Where(e => e.Group == MatcmsStoreService.GroupComponent)
+            });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPost("/api/v1/store/matcms/{pluginKey}/take-over", async (HttpContext ctx, string pluginKey, ApiKeyService keys, MatcmsStoreService matcms, bool? replaceOwn) =>
+        app.MapPost("/api/v1/store/matcms/{pluginKey}/take-over", async (HttpContext ctx, string pluginKey, ApiKeyService keys, MatcmsStoreService matcms, bool? replaceOwn, string? kind) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireStore(key!) is { } g) return g;
-            var r = await matcms.ImportAsync(pluginKey, ctx.RequestAborted, replaceOwn == true);
+            // ?kind=template|component takes a template or component over; without it, a plugin (the key alone is not enough: the arrays are separate).
+            var r = await matcms.ImportAsync(pluginKey, ctx.RequestAborted, replaceOwn == true,
+                kind is MatcmsStoreService.GroupTemplate or MatcmsStoreService.GroupComponent ? kind : MatcmsStoreService.GroupPlugin);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message, key = r.Key, version = r.Version })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status422UnprocessableEntity);
         }).RequireRateLimiting("operatorApi");

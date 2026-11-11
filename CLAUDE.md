@@ -246,6 +246,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   **Update hints:** `MatcmsStoreUpdateService` asks the store every 6 h (first after 3 min) into the singleton `MatcmsStoreUpdates` (every catalogue read
   refreshes it too; keys the cloud's store offers are left out); Admin → Plugins shows "Update x im MatCMS Store" + "Aktualisieren" and the dashboard's
   attention list a line — both from memory, never a remote call while a page waits.
+  **Templates and components** come from the store too (Templates/Komponenten → "Weitere durchsuchen", same tabs via `Shared.StoreTabs`): ONE JSON file each —
+  exactly what the editors' "Als JSON exportieren" writes — signed with kind `template`/`component`; the key follows from the content
+  (`MatCMS.Shared/StoreItemPackage.Key`: a template's NAME, a component's TYPE), and `InstallDesignAsync` refuses a file whose name/type does not give
+  the key the store named (it would overwrite another template here). Installed through `Services/DesignImport.cs` — the SAME importer as a pasted
+  JSON (a template is never activated; its tuned parameter values survive an update; a paste still takes them). The store plugin keeps its own copy of
+  the key rule; `MatcmsStoreTests` makes both agree.
   Test seams `MatcmsStoreClient.BaseUrl/HandlerFactory/KeysOverride` (`MatcmsStoreClientTests`).
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its

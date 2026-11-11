@@ -17,6 +17,12 @@ internal static class StoreText
     public static string Cut(string s, int max) => s.Length <= max ? s : s[..max].TrimEnd();
 
     /// <summary>A slug of letters, digits and dashes (umlauts spelled out).</summary>
+    /// <summary>The label key of a package kind: script, native, template, component.</summary>
+    public static string KindKey(string kind) => kind switch
+    {
+        "native" => "store.kind.native", StorePackage.KindTemplate => "store.kind.template", StorePackage.KindComponent => "store.kind.component", _ => "store.kind.script"
+    };
+
     public static string Slug(string s)
     {
         var sb = new StringBuilder();
@@ -71,18 +77,32 @@ internal static class StoreText
     [
         ("store.nav", "MatCMS Store", "MatCMS Store"),
         ("store.menu", "Store", "Store"),
-        ("store.menuHelp", "Der MatCMS Store: Plugins stöbern und suchen.", "The MatCMS Store: browse and search plugins."),
+        ("store.menuHelp", "Der MatCMS Store: Plugins, Templates und Komponenten stöbern und suchen.", "The MatCMS Store: browse and search plugins, templates and components."),
         ("store.links.group", "MatCMS Store", "MatCMS Store"),
         ("store.links.item", "Store: {0}", "Store: {0}"),
         ("store.search.kind", "Store", "Store"),
         ("store.all", "Alle", "All"),
         ("store.kind.script", "Skript", "Script"),
         ("store.kind.native", "Native", "Native"),
+        ("store.kind.template", "Template", "Template"),
+        ("store.kind.component", "Komponente", "Component"),
+        ("store.kind.templates", "Templates", "Templates"),
+        ("store.kind.components", "Komponenten", "Components"),
+        ("store.installTemplate", "So kommt es auf Ihre Website: im Admin unter Templates → „Weiter durchsuchen …“ → „Installieren“ – oder die Datei herunterladen und unter Templates importieren. Aktiv wird es erst, wenn Sie es aktivieren.",
+            "To put it on your website: in the admin, Templates → “Browse further …” → “Install” – or download the file and import it under Templates. It only goes live when you activate it."),
+        ("store.installComponent", "So kommt es auf Ihre Website: im Admin unter Komponenten → „Weiter durchsuchen …“ → „Installieren“ – oder die Datei herunterladen und unter Komponenten importieren.",
+            "To put it on your website: in the admin, Components → “Browse further …” → “Install” – or download the file and import it under Components."),
+        ("store.field.version", "Version (nur Templates und Komponenten)", "Version (templates and components only)"),
+        ("store.field.versionHint", "Ein Plugin-Paket nennt seine Version selbst; ein Template oder eine Komponente (die JSON-Datei aus „Als JSON exportieren“) bekommt sie hier.",
+            "A plugin package names its own version; a template or component (the JSON file from “Export as JSON”) gets it here."),
+        ("store.err.pkgJson", "Die Datei ist weder ein Plugin-Paket noch das JSON eines Templates oder einer Komponente.", "The file is neither a plugin package nor the JSON of a template or component."),
+        ("store.err.pkgNoVersion", "Bitte für ein Template oder eine Komponente eine Version angeben.", "Please give a template or component a version."),
+        ("store.err.kindChanged", "Der Key „{0}“ gehört zu einer anderen Art von Eintrag (Plugin, Template oder Komponente).", "The key “{0}” belongs to another kind of entry (plugin, template or component)."),
         ("store.by", "von", "by"),
         ("store.verified", "geprüfter Herausgeber", "verified publisher"),
         ("store.version", "Version {0}", "Version {0}"),
         ("store.downloads", "{0} Downloads", "{0} downloads"),
-        ("store.submit", "Plugin einreichen", "Submit a plugin"),
+        ("store.submit", "Einreichen", "Submit"),
         ("store.searchPlaceholder", "Im Store suchen …", "Search the store …"),
         ("store.removeTag", "Schlagwort entfernen", "Remove keyword"),
         ("store.empty", "Noch keine Einträge.", "No entries yet."),
@@ -123,8 +143,8 @@ internal static class StoreText
             "Publishers need two-step sign-in (2FA). Please set it up – then you can upload."),
         ("store.set2fa", "2FA einrichten", "Set up 2FA"),
         ("store.upload", "Plugin hochladen", "Upload a plugin"),
-        ("store.uploadIntro", "Ein Paket (.zip, höchstens {0} MB) wie es „Exportieren“ in MatCMS oder pack.ps1 erzeugt. Key und Version stehen im Paket; ein neuer Key legt einen neuen Eintrag an, ein bekannter eine neue Version.",
-            "A package (.zip, at most {0} MB) as MatCMS’s “Export” or pack.ps1 makes it. Key and version are in the package; a new key makes a new entry, a known one a new version."),
+        ("store.uploadIntro", "Ein Plugin-Paket (.zip, höchstens {0} MB) wie es „Exportieren“ in MatCMS oder pack.ps1 erzeugt – oder ein Template bzw. eine Komponente als JSON (aus „Als JSON exportieren“). Key und Version stehen im Paket; ein neuer Key legt einen neuen Eintrag an, ein bekannter eine neue Version.",
+            "A plugin package (.zip, at most {0} MB) as MatCMS’s “Export” or pack.ps1 makes it – or a template or component as JSON (from “Export as JSON”). Key and version are in the package; a new key makes a new entry, a known one a new version."),
         ("store.uploadSend", "Zur Prüfung einreichen", "Submit for review"),
         ("store.newVersion", "Neue Version hochladen", "Upload a new version"),
         ("store.newEntryTexts", "Texte für den Store", "Texts for the store"),
@@ -171,7 +191,7 @@ internal static class StoreText
         ("store.field.website", "Website (optional)", "Website (optional)"),
         ("store.field.about", "Über den Herausgeber", "About the publisher"),
         ("store.field.terms", "Ich habe die Bedingungen für Herausgeber gelesen und stimme ihnen zu.", "I have read and agree to the terms for publishers."),
-        ("store.field.package", "Paket (.zip)", "Package (.zip)"),
+        ("store.field.package", "Paket (.zip) oder Template/Komponente (.json)", "Package (.zip) or template/component (.json)"),
         ("store.field.packageHint", "Skript-Plugins aus MatCMS → Plugins → Exportieren, native mit pack-native.ps1.", "Script plugins from MatCMS → Plugins → Export, native ones with pack-native.ps1."),
         ("store.field.notes", "Was ist neu?", "What is new?"),
         ("store.field.notesHint", "Erscheint bei den Versionen im Store.", "Shown with the versions in the store."),

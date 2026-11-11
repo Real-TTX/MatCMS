@@ -210,7 +210,7 @@
   "store.matcms.page": "Im Store ansehen",
   "store.matcms.take": "Übernehmen",
   "store.matcms.takeUpdate": "Aktualisieren",
-  "store.matcms.help": "Aus {0}. „Übernehmen“ prüft die Signatur gegen die Store-Schlüssel dieser Version und legt das Plugin mit Bildern und Herausgeber in diesen Store; Profile nehmen es dann wie jedes andere. Ein eigener Eintrag mit demselben Key wird nie überschrieben.",
+  "store.matcms.help": "Aus {0}. „Übernehmen“ prüft die Signatur gegen die Store-Schlüssel dieser Version und legt den Eintrag in diesen Store (ein Plugin mit Bildern und Herausgeber); Profile nehmen ihn dann wie jeden anderen. Ein eigener Eintrag mit demselben Key oder Namen wird nur mit „Ersetzen“ überschrieben; wer ein übernommenes Template oder eine Komponente hier bearbeitet, macht es zum eigenen Eintrag.",
   "store.matcms.fromStore": "Aus dem MatCMS Store übernommen, signiert mit dem Store-Schlüssel {0}. Hier wird es nicht bearbeitet – eine neue Version kommt über „Aktualisieren“ im Reiter MatCMS Store. Ein eigenes Paket macht es zu einem eigenen Eintrag.",
   "store.matcms.replace": "Ersetzen",
   "store.matcms.replaceConfirm": "Den eigenen Eintrag „{0}“ ({1}) durch die signierte Version {2} aus dem MatCMS Store ersetzen? Profile, die ihn nutzen, behalten ihn und verteilen die neue Version. Danach wird er hier nicht mehr bearbeitet.",
@@ -1647,5 +1647,8 @@
   "aiprof.saveFirst": "Erst das Profil speichern – danach meldest du dich hier mit dem ChatGPT-Konto an, das es nutzen soll.",
   "aiprof.chatgptAccount": "ChatGPT-Konto dieses Profils",
   "profiles.aiGuideBot": "Chat-Bot für Besucher",
-  "profiles.aiGuideBotPlaceholder": "z. B. Nie Preise nennen, immer auf das Kontaktformular verweisen."
+  "profiles.aiGuideBotPlaceholder": "z. B. Nie Preise nennen, immer auf das Kontaktformular verweisen.",
+  "store.matcms.kindTemplate": "Template",
+  "store.matcms.kindComponent": "Komponente",
+  "store.matcms.ownNoVersion": "eigenes"
 }

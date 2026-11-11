@@ -22,7 +22,7 @@ internal static class StoreApiRoutes
         ["signature"] = v.Status == VersionStatus.Published ? v.Signature : "", ["keyId"] = v.Status == VersionStatus.Published ? v.KeyId : "",
         ["published"] = Iso(v.PublishedAt), ["notes"] = v.Notes, ["status"] = v.Status,
         ["reason"] = v.Status == VersionStatus.Withdrawn ? v.Reason : "",
-        ["download"] = v.Status == VersionStatus.Published ? StoreUrls.Bundle(item.Key, v.Version) : ""
+        ["download"] = v.Status == VersionStatus.Published ? StoreUrls.Package(item.Key, v.Version, v.Kind) : ""
     };
 
     private static async Task<JsonObject> ItemJsonAsync(IPluginContext ctx, StoreDb db, Item item, Publisher? pub, bool allVersions, CancellationToken ct)
@@ -43,8 +43,15 @@ internal static class StoreApiRoutes
             ["page"] = ctx.Site.Origin.TrimEnd('/') + StoreUrls.Item(item.Key), ["images"] = images, ["tags"] = tags, ["license"] = item.License,
             ["homepage"] = StoreText.SafeUrl(item.Homepage), ["downloads"] = item.Downloads,
             ["sha256"] = latest?.Sha256 ?? "", ["size"] = latest?.Size ?? 0, ["signature"] = latest?.Signature ?? "", ["keyId"] = latest?.KeyId ?? "",
-            ["download"] = latest is null ? "" : StoreUrls.Bundle(item.Key, latest.Version)
+            ["download"] = latest is null ? "" : StoreUrls.Package(item.Key, latest.Version, latest.Kind)
         };
+        // A template's look (colours, fonts) and a component's icon, as the package carried them — a showcase draws them, a site never applies them.
+        if (latest is not null && latest.Look.Length > 0 && JsonNode.Parse(latest.Look) is JsonObject look)
+        {
+            o["look"] = look;
+            if (look["accent"] is JsonValue a) o["accentColor"] = a.DeepClone();
+            if (look["icon"] is JsonValue ic) o["icon"] = ic.DeepClone();
+        }
         if (allVersions)
         {
             var arr = new JsonArray();
@@ -61,16 +68,21 @@ internal static class StoreApiRoutes
     {
         var db = new StoreDb(ctx.Data);
         var plugins = new JsonArray();
+        var templates = new JsonArray();
+        var components = new JsonArray();
         foreach (var (item, pub, _) in await StorePages.PublicItemsAsync(db, "", "", "", ct))
-            plugins.Add(await ItemJsonAsync(ctx, db, item, pub, allVersions: false, ct));
+        {
+            var json = await ItemJsonAsync(ctx, db, item, pub, allVersions: false, ct);
+            (StorePackage.Group(item.LatestKind) switch { StorePackage.KindTemplate => templates, StorePackage.KindComponent => components, _ => plugins }).Add(json);
+        }
         var body = new JsonObject
         {
             ["format"] = 1, ["generated"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
             ["store"] = new JsonObject { ["name"] = StoreSettings.StoreTitle(ctx), ["url"] = ctx.Site.Origin.TrimEnd('/') + StoreUrls.Home, ["signatureScheme"] = StoreSig.Scheme },
-            ["plugins"] = plugins, ["templates"] = new JsonArray(), ["components"] = new JsonArray()
+            ["plugins"] = plugins, ["templates"] = templates, ["components"] = components
         };
         // A validator over the content, so a cloud asking every hour mostly gets a 304 from its own cache logic.
-        var etag = "\"" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plugins.ToJsonString())))[..16] + "\"";
+        var etag = "\"" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plugins.ToJsonString() + templates.ToJsonString() + components.ToJsonString())))[..16] + "\"";
         return Json(body, 300).WithHeader("ETag", etag);
     }
 
@@ -93,7 +105,8 @@ internal static class StoreApiRoutes
         var version = (await db.VersionsOfAsync(item.Id, ct)).FirstOrDefault(v => v.Version == ctx.Request.R("version") && v.Status == VersionStatus.Published);
         if (version is null || await ctx.Files.OpenAsync(version.File, ct) is not { } stream) return NotFound();
         await db.CountDownloadAsync(version, ctx.Request.ClientIp, ct);
-        return PluginResult.FromStream(stream, "application/zip", item.Key + "-" + version.Version + ".zip")
+        var json = StorePackage.Group(version.Kind) != "plugin";
+        return PluginResult.FromStream(stream, json ? "application/json" : "application/zip", item.Key + "-" + version.Version + (json ? ".json" : ".zip"))
             .WithHeader("X-Sha256", version.Sha256).WithHeader("Cache-Control", "public, max-age=86400").WithHeader("X-Content-Type-Options", "nosniff");
     }
 

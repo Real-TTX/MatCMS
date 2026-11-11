@@ -25,7 +25,8 @@ internal sealed record Item(long Id, string Key, string Name, string Summary, st
     string Status, string LatestVersion, string LatestKind, long Downloads, DateTime? Created, DateTime? Updated);
 
 internal sealed record PackageVersion(long Id, long ItemId, string Version, string Kind, string Api, string MinCms, long Size, string Sha256, string File,
-    string Signature, string KeyId, string Notes, string Status, string Reason, long Downloads, DateTime? Created, DateTime? PublishedAt, string Files);
+    string Signature, string KeyId, string Notes, string Status, string Reason, long Downloads, DateTime? Created, DateTime? PublishedAt, string Files,
+    string Look = "");
 
 internal sealed record Picture(long Id, long ItemId, string File, string Type, string Caption, long Sort);
 
@@ -57,7 +58,7 @@ internal sealed class StoreDb
             .Int("item_id", required: true).Text("version", required: true).Text("kind", def: "script").Text("api", def: "").Text("min_cms", def: "")
             .Int("size", def: "0").Text("sha256", def: "").Text("file", def: "").Text("signature", def: "").Text("key_id", def: "")
             .Text("notes", def: "").Text("status", def: VersionStatus.Review).Text("reason", def: "").Int("downloads", def: "0")
-            .Timestamp("created").Timestamp("published_at").Text("files", def: "")
+            .Timestamp("created").Timestamp("published_at").Text("files", def: "").Text("look", def: "")
             .UniqueIndex("item_id", "version").Index("status"));
         // One row per (address, version, day) that was counted — a hash, never the address itself; deleted after two days. So a cloud
         // or site that retries, or a script that pulls the same package again and again, counts once a day and the public number means something.
@@ -78,7 +79,7 @@ internal sealed class StoreDb
 
     private static PackageVersion V(DataRow r) => new(r.Id, r.Int("item_id"), r.Text("version"), r.Text("kind"), r.Text("api"), r.Text("min_cms"),
         r.Int("size"), r.Text("sha256"), r.Text("file"), r.Text("signature"), r.Text("key_id"), r.Text("notes"), r.Text("status"), r.Text("reason"),
-        r.Int("downloads"), r.Timestamp("created"), r.Timestamp("published_at"), r.Text("files"));
+        r.Int("downloads"), r.Timestamp("created"), r.Timestamp("published_at"), r.Text("files"), r.Text("look"));
 
     private static Picture Pic(DataRow r) => new(r.Id, r.Int("item_id"), r.Text("file"), r.Text("type"), r.Text("caption"), r.Int("sort"));
 

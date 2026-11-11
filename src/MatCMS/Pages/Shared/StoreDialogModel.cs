@@ -26,6 +26,22 @@ public sealed record StoreItem(
     public string? SafePublisherUrl => Uri.TryCreate(PublisherUrl ?? "", UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps || u.Scheme == Uri.UriSchemeHttp) ? u.ToString() : null;
 }
 
+/// <summary>The two tabs of a store dialog — the cloud's store and the MatCMS Store — as links (<c>?browse=true|matcms</c>), so only the store
+/// looked at is asked. Null (no tabs) unless both are open to this site.</summary>
+public static class StoreTabs
+{
+    public static IReadOnlyList<StoreTab>? For(Microsoft.AspNetCore.Http.HttpContext http, Microsoft.AspNetCore.Mvc.IUrlHelper url, bool both, string? browsing)
+    {
+        if (!both) return null;
+        var t = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<MatCMS.Services.Localizer>(http.RequestServices);
+        return new[]
+        {
+            new StoreTab(t["plugins.storeTab.cloud"], Microsoft.AspNetCore.Mvc.UrlHelperExtensions.Page(url, "Index", new { browse = "true" })!, browsing != "matcms"),
+            new StoreTab(t["plugins.storeTab.matcms"], Microsoft.AspNetCore.Mvc.UrlHelperExtensions.Page(url, "Index", new { browse = "matcms" })!, browsing == "matcms")
+        };
+    }
+}
+
 /// <summary>One picture of a store offering: where this site serves it, and its caption.</summary>
 public sealed record StoreImage(string Url, string Caption);
 

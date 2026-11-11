@@ -99,6 +99,11 @@ public class StoreTemplate
     public string ParamValuesJson { get; set; } = "{}";
     public int SchemaVersion { get; set; } = 1;
     public string PartsJson { get; set; } = "{}";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" and the store version it came as (the take-over list compares it). Cleared by every own
+    /// save — an edited copy is the operator's, and a later take-over must not overwrite it without being asked.</summary>
+    public string Origin { get; set; } = "";
+    public string OriginVersion { get; set; } = "";
 }
 
 /// <summary>A reusable block in the store. <see cref="Type"/> is the identity.</summary>
@@ -111,6 +116,11 @@ public class StoreComponent
     public string Icon { get; set; } = "";
     public string FieldsJson { get; set; } = "[]";
     public string TemplateHtml { get; set; } = "";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" and the store version it came as (the take-over list compares it). Cleared by every own
+    /// save — an edited copy is the operator's, and a later take-over must not overwrite it without being asked.</summary>
+    public string Origin { get; set; } = "";
+    public string OriginVersion { get; set; } = "";
 }
 
 

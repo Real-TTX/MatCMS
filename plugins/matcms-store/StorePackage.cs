@@ -8,7 +8,11 @@ namespace MatCMS.Plugin.MatcmsStore;
 
 /// <summary>What an uploaded package says about itself, read from its <c>plugin.json</c>, plus its hash and file list.</summary>
 internal sealed record PackageInfo(string Key, string Name, string Version, string Kind, string Api, string Description, string MinCms, string Sha256,
-    long Size, IReadOnlyList<string> Files);
+    long Size, IReadOnlyList<string> Files, string Look = "")
+{
+    /// <summary>A template or a component: one JSON file, no zip.</summary>
+    public bool IsJson => Kind is StorePackage.KindTemplate or StorePackage.KindComponent;
+}
 
 /// <summary>
 /// Reads an uploaded plugin package BEFORE anything is stored: the same container rules the sites apply when they import it (MatCMS.Shared/PluginBundle —
@@ -25,9 +29,35 @@ internal static class StorePackage
     private static readonly Regex KeyRx = new("^[a-z][a-z0-9-]{1,40}$", RegexOptions.CultureInvariant);
     private static readonly Regex VersionRx = new("^[0-9][0-9A-Za-z.+-]{0,19}$", RegexOptions.CultureInvariant);
 
-    /// <summary>Reads the package or says (as a string key of the plugin) why it is not one.</summary>
-    public static (PackageInfo? Info, string? Error) Read(byte[] bytes)
+    public const string KindTemplate = "template", KindComponent = "component";
+    private const int MaxJson = 2 * 1024 * 1024;
+
+    /// <summary>Plugin, template or component — what a package kind belongs to. A key keeps its group for good.</summary>
+    public static string Group(string kind) => kind is KindTemplate or KindComponent ? kind : "plugin";
+
+    /// <summary>
+    /// The key a template or component has in the store — the SAME rule the sites apply when they check a package (MatCMS.Shared/StoreItemPackage):
+    /// a template by its name, a component by its type, lower case, everything but letters and digits a hyphen.
+    /// </summary>
+    public static string JsonKey(string kind, string nameOrType)
     {
+        var s = (nameOrType ?? "").Trim().ToLowerInvariant().Replace("ä", "ae").Replace("ö", "oe").Replace("ü", "ue").Replace("ß", "ss");
+        var sb = new StringBuilder();
+        foreach (var ch in s)
+        {
+            if (ch is >= 'a' and <= 'z' or >= '0' and <= '9') sb.Append(ch);
+            else if (sb.Length > 0 && sb[^1] != '-') sb.Append('-');
+        }
+        return sb.ToString().Trim('-');
+    }
+
+    /// <summary>Reads the package — a plugin zip, or the JSON a MatCMS template or component editor exports (then <paramref name="version"/> comes from
+    /// the form: that JSON names no version) — or says (as a string key of the plugin) why it is not one.</summary>
+    public static (PackageInfo? Info, string? Error) Read(byte[] bytes, string? formVersion = null)
+    {
+        var start = bytes.AsSpan().StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]) ? 3 : 0;
+        while (start < bytes.Length && bytes[start] is (byte)' ' or (byte)'\r' or (byte)'\n' or (byte)'\t') start++;
+        if (start < bytes.Length && bytes[start] == (byte)'{') return ReadJson(bytes, (formVersion ?? "").Trim());
         try
         {
             using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
@@ -82,6 +112,46 @@ internal static class StorePackage
         {
             return (null, "store.err.pkgZip");
         }
+    }
+
+    /// <summary>A template (it has a layout or colours) or a component (it has a type and its markup), as the editors export them.</summary>
+    private static (PackageInfo? Info, string? Error) ReadJson(byte[] bytes, string version)
+    {
+        if (bytes.Length > MaxJson) return (null, "store.err.pkgSize");
+        JsonObject? o;
+        try { o = JsonNode.Parse(Encoding.UTF8.GetString(bytes).TrimStart('\uFEFF')) as JsonObject; }
+        catch (System.Text.Json.JsonException) { return (null, "store.err.pkgJson"); }
+        if (o is null) return (null, "store.err.pkgJson");
+        string F(string field) => o[field] is JsonValue v && v.TryGetValue<string>(out var t) ? t.Trim() : "";
+        bool Has(string field) => o.ContainsKey(field);
+
+        string kind, key, name;
+        var look = new JsonObject();
+        if (Has("Type") && (Has("TemplateHtml") || Has("FieldsJson")))
+        {
+            kind = KindComponent;
+            name = F("Name") is { Length: > 0 } n ? n : F("Type");
+            key = JsonKey(kind, F("Type"));
+            if (F("Icon") is { Length: > 0 } icon) look["icon"] = StoreText.Cut(icon, 60);
+        }
+        else if (F("Name").Length > 0 && (Has("LayoutHtml") || Has("AccentColor") || Has("CustomCss")))
+        {
+            kind = KindTemplate;
+            name = F("Name");
+            key = JsonKey(kind, name);
+            // What a catalogue may show of a template's look — colours and fonts, never its code. Values are checked where they are drawn.
+            foreach (var (field, prop) in new[] { ("AccentColor", "accent"), ("SecondaryColor", "secondary"), ("HeadingColor", "heading"), ("TextColor", "text"),
+                         ("BackgroundColor", "background"), ("AltBackground", "alt"), ("HeaderBackground", "headerBackground"), ("HeaderTextColor", "headerText"),
+                         ("HeadingFont", "headingFont"), ("BodyFont", "bodyFont"), ("ButtonStyle", "buttonStyle"), ("ButtonRadius", "buttonRadius") })
+                if (F(field) is { Length: > 0 and <= 60 } v) look[prop] = v;
+        }
+        else return (null, "store.err.pkgJson");
+
+        if (!KeyRx.IsMatch(key)) return (null, "store.err.pkgKey");
+        if (version.Length == 0) return (null, "store.err.pkgNoVersion");
+        if (!VersionRx.IsMatch(version)) return (null, "store.err.pkgVersion");
+        return (new PackageInfo(key, StoreText.Cut(name, 80), version, kind, "", F("Description"), "",
+            Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), bytes.LongLength, [kind + ".json"], look.ToJsonString()), null);
     }
 }
 

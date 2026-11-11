@@ -45,7 +45,7 @@
                 {
                     <tr data-search="@(e.Name + " " + e.Key + " " + e.Publisher + " " + e.Summary)">
                         <td>
-                            <strong>@e.Name</strong> <span class="badge badge-off">@(e.Kind == "native" ? "Native" : T["store.matcms.script"])</span>
+                            <strong>@e.Name</strong> <span class="badge badge-off">@(e.Group switch { "template" => T["store.matcms.kindTemplate"], "component" => T["store.matcms.kindComponent"], _ => e.Kind == "native" ? "Native" : T["store.matcms.script"] })</span>
                             <div class="muted">@(e.Summary.Length > 0 ? e.Summary : e.Description)</div>
                             <div class="muted mono">@e.Key</div>
                         </td>
@@ -56,7 +56,7 @@
                             {
                                 case "current": <span class="badge badge-on">@T["store.matcms.current"]</span> break;
                                 case "update": <span class="badge badge-new">@T["store.matcms.update", e.LocalVersion]</span> break;
-                                case "own": <span class="badge badge-err">@T["store.matcms.own", e.LocalVersion]</span> break;
+                                case "own": <span class="badge badge-err">@T["store.matcms.own", e.LocalVersion.Length > 0 ? e.LocalVersion : T["store.matcms.ownNoVersion"].ToString()]</span> break;
                                 default: <span class="badge badge-off">@T["store.matcms.notHere"]</span> break;
                             }
                         </td>
@@ -70,6 +70,7 @@
                                 {
                                     <form method="post" asp-page-handler="TakeOver" class="inline-form">
                                         <input type="hidden" name="key" value="@e.Key" />
+                                        <input type="hidden" name="group" value="@e.Group" />
                                         <button type="submit" class="btn btn-sm">@(e.State == "new" ? T["store.matcms.take"] : T["store.matcms.takeUpdate"])</button>
                                     </form>
                                 }
@@ -77,6 +78,7 @@
                                 {
                                     <form method="post" asp-page-handler="TakeOver" class="inline-form" data-confirm="@T["store.matcms.replaceConfirm", e.Name, e.LocalVersion, e.Version]">
                                         <input type="hidden" name="key" value="@e.Key" />
+                                        <input type="hidden" name="group" value="@e.Group" />
                                         <input type="hidden" name="replace" value="true" />
                                         <button type="submit" class="btn btn-sm btn-ghost">@T["store.matcms.replace"]</button>
                                     </form>

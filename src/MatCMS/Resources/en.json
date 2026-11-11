@@ -2368,5 +2368,9 @@
   "plugins.matcms.updateConfirm": "Update “{0}” to version {1} from the MatCMS Store? The plugin is switched off for this and has to be switched on again afterwards.",
   "dashboard.attn.pluginUpdates.title": "Plugin updates",
   "dashboard.attn.pluginUpdates": "{0} plugin(s) have a newer version in the MatCMS Store.",
-  "store.dialogDownloads": "{0} downloads"
+  "store.dialogDownloads": "{0} downloads",
+  "templates.matcmsCatalog": "Templates from the MatCMS Store",
+  "templates.matcmsIntro": "Signed templates from matcms.de. Only what fits its signature is installed; a template goes live only when you activate it.",
+  "components.matcmsCatalog": "Components from the MatCMS Store",
+  "components.matcmsIntro": "Signed components from matcms.de. Only what fits its signature is installed."
 }

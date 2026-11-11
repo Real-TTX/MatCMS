@@ -210,7 +210,7 @@
   "store.matcms.page": "View in the store",
   "store.matcms.take": "Take over",
   "store.matcms.takeUpdate": "Update",
-  "store.matcms.help": "From {0}. “Take over” checks the signature against the store keys of this version and puts the plugin with its pictures and publisher into this store; profiles then use it like any other. An own entry with the same key is never overwritten.",
+  "store.matcms.help": "From {0}. “Take over” checks the signature against the store keys of this version and puts the entry into this store (a plugin with its pictures and publisher); profiles then use it like any other. An own entry with the same key or name is only overwritten with “Replace”; editing a taken-over template or component here makes it an own entry.",
   "store.matcms.fromStore": "Taken over from the MatCMS Store, signed with store key {0}. It is not edited here – a new version comes through “Update” in the MatCMS Store tab. An own package makes it an own entry.",
   "store.matcms.replace": "Replace",
   "store.matcms.replaceConfirm": "Replace the own entry “{0}” ({1}) by the signed version {2} from the MatCMS Store? Profiles using it keep it and roll the new version out. It is not edited here afterwards.",
@@ -1647,5 +1647,8 @@
   "aiprof.saveFirst": "Save the profile first – then sign in here with the ChatGPT account it should use.",
   "aiprof.chatgptAccount": "This profile's ChatGPT account",
   "profiles.aiGuideBot": "Chat bot for visitors",
-  "profiles.aiGuideBotPlaceholder": "e.g. Never name prices, always point to the contact form."
+  "profiles.aiGuideBotPlaceholder": "e.g. Never name prices, always point to the contact form.",
+  "store.matcms.kindTemplate": "Template",
+  "store.matcms.kindComponent": "Component",
+  "store.matcms.ownNoVersion": "own"
 }

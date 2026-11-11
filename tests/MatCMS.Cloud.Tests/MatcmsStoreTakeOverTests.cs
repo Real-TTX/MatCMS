@@ -138,6 +138,56 @@ public sealed class MatcmsStoreTakeOverTests : IDisposable
         Assert.Equal("current", (await _matcms.ListAsync(fresh: true)).Entries.Single().State);
     }
 
+    /// <summary>A template or component file as the editors export it, published under the key its name / type gives.</summary>
+    private void PublishDesign(string kind, JsonObject file, string version, bool tamper = false)
+    {
+        var key = StoreItemPackage.Key((string)file[kind == "template" ? "Name" : "Type"]!);
+        var bytes = Encoding.UTF8.GetBytes(file.ToJsonString());
+        var sha = StoreSignature.Sha256Hex(bytes);
+        var sig = StoreSignature.Sign(StoreSignature.Text(kind, key, version, sha), _key);
+        _server.Files[$"/store/api/items/{key}/{version}/package"] = tamper ? Encoding.UTF8.GetBytes(file.ToJsonString() + " ") : bytes;
+        (kind == "template" ? _server.Templates : _server.Components)[key] = new JsonObject
+        {
+            ["key"] = key, ["name"] = (string?)file["Name"], ["version"] = version, ["kind"] = kind, ["summary"] = "Aus dem Store",
+            ["sha256"] = sha, ["signature"] = sig, ["keyId"] = _keyId, ["download"] = $"/store/api/items/{key}/{version}/package"
+        };
+    }
+
+    [Fact]
+    public async Task Templates_and_components_are_taken_over_signed_by_their_own_name_and_an_own_edit_makes_them_own()
+    {
+        PublishDesign("template", new JsonObject { ["Name"] = "Grüne Wiese", ["AccentColor"] = "#2a7", ["LayoutHtml"] = "<main>{{content}}</main>", ["CustomCss"] = "body{}" }, "1.0");
+        PublishDesign("component", new JsonObject { ["Type"] = "price_box", ["Name"] = "Preisbox", ["FieldsJson"] = "[]", ["TemplateHtml"] = "<div>{{price}}</div>" }, "2.0");
+
+        var (entries, _) = await _matcms.ListAsync(fresh: true);
+        Assert.Contains(entries, e => e.Group == "template" && e.Key == "gruene-wiese" && e.State == "new");
+        Assert.Contains(entries, e => e.Group == "component" && e.Key == "price-box" && e.State == "new");
+
+        // The key alone does not say what it is: without the kind, the plugin list is asked and has no such key.
+        Assert.False((await _matcms.ImportAsync("gruene-wiese")).Ok);
+        var t = await _matcms.ImportAsync("gruene-wiese", group: "template");
+        Assert.True(t.Ok, t.Message);
+        var c = await _matcms.ImportAsync("price-box", group: "component");
+        Assert.True(c.Ok, c.Message);
+        var tpl = await _db.StoreTemplates.AsNoTracking().SingleAsync(x => x.Name == "Grüne Wiese");
+        Assert.Equal(("#2a7", "<main>{{content}}</main>", MatcmsStoreService.Origin, "1.0"), (tpl.AccentColor, tpl.LayoutHtml, tpl.Origin, tpl.OriginVersion));
+        var comp = await _db.StoreComponents.AsNoTracking().SingleAsync(x => x.Type == "price_box");
+        Assert.Equal(("Preisbox", MatcmsStoreService.Origin, "2.0"), (comp.Name, comp.Origin, comp.OriginVersion));
+        Assert.Contains((await _matcms.ListAsync(fresh: true)).Entries, e => e.Key == "gruene-wiese" && e.State == "current");
+
+        // Other bytes than the signed ones: refused.
+        PublishDesign("component", new JsonObject { ["Type"] = "price_box", ["Name"] = "Preisbox", ["TemplateHtml"] = "<b>x</b>" }, "2.1", tamper: true);
+        Assert.False((await _matcms.ImportAsync("price-box", group: "component")).Ok);
+
+        // An own save makes it the operator's: a take-over then asks first (replaceOwn).
+        await _store.UpsertTemplateAsync(new StoreTemplateInput("Grüne Wiese", null, "#000", null, null, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, null));
+        Assert.Contains((await _matcms.ListAsync(fresh: true)).Entries, e => e.Key == "gruene-wiese" && e.State == "own");
+        Assert.False((await _matcms.ImportAsync("gruene-wiese", group: "template")).Ok);
+        Assert.True((await _matcms.ImportAsync("gruene-wiese", replaceOwn: true, group: "template")).Ok);
+        Assert.Equal("#2a7", (await _db.StoreTemplates.AsNoTracking().SingleAsync(x => x.Name == "Grüne Wiese")).AccentColor);
+    }
+
     [Fact]
     public async Task An_unreachable_store_is_a_message_not_an_exception()
     {
@@ -151,6 +201,8 @@ public sealed class MatcmsStoreTakeOverTests : IDisposable
     private sealed class FakeStore : HttpMessageHandler
     {
         public readonly Dictionary<string, JsonObject> Plugins = new();
+        public readonly Dictionary<string, JsonObject> Templates = new();
+        public readonly Dictionary<string, JsonObject> Components = new();
         public readonly Dictionary<string, byte[]> Files = new();
         public bool Down;
 
@@ -164,7 +216,8 @@ public sealed class MatcmsStoreTakeOverTests : IDisposable
             if (uri.Host != "matcms.de") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
             if (uri.AbsolutePath == "/store/api/catalog")
             {
-                var json = new JsonObject { ["plugins"] = new JsonArray(Plugins.Values.Select(p => (JsonNode)p.DeepClone()).ToArray()) };
+                static JsonArray A(Dictionary<string, JsonObject> d) => new(d.Values.Select(p => (JsonNode)p.DeepClone()).ToArray());
+                var json = new JsonObject { ["plugins"] = A(Plugins), ["templates"] = A(Templates), ["components"] = A(Components) };
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json.ToJsonString(), Encoding.UTF8, "application/json") });
             }
             return Task.FromResult(Files.TryGetValue(uri.AbsolutePath, out var b)

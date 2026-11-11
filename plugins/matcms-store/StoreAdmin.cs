@@ -30,7 +30,7 @@ internal static class StoreAdmin
             var pub = item is null ? null : await db.PublisherAsync(item.PublisherId, ct);
             rows.Add(Ui.RowFor((item?.Name ?? "") + " " + (item?.Key ?? "") + " " + (pub?.Name ?? ""),
                 Ui.Stack(Ui.Link((item?.Name ?? "?") + " " + v.Version, Base + "review/" + Id(v.Id)), Ui.Muted(item?.Key ?? "")),
-                Ui.Badge(ctx.T(v.Kind == "native" ? "store.kind.native" : "store.kind.script"), v.Kind == "native" ? UiTone.Warning : UiTone.Default),
+                Ui.Badge(ctx.T(StoreText.KindKey(v.Kind)), v.Kind == "native" ? UiTone.Warning : UiTone.Default),
                 Ui.Stack(Ui.Text(pub?.Name ?? "?"), pub?.Verified == true ? Ui.Badge(ctx.T("store.verified"), UiTone.Success) : null),
                 item?.Status == ItemStatus.Draft ? ctx.T("store.admin.newEntry") : ctx.T("store.admin.update"),
                 When(v.Created)));
@@ -87,7 +87,7 @@ internal static class StoreAdmin
         var files = v.Files.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var facts = Ui.Card(ctx.T("store.admin.package"), Ui.KeyValue(
                 (ctx.T("store.col.item"), item.Name + " (" + item.Key + ")"), (ctx.T("store.fact.version"), v.Version),
-                (ctx.T("store.fact.kind"), ctx.T(v.Kind == "native" ? "store.kind.native" : "store.kind.script") + (v.Api.Length > 0 ? " · API " + v.Api : "")),
+                (ctx.T("store.fact.kind"), ctx.T(StoreText.KindKey(v.Kind)) + (v.Api.Length > 0 ? " · API " + v.Api : "")),
                 (ctx.T("store.fact.publisher"), (pub?.Name ?? "?") + (pub?.Verified == true ? " ✓" : "")),
                 (ctx.T("store.admin.size"), StoreText.Size(v.Size)), (ctx.T("store.fact.sha"), v.Sha256), (ctx.T("store.col.submitted"), When(v.Created)),
                 (ctx.T("store.col.status"), ctx.T("store.vstatus." + v.Status))),
@@ -129,7 +129,8 @@ internal static class StoreAdmin
         if (!long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || await db.VersionAsync(id, ct) is not { } v
             || await db.ItemAsync(v.ItemId, ct) is not { } item || await ctx.Files.OpenAsync(v.File, ct) is not { } stream)
             return PluginResult.NotFound();
-        return PluginResult.FromStream(stream, "application/zip", item.Key + "-" + v.Version + ".zip");
+        var json = StorePackage.Group(v.Kind) != "plugin";
+        return PluginResult.FromStream(stream, json ? "application/json" : "application/zip", item.Key + "-" + v.Version + (json ? ".json" : ".zip"));
     }
 
     // ---- entries --------------------------------------------------------------------------------------------------------
@@ -180,7 +181,7 @@ internal static class StoreAdmin
         foreach (var v in await db.VersionsOfAsync(item.Id, ct))
             rows.Add(Ui.Row(
                 v.Status == VersionStatus.Review ? Ui.Link(v.Version, Base + "review/" + Id(v.Id)) : (UiNode)Ui.Text(v.Version),
-                ctx.T(v.Kind == "native" ? "store.kind.native" : "store.kind.script"),
+                ctx.T(StoreText.KindKey(v.Kind)),
                 Ui.Badge(ctx.T("store.vstatus." + v.Status), v.Status == VersionStatus.Published ? UiTone.Success : v.Status is VersionStatus.Rejected or VersionStatus.Withdrawn ? UiTone.Error : UiTone.Warning),
                 When(v.PublishedAt ?? v.Created), StoreHtml.N(v.Downloads),
                 v.Status == VersionStatus.Published

@@ -41,6 +41,16 @@ Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX
   „Aktualisieren“ (Rückfrage; das Plugin wird dabei ausgeschaltet), „Braucht Aufmerksamkeit“ eine Zeile. Einträge, die auch der Cloud-Store
   anbietet, bekommen keinen Hinweis (sie kommen von dort). **Download-Zahlen** zählen je Adresse, Version und Tag einmal (Tabelle
   `download_marks`, nur ein Hash, nach zwei Tagen gelöscht; `matcms-store` 0.2) und stehen jetzt auch im Store-Dialog der Websites.
+- **S4b** — **Templates und Komponenten** im MatCMS Store. Ein Eintrag ist EINE JSON-Datei, genau die aus „Als JSON exportieren“ der Editoren;
+  hochgeladen wie ein Plugin (`/store/konto/hochladen` nimmt .zip oder .json; bei JSON gibt das Formular die Version an), geprüft und freigegeben mit
+  einer Signatur der Art `template`/`component`. Der Key folgt aus dem Inhalt (`MatCMS.Shared/StoreItemPackage.Key`: Name bzw. Typ, klein, Umlaute
+  ausgeschrieben, sonst Bindestriche) — so prüft jede Seite, dass die Datei der genannte Eintrag ist und kein Template anderen Namens überschreibt.
+  Ein Key bleibt bei seiner Art (Plugin/Template/Komponente). Katalog: eigene Arrays `templates`/`components` (Template mit `look` und
+  `accentColor`), Datei unter `/store/api/items/{key}/{version}/package`; `/store` hat Reiter Templates/Komponenten. **Cloud:** derselbe Reiter
+  übernimmt sie (Origin/OriginVersion, Migration `StoreDesignOrigin`); sie bleiben dort bearbeitbar, eine eigene Änderung macht sie zum eigenen Eintrag.
+  **Websites:** Templates/Komponenten → „Weitere durchsuchen“ mit Reiter „MatCMS Store“, Installation nur signiert, über denselben Import wie
+  eingefügtes JSON (`DesignImport`); ein Template wird nie aktiviert. Noch nicht: Update-Hinweise für Templates/Komponenten (sie haben auf der
+  Website keine Versionsnummer), Bilder für Templates in der Cloud.
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

@@ -52,6 +52,9 @@ internal static class StoreUrls
     public static string Publisher(string slug) => Home + "/herausgeber/" + Uri.EscapeDataString(slug);
     public static string AccountItem(string key) => Account + "/eintrag/" + Uri.EscapeDataString(key);
     public static string Bundle(string key, string version) => "/store/api/plugins/" + Uri.EscapeDataString(key) + "/" + Uri.EscapeDataString(version) + "/bundle";
+    /// <summary>A template's or component's package (the plugin path would read oddly; both answer for every key).</summary>
+    public static string Package(string key, string version, string kind) =>
+        StorePackage.Group(kind) == "plugin" ? Bundle(key, version) : "/store/api/items/" + Uri.EscapeDataString(key) + "/" + Uri.EscapeDataString(version) + "/package";
     public static string Image(string key, long id) => "/store/api/plugins/" + Uri.EscapeDataString(key) + "/images/" + id.ToString(System.Globalization.CultureInfo.InvariantCulture);
     public static string ItemApi(string key) => "/store/api/plugins/" + Uri.EscapeDataString(key);
 }

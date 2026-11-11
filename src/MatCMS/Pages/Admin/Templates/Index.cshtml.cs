@@ -11,11 +11,21 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly CloudCatalogService _catalog;
-    public IndexModel(AppDbContext db, CloudCatalogService catalog)
+    private readonly MatcmsStoreClient _matcms;
+    public IndexModel(AppDbContext db, CloudCatalogService catalog, MatcmsStoreClient matcms)
     {
         _db = db;
         _catalog = catalog;
+        _matcms = matcms;
     }
+
+    /// <summary>Whether this site may install from the MatCMS Store, and the store's templates while its tab is open (<c>?browse=matcms</c>).</summary>
+    public MatcmsStoreClient.Access StoreAccess { get; private set; } = new(false, false, true);
+    public List<MatcmsStoreClient.Entry>? Matcms { get; private set; }
+    /// <summary>Which store the dialog shows: "cloud", "matcms" or null (closed).</summary>
+    public string? Browsing { get; private set; }
+    /// <summary>Where "browse" leads: the cloud's store when one is connected, else the MatCMS Store when this site may use it.</summary>
+    public string? BrowseUrl => CloudConnected ? Url.Page("Index", new { browse = "true" }) : StoreAccess.Allowed ? Url.Page("Index", new { browse = "matcms" }) : null;
 
     /// <summary>Catalogue of the connected cloud, fetched only on demand (?browse=true).</summary>
     public StoreCatalog? Catalog { get; private set; }
@@ -24,7 +34,32 @@ public class IndexModel : PageModel
 
     /// <summary>The catalogue shaped for the store dialog. Built here rather than in the view so
     /// the "already installed?" lookup stays out of the markup.</summary>
-    public Shared.StoreDialog StoreDialog => new(
+    public Shared.StoreDialog StoreDialog => Browsing == "matcms" ? MatcmsDialog : CloudDialog;
+
+    private IReadOnlyList<Shared.StoreTab>? Tabs() => Shared.StoreTabs.For(HttpContext, Url, CloudConnected && StoreAccess.Allowed, Browsing);
+
+    /// <summary>The MatCMS Store's templates; a name the cloud's store also offers comes from there (note instead of a button).</summary>
+    private Shared.StoreDialog MatcmsDialog
+    {
+        get
+        {
+            var t = HttpContext.RequestServices.GetRequiredService<Localizer>();
+            var inCloud = (Catalog?.Templates ?? []).Select(x => StoreItemPackage.Key(x.Name)).ToHashSet();
+            return new(
+                TitleKey: "templates.matcmsCatalog", IntroKey: "templates.matcmsIntro", RouteName: "key", Handler: "InstallFromMatcms", Tabs: Tabs(),
+                Items: (Matcms ?? new()).Select(e => new Shared.StoreItem(
+                    Title: e.Name, Sub: e.Name, Description: e.Summary.Length > 0 ? e.Summary : e.Description, RouteValue: e.Key,
+                    InstalledVersion: Items.Any(i => StoreItemPackage.Key(i.Name) == e.Key) ? "" : null, Version: e.Version, Accent: e.Accent,
+                    Publisher: e.Publisher + (e.PublisherVerified ? " ✓" : ""), PublisherUrl: e.PublisherUrl, Downloads: e.Downloads,
+                    Note: inCloud.Contains(e.Key) ? t["plugins.matcmsViaCloud"] : null,
+                    Images: e.Images.Select(img => new Shared.StoreImage(Url.Page("/Admin/Templates/Index", "MatcmsImage", new { key = e.Key, imageId = img.Id })!, img.Caption)).ToList()
+                )).ToList(),
+                Error: CatalogError);
+        }
+    }
+
+    private Shared.StoreDialog CloudDialog => new(
+        Tabs: Tabs(),
         TitleKey: "templates.cloudCatalog",
         IntroKey: "templates.cloudIntro",
         RouteName: "name",
@@ -37,6 +72,21 @@ public class IndexModel : PageModel
             Accent: t.AccentColor)).ToList(),
         Error: CatalogError);
 
+    public async Task<IActionResult> OnPostInstallFromMatcmsAsync(string key)
+    {
+        var (ok, message) = await _matcms.InstallDesignAsync(MatcmsStoreClient.GroupTemplate, key, HttpContext.RequestAborted);
+        TempData[ok ? "Flash" : "FlashError"] = message;
+        return RedirectToPage(new { browse = "matcms" });
+    }
+
+    public async Task<IActionResult> OnGetMatcmsImageAsync(string key, long imageId)
+    {
+        if (await _matcms.ImageAsync(key, imageId, HttpContext.RequestAborted) is not { } img) return NotFound();
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers.CacheControl = "private, max-age=3600";
+        return File(img.Data, img.Type);
+    }
+
     public async Task<IActionResult> OnPostInstallFromCloudAsync(string name)
     {
         var (ok, message) = await _catalog.InstallTemplateAsync(name, HttpContext.RequestAborted);
@@ -46,14 +96,24 @@ public class IndexModel : PageModel
 
     public List<Template> Items { get; private set; } = new();
 
-    public async Task OnGetAsync(bool browse = false)
+    public async Task OnGetAsync(string? browse = null)
     {
         Items = await _db.Templates
             .OrderByDescending(t => t.IsActive).ThenBy(t => t.Name)
             .ToListAsync();
         CloudConnected = await _catalog.IsAvailableAsync();
-        if (browse && CloudConnected)
+        StoreAccess = await _matcms.AccessAsync(HttpContext.RequestAborted);
+        if (browse == "matcms" && StoreAccess.Allowed)
+        {
+            Browsing = "matcms";
+            (Matcms, CatalogError) = await _matcms.ListAsync(MatcmsStoreClient.GroupTemplate, HttpContext.RequestAborted);
+            if (CloudConnected) Catalog = (await _catalog.GetCatalogAsync(HttpContext.RequestAborted)).catalog;
+        }
+        else if (browse is "true" or "cloud" && CloudConnected)
+        {
+            Browsing = "cloud";
             (Catalog, CatalogError) = await _catalog.GetCatalogAsync(HttpContext.RequestAborted);
+        }
     }
 
     public async Task<IActionResult> OnPostActivateAsync(int id)
@@ -122,63 +182,13 @@ public class IndexModel : PageModel
         }
 
         var root = doc.RootElement;
-        var name = JsonImport.Text(root, "Name").Trim();
-        if (name.Length == 0)
+        if (JsonImport.Text(root, "Name").Trim().Length == 0)
         {
             TempData["FlashError"] = "Im JSON fehlt der Name.";
             return RedirectToPage();
         }
-
-        var row = await _db.Templates.FirstOrDefaultAsync(t => t.Name == name);
-        var isNew = row is null;
-        if (row is null)
-        {
-            row = new Template { Name = name };
-            _db.Templates.Add(row);
-        }
-
-        // Every setter below runs only when the document actually carries the property; what it did
-        // not carry is collected instead. The fallbacks are still passed for the second case Has()
-        // does not cover — a property that IS there but holds the wrong JSON kind.
-        var missing = new List<string>();
-        void Str(string prop, Action<string> set, string fallback = "")
-        {
-            if (JsonImport.Has(root, prop)) set(JsonImport.Text(root, prop, fallback));
-            else missing.Add(prop);
-        }
-        // Raw, not Text: these are nested blobs. Hand-written JSON writes them as real objects and
-        // arrays, our own export writes them as strings — both have to arrive intact.
-        void Blob(string prop, Action<string> set, string fallback)
-        {
-            if (JsonImport.Has(root, prop)) set(JsonImport.Raw(root, prop, fallback));
-            else missing.Add(prop);
-        }
-
-        Str("AccentColor", v => row.AccentColor = v, "#de7e11");
-        Str("SecondaryColor", v => row.SecondaryColor = v);
-        Str("HeadingFont", v => row.HeadingFont = v, "Geologica");
-        Str("BodyFont", v => row.BodyFont = v, "Inter");
-        Str("ButtonStyle", v => row.ButtonStyle = v, "solid");
-        Str("HeadingColor", v => row.HeadingColor = v, "#010101");
-        Str("TextColor", v => row.TextColor = v, "#1a1a1a");
-        Str("BackgroundColor", v => row.BackgroundColor = v, "#ffffff");
-        Str("AltBackground", v => row.AltBackground = v, "#f6f7f9");
-        Str("ContainerWidth", v => row.ContainerWidth = v, "1180");
-        Str("ButtonRadius", v => row.ButtonRadius = v, "0");
-        Str("HeaderBackground", v => row.HeaderBackground = v);
-        Str("HeaderTextColor", v => row.HeaderTextColor = v);
-        Str("HeaderPadding", v => row.HeaderPadding = v, "16");
-        Str("CustomCss", v => row.CustomCss = v);
-        Str("CustomJs", v => row.CustomJs = v);
-        Str("LayoutHtml", v => row.LayoutHtml = v);
-        Blob("MenuMapJson", v => row.MenuMapJson = v, "{}");
-        Blob("ParametersJson", v => row.ParametersJson = v, "[]");
-        Blob("ParamValuesJson", v => row.ParamValuesJson = v, "{}");
-        Blob("PartsJson", v => row.PartsJson = v, "{}");
-        if (JsonImport.Has(root, "SchemaVersion")) row.SchemaVersion = JsonImport.Int(root, "SchemaVersion", 1);
-        else missing.Add("SchemaVersion");
-
-        await _db.SaveChangesAsync();
+        // Pasted by hand: the parameter values in it are meant (keepParamValues: false), unlike a store package's.
+        var (row, isNew, missing) = await DesignImport.TemplateAsync(_db, root, HttpContext.RequestAborted, keepParamValues: false);
         // Only worth saying on an update: on a new template a missing field is a default, not a
         // decision that overruled something. On an update it is the difference between "your JSON
         // did this" and "your JSON stayed out of this", and the operator has to be able to tell.

@@ -210,8 +210,9 @@ internal static class StoreAccount
         var sb = new StringBuilder($"<h1>{E(ctx.T("store.upload"))}</h1><p class=\"mst-intro\">{E(ctx.T("store.uploadIntro", maxMb))}</p>");
         if (error is not null) sb.Append(Notice(error, "err"));
         sb.Append("<form method=\"post\" enctype=\"multipart/form-data\" class=\"mst-form\">").Append(ctx.Antiforgery)
-          .Append($"<label for=\"st-package\">{E(ctx.T("store.field.package"))}</label><input type=\"file\" id=\"st-package\" name=\"package\" accept=\".zip\" required>")
+          .Append($"<label for=\"st-package\">{E(ctx.T("store.field.package"))}</label><input type=\"file\" id=\"st-package\" name=\"package\" accept=\".zip,.json\" required>")
           .Append($"<p class=\"mst-hint\">{E(ctx.T("store.field.packageHint"))}</p>")
+          .Append(Field("version", ctx.T("store.field.version"), ctx.Request.F("version"), hint: ctx.T("store.field.versionHint"), max: 20))
           .Append(Area("notes", ctx.T("store.field.notes"), ctx.Request.F("notes"), ctx.T("store.field.notesHint"), 4))
           .Append($"<h2>{E(ctx.T("store.newEntryTexts"))}</h2><p class=\"mst-hint\">{E(ctx.T("store.newEntryTextsHint"))}</p>")
           .Append(Field("summary", ctx.T("store.field.summary"), ctx.Request.F("summary"), max: 200))
@@ -237,7 +238,7 @@ internal static class StoreAccount
             await s.CopyToAsync(ms, ct);
             bytes = ms.ToArray();
         }
-        var (info, why) = StorePackage.Read(bytes);
+        var (info, why) = StorePackage.Read(bytes, ctx.Request.F("version"));
         if (info is null) return (null, ctx.T(why!));
         if (StoreUrls.Taken.Contains(info.Key)) return (null, ctx.T("store.err.keyTaken", info.Key));
 
@@ -248,13 +249,15 @@ internal static class StoreAccount
         if (item is not null)
         {
             var versions = await db.VersionsOfAsync(item.Id, ct);
+            // A key stays what it was: a plugin's key never becomes a template, a template's never a component.
+            if (versions.Count > 0 && StorePackage.Group(versions[0].Kind) != StorePackage.Group(info.Kind)) return (null, ctx.T("store.err.kindChanged", info.Key));
             if (versions.Any(v => v.Version == info.Version)) return (null, ctx.T("store.err.versionExists", info.Version));
             var highest = versions.Where(v => v.Status != VersionStatus.Rejected).Select(v => v.Version).OrderByDescending(StoreText.VersionKey).FirstOrDefault();
             if (highest is not null && StoreText.VersionKey(info.Version).CompareTo(StoreText.VersionKey(highest)) <= 0)
                 return (null, ctx.T("store.err.versionLower", info.Version, highest));
         }
 
-        var name = "packages/" + info.Key + "/" + DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture) + ".zip";
+        var name = "packages/" + info.Key + "/" + DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture) + (info.IsJson ? ".json" : ".zip");
         using (var ms = new MemoryStream(bytes)) await ctx.Files.SaveAsync(name, ms, ct);
         try
         {
@@ -276,7 +279,7 @@ internal static class StoreAccount
             {
                 ["item_id"] = itemId, ["version"] = info.Version, ["kind"] = info.Kind, ["api"] = info.Api, ["min_cms"] = info.MinCms, ["size"] = info.Size,
                 ["sha256"] = info.Sha256, ["file"] = name, ["notes"] = StoreText.Cut(ctx.Request.F("notes").Trim(), 4000), ["status"] = VersionStatus.Review,
-                ["created"] = now, ["files"] = string.Join('\n', info.Files.Take(300))
+                ["created"] = now, ["files"] = string.Join('\n', info.Files.Take(300)), ["look"] = info.Look
             }, ct);
             await AddPicturesAsync(ctx, db, itemId, ct);
 
@@ -378,7 +381,7 @@ internal static class StoreAccount
           .Append("</th><th>").Append(E(ctx.T("store.col.status"))).Append("</th><th>").Append(E(ctx.T("store.col.submitted"))).Append("</th><th>")
           .Append(E(ctx.T("store.col.note"))).Append("</th></tr></thead><tbody>");
         foreach (var v in await db.VersionsOfAsync(item.Id, ct))
-            sb.Append("<tr><td>").Append(E(v.Version)).Append(" <span class=\"mst-hint\">").Append(E(ctx.T(v.Kind == "native" ? "store.kind.native" : "store.kind.script")))
+            sb.Append("<tr><td>").Append(E(v.Version)).Append(" <span class=\"mst-hint\">").Append(E(ctx.T(StoreText.KindKey(v.Kind))))
               .Append("</span></td><td><span class=\"mst-status\">").Append(E(ctx.T("store.vstatus." + v.Status))).Append("</span></td><td>").Append(E(Day(v.Created)))
               .Append("</td><td>").Append(E(v.Reason.Length > 0 ? v.Reason : v.Notes)).Append("</td></tr>");
         sb.Append("</tbody></table><div class=\"mst-actions\"><a class=\"btn\" href=\"").Append(StoreUrls.Upload).Append("\">").Append(E(ctx.T("store.newVersion"))).Append("</a></div>");

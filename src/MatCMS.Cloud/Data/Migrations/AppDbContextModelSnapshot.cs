@@ -1640,6 +1640,14 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TemplateHtml")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1859,6 +1867,14 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginVersion")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

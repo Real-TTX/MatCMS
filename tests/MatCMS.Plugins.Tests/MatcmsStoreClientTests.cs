@@ -177,6 +177,51 @@ public sealed class MatcmsStoreClientTests : IDisposable
         }
     }
 
+    /// <summary>A template or component file as the editors export it, published under <paramref name="key"/> (by default the key its name / type gives).</summary>
+    private void PublishDesign(string kind, JsonObject file, string version, string? key = null, bool tamper = false)
+    {
+        key ??= StoreItemPackage.Key((string)file[kind == "template" ? "Name" : "Type"]!);
+        var bytes = Encoding.UTF8.GetBytes(file.ToJsonString());
+        var sha = StoreSignature.Sha256Hex(bytes);
+        _server.Files[$"/store/api/items/{key}/{version}/package"] = tamper ? Encoding.UTF8.GetBytes(file.ToJsonString() + " ") : bytes;
+        (kind == "template" ? _server.Templates : _server.Components)[key] = new JsonObject
+        {
+            ["key"] = key, ["name"] = (string?)file["Name"], ["version"] = version, ["kind"] = kind, ["summary"] = "Aus dem Store", ["accentColor"] = "#2a7",
+            ["sha256"] = sha, ["signature"] = StoreSignature.Sign(StoreSignature.Text(kind, key, version, sha), _key), ["keyId"] = _keyId,
+            ["download"] = $"/store/api/items/{key}/{version}/package"
+        };
+    }
+
+    [Fact]
+    public async Task Templates_and_components_install_from_the_store_only_signed_and_only_under_their_own_name()
+    {
+        using var app = new AppFactory();
+        var c = app.Browser();
+        await AppFactory.LoginAsync(c);
+        PublishDesign("template", new JsonObject { ["Name"] = "Grüne Wiese", ["AccentColor"] = "#2a7", ["LayoutHtml"] = "<main>{{content}}</main>", ["ParamValuesJson"] = "{}" }, "1.0");
+        PublishDesign("component", new JsonObject { ["Type"] = "price_box", ["Name"] = "Preisbox", ["FieldsJson"] = "[]", ["TemplateHtml"] = "<div>{{price}}</div>" }, "2.0");
+        // signed correctly, but the file is a template of ANOTHER name than its key — would overwrite that template here
+        PublishDesign("template", new JsonObject { ["Name"] = "Standard", ["LayoutHtml"] = "<p>weg</p>" }, "1.0", key: "harmlos");
+        PublishDesign("component", new JsonObject { ["Type"] = "evil_box", ["Name"] = "Böse", ["TemplateHtml"] = "<i>x</i>" }, "1.0", tamper: true);
+
+        var page = await c.GetStringAsync("/admin/templates?browse=matcms");
+        Assert.Contains("Grüne Wiese", WebUtility.HtmlDecode(page));
+        var token = AppFactory.Token(page)!;
+        Assert.Equal(HttpStatusCode.Redirect, (await AppFactory.PostAsync(c, "/admin/templates?handler=InstallFromMatcms&key=gruene-wiese", new() { ["__RequestVerificationToken"] = token })).StatusCode);
+        await AppFactory.PostAsync(c, "/admin/templates?handler=InstallFromMatcms&key=harmlos", new() { ["__RequestVerificationToken"] = token });
+        Assert.Contains("Preisbox", await c.GetStringAsync("/admin/components?browse=matcms"));
+        await AppFactory.PostAsync(c, "/admin/components?handler=InstallFromMatcms&key=price-box", new() { ["__RequestVerificationToken"] = token });
+        await AppFactory.PostAsync(c, "/admin/components?handler=InstallFromMatcms&key=evil-box", new() { ["__RequestVerificationToken"] = token });
+
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var tpl = await db.Templates.AsNoTracking().SingleAsync(t => t.Name == "Grüne Wiese");
+        Assert.Equal(("#2a7", "<main>{{content}}</main>", false), (tpl.AccentColor, tpl.LayoutHtml, tpl.IsActive));   // installed, never activated
+        Assert.DoesNotContain(await db.Templates.AsNoTracking().Select(t => t.LayoutHtml).ToListAsync(), l => l == "<p>weg</p>");
+        Assert.Equal("<div>{{price}}</div>", (await db.Components.AsNoTracking().SingleAsync(x => x.Type == "price_box")).TemplateHtml);
+        Assert.False(await db.Components.AnyAsync(x => x.Type == "evil_box"));
+    }
+
     [Fact]
     public void Both_switches_are_protected_against_every_generic_writer()
     {
@@ -188,6 +233,8 @@ public sealed class MatcmsStoreClientTests : IDisposable
     private sealed class FakeStore : HttpMessageHandler
     {
         public readonly Dictionary<string, JsonObject> Plugins = new();
+        public readonly Dictionary<string, JsonObject> Templates = new();
+        public readonly Dictionary<string, JsonObject> Components = new();
         public readonly Dictionary<string, byte[]> Files = new();
 
         protected override void Dispose(bool disposing) { }
@@ -198,7 +245,8 @@ public sealed class MatcmsStoreClientTests : IDisposable
             if (uri.Host != "store.test") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
             if (uri.AbsolutePath == "/store/api/catalog")
             {
-                var json = new JsonObject { ["format"] = 1, ["plugins"] = new JsonArray(Plugins.Values.Select(p => (JsonNode)p.DeepClone()).ToArray()) };
+                static JsonArray A(Dictionary<string, JsonObject> d) => new(d.Values.Select(p => (JsonNode)p.DeepClone()).ToArray());
+                var json = new JsonObject { ["format"] = 1, ["plugins"] = A(Plugins), ["templates"] = A(Templates), ["components"] = A(Components) };
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json.ToJsonString(), Encoding.UTF8, "application/json") });
             }
             if (!Files.TryGetValue(uri.AbsolutePath, out var b)) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));

@@ -30,6 +30,8 @@ public sealed class StorePlugin : IPlugin
         b.Route("/store/api/plugins/{key}", StoreApiRoutes.ItemAsync, api);
         b.Route("/store/api/plugins/{key}/{version}/bundle", StoreApiRoutes.BundleAsync, api);
         b.Route("/store/api/plugins/{key}/images/{id}", StoreApiRoutes.ImageAsync, api);
+        b.Route("/store/api/items/{key}", StoreApiRoutes.ItemAsync, api);
+        b.Route("/store/api/items/{key}/{version}/package", StoreApiRoutes.BundleAsync, api);
         b.Route(StoreUrls.Register, StoreAccount.RegisterAsync, form);
         b.Route(StoreUrls.Account, StoreAccount.AccountAsync, member);
         // A package may be big; the bigger limit applies only to a signed-in member's form (checked by the host before it reads the body).

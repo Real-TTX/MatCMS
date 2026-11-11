@@ -76,16 +76,7 @@ public class IndexModel : PageModel
     /// "already installed?" lookup stays out of the markup.</summary>
     public Shared.StoreDialog StoreDialog => Browsing == "matcms" ? MatcmsDialog : CloudDialog;
 
-    private IReadOnlyList<Shared.StoreTab>? Tabs()
-    {
-        if (!CloudConnected || !StoreAccess.Allowed) return null;
-        var t = HttpContext.RequestServices.GetRequiredService<Localizer>();
-        return new[]
-        {
-            new Shared.StoreTab(t["plugins.storeTab.cloud"], Url.Page("Index", new { browse = "true" })!, Browsing != "matcms"),
-            new Shared.StoreTab(t["plugins.storeTab.matcms"], Url.Page("Index", new { browse = "matcms" })!, Browsing == "matcms")
-        };
-    }
+    private IReadOnlyList<Shared.StoreTab>? Tabs() => Shared.StoreTabs.For(HttpContext, Url, CloudConnected && StoreAccess.Allowed, Browsing);
 
     /// <summary>The MatCMS Store as the dialog shows it. A key the cloud's store also offers is installed from there (its operator may hold a
     /// checked version on purpose), so it gets a note instead of a button here.</summary>
@@ -195,7 +186,7 @@ public class IndexModel : PageModel
         if (browse == "matcms" && StoreAccess.Allowed)
         {
             Browsing = "matcms";
-            (Matcms, CatalogError) = await _matcms.ListAsync(HttpContext.RequestAborted);
+            (Matcms, CatalogError) = await _matcms.ListAsync(MatcmsStoreClient.GroupPlugin, HttpContext.RequestAborted);
             // The cloud's list too, only to know which keys come from there (the cloud wins); its failure is not this tab's error.
             if (CloudConnected) Catalog = (await _catalog.GetCatalogAsync(HttpContext.RequestAborted)).catalog;
         }

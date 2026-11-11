@@ -53,9 +53,13 @@ public sealed class MatcmsStoreClient
         return new(own, false, own);
     }
 
-    /// <summary>One plugin of the MatCMS Store, as the store dialog shows it. Picture addresses are the STORE's (relative); the site passes them through.</summary>
+    /// <summary>What the store offers: plugins, templates, components — the arrays of the catalogue.</summary>
+    public const string GroupPlugin = "plugin", GroupTemplate = StoreItemPackage.KindTemplate, GroupComponent = StoreItemPackage.KindComponent;
+
+    /// <summary>One entry of the MatCMS Store, as the store dialog shows it. Picture addresses are the STORE's (relative); the site passes them through.
+    /// <paramref name="Accent"/> is a template's accent colour, already checked to be a plain colour (it ends up in a style attribute).</summary>
     public sealed record Entry(string Key, string Name, string Version, string Kind, string Summary, string Description, string Publisher, string PublisherUrl,
-        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images, long Downloads = 0);
+        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images, long Downloads = 0, string? Accent = null);
 
     private static HttpClient Client(TimeSpan timeout)
     {
@@ -67,19 +71,24 @@ public sealed class MatcmsStoreClient
 
     private static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
 
+    private static readonly System.Text.RegularExpressions.Regex Colour = new("^#[0-9a-fA-F]{3,8}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    private static JsonArray Items(JsonObject? catalog, string group) =>
+        catalog?[group switch { GroupTemplate => "templates", GroupComponent => "components", _ => "plugins" }] as JsonArray ?? new JsonArray();
+
     /// <summary>The catalogue as JSON, five minutes in memory (a failure one). Never throws — an unreachable store is a message in the dialog.</summary>
-    private async Task<(JsonArray? Plugins, string? Error)> CatalogAsync(bool fresh, CancellationToken ct)
+    private async Task<(JsonObject? Catalog, string? Error)> CatalogAsync(bool fresh, CancellationToken ct)
     {
         var cacheKey = "matcms-store-catalog|" + BaseUrl;
-        if (!fresh && _cache.TryGetValue(cacheKey, out (JsonArray? Plugins, string? Error) hit)) return hit;
-        (JsonArray?, string?) result;
+        if (!fresh && _cache.TryGetValue(cacheKey, out (JsonObject? Catalog, string? Error) hit)) return hit;
+        (JsonObject?, string?) result;
         try
         {
             using var http = Client(TimeSpan.FromSeconds(8));
             var body = await http.GetStringAsync(BaseUrl + "/store/api/catalog", ct);
-            var plugins = body.Length < 5_000_000 && JsonNode.Parse(body) is JsonObject o ? o["plugins"] as JsonArray : null;
-            result = plugins is null ? (null, "Der MatCMS Store hat keinen gültigen Katalog geliefert.") : (plugins, null);
-            if (plugins is not null) _updates.SetStore(plugins.OfType<JsonObject>().Select(p => (S(p["key"]), S(p["version"]))));
+            var catalog = body.Length < 5_000_000 && JsonNode.Parse(body) is JsonObject o && o["plugins"] is JsonArray ? o : null;
+            result = catalog is null ? (null, "Der MatCMS Store hat keinen gültigen Katalog geliefert.") : (catalog, null);
+            if (catalog is not null) _updates.SetStore(Items(catalog, GroupPlugin).OfType<JsonObject>().Select(p => (S(p["key"]), S(p["version"]))));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -90,38 +99,40 @@ public sealed class MatcmsStoreClient
         return result;
     }
 
-    /// <summary>The store's plugins (only when this site may use the store).</summary>
-    public async Task<(List<Entry> Entries, string? Error)> ListAsync(CancellationToken ct = default)
+    /// <summary>The store's plugins, templates or components (<paramref name="group"/>) — only when this site may use the store.</summary>
+    public async Task<(List<Entry> Entries, string? Error)> ListAsync(string group = GroupPlugin, CancellationToken ct = default)
     {
         if (!(await AccessAsync(ct)).Allowed) return (new(), "Diese Website darf nicht aus dem MatCMS Store laden.");
-        var (plugins, error) = await CatalogAsync(false, ct);
-        if (plugins is null) return (new(), error);
+        var (catalog, error) = await CatalogAsync(false, ct);
+        if (catalog is null) return (new(), error);
         var list = new List<Entry>();
-        foreach (var p in plugins.OfType<JsonObject>())
+        foreach (var p in Items(catalog, group).OfType<JsonObject>())
         {
             var key = S(p["key"]);
             if (key.Length == 0 || S(p["download"]).Length == 0) continue;
             var images = (p["images"] as JsonArray ?? new JsonArray()).OfType<JsonObject>()
                 .Select(i => (Id: i["id"] is JsonValue iv && iv.TryGetValue<long>(out var id) ? id : 0, Caption: S(i["caption"])))
                 .Where(i => i.Id > 0).Take(8).ToList();
+            var accent = S(p["accentColor"]);
             list.Add(new Entry(key, S(p["name"]), S(p["version"]), S(p["kind"]), S(p["summary"]), S(p["description"]), S(p["publisher"]), S(p["publisherUrl"]),
                 p["publisherVerified"] is JsonValue pv && pv.TryGetValue<bool>(out var b) && b, images,
-                p["downloads"] is JsonValue dv && dv.TryGetValue<long>(out var dl) ? dl : 0));
+                p["downloads"] is JsonValue dv && dv.TryGetValue<long>(out var dl) ? dl : 0,
+                Colour.IsMatch(accent) ? accent : null));
         }
         return (list.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList(), null);
     }
 
     /// <summary>
     /// A store picture for the site's own admin, fetched by the SITE and served by it (the admin's browser never talks to matcms.de; the
-    /// admin's content policy would refuse it anyway). Only an id the catalogue names for that plugin, only PNG/JPEG/WebP, an hour in memory.
+    /// admin's content policy would refuse it anyway). Only an id the catalogue names for that entry, only PNG/JPEG/WebP, an hour in memory.
     /// </summary>
     public async Task<(byte[] Data, string Type)?> ImageAsync(string key, long id, CancellationToken ct = default)
     {
         if (!(await AccessAsync(ct)).Allowed) return null;
         var cacheKey = $"matcms-store-image|{BaseUrl}|{key}|{id}";
         if (_cache.TryGetValue(cacheKey, out (byte[] Data, string Type) hit)) return hit;
-        var (plugins, _) = await CatalogAsync(false, ct);
-        var entry = plugins?.OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
+        var (catalog, _) = await CatalogAsync(false, ct);
+        var entry = new[] { GroupPlugin, GroupTemplate, GroupComponent }.SelectMany(g => Items(catalog, g).OfType<JsonObject>()).FirstOrDefault(p => S(p["key"]) == key);
         var url = (entry?["images"] as JsonArray)?.OfType<JsonObject>()
             .FirstOrDefault(i => i["id"] is JsonValue iv && iv.TryGetValue<long>(out var x) && x == id) is { } img ? S(img["url"]) : "";
         if (!url.StartsWith('/') || url.StartsWith("//")) return null;
@@ -143,39 +154,53 @@ public sealed class MatcmsStoreClient
     }
 
     /// <summary>
-    /// Installs (or updates) one plugin from the MatCMS Store: the package only from the store server itself, only with a valid signature of
-    /// exactly these bytes for this key, kind and version, and only when the package's own manifest names the same key and version. Arrives
-    /// switched off, like every import.
+    /// Fetches one entry's package from the store server and checks it: only an address ON the store server (the catalogue names it), only a
+    /// valid signature of exactly these bytes for this kind, key and version. Returns the bytes and the entry, or why not.
     /// </summary>
-    public async Task<(bool Ok, string Message, int? PluginId)> InstallAsync(string key, CancellationToken ct = default)
+    private async Task<(byte[]? Bytes, JsonObject? Entry, string? Error)> FetchSignedAsync(string group, string key, CancellationToken ct)
     {
-        if (!(await AccessAsync(ct)).Allowed) return (false, "Diese Website darf nicht aus dem MatCMS Store laden.", null);
-        var (plugins, error) = await CatalogAsync(true, ct);
-        if (plugins is null) return (false, error ?? "Der MatCMS Store ist nicht erreichbar.", null);
-        var entry = plugins.OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
-        if (entry is null) return (false, $"„{key}“ gibt es im MatCMS Store nicht.", null);
+        if (!(await AccessAsync(ct)).Allowed) return (null, null, "Diese Website darf nicht aus dem MatCMS Store laden.");
+        var (catalog, error) = await CatalogAsync(true, ct);
+        if (catalog is null) return (null, null, error ?? "Der MatCMS Store ist nicht erreichbar.");
+        var entry = Items(catalog, group).OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
+        if (entry is null) return (null, null, $"„{key}“ gibt es im MatCMS Store nicht.");
         var download = S(entry["download"]);
-        if (!download.StartsWith('/') || download.StartsWith("//")) return (false, "Der Katalog nennt kein Paket für diesen Eintrag.", null);
+        if (!download.StartsWith('/') || download.StartsWith("//")) return (null, null, "Der Katalog nennt kein Paket für diesen Eintrag.");
 
         byte[] bytes;
+        var max = group == GroupPlugin ? MaxPackageBytes : StoreItemPackage.MaxBytes;
         try
         {
             using var http = Client(TimeSpan.FromSeconds(90));
             using var res = await http.GetAsync(BaseUrl + download, HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!res.IsSuccessStatusCode) return (false, $"Das Paket kam nicht an (HTTP {(int)res.StatusCode}).", null);
-            if (res.Content.Headers.ContentLength > MaxPackageBytes) return (false, "Das Paket ist zu groß.", null);
+            if (!res.IsSuccessStatusCode) return (null, null, $"Das Paket kam nicht an (HTTP {(int)res.StatusCode}).");
+            if (res.Content.Headers.ContentLength > max) return (null, null, "Das Paket ist zu groß.");
             bytes = await res.Content.ReadAsByteArrayAsync(ct);
-            if (bytes.LongLength > MaxPackageBytes) return (false, "Das Paket ist zu groß.", null);
+            if (bytes.LongLength > max) return (null, null, "Das Paket ist zu groß.");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            return (false, "Das Paket konnte nicht geladen werden: " + ex.Message, null);
+            return (null, null, "Das Paket konnte nicht geladen werden: " + ex.Message);
         }
 
         var version = S(entry["version"]);
-        var kind = S(entry["kind"]) is { Length: > 0 } k ? k : PluginBundle.KindScript;
+        // The kind that is signed: a plugin's own (script/native) from the catalogue, a template's or component's fixed — a template cannot be passed
+        // off as a component, or the other way round.
+        var kind = group == GroupPlugin ? (S(entry["kind"]) is { Length: > 0 } k ? k : PluginBundle.KindScript) : group;
         if (!StoreSignature.VerifyPackage(bytes, kind, key, version, S(entry["sha256"]), S(entry["signature"]), S(entry["keyId"]), KeysOverride))
-            return (false, $"Die Signatur von „{key}“ {version} passt nicht zu diesem Paket oder zu den Store-Schlüsseln dieser MatCMS-Version – nichts installiert.", null);
+            return (null, null, $"Die Signatur von „{key}“ {version} passt nicht zu diesem Paket oder zu den Store-Schlüsseln dieser MatCMS-Version – nichts installiert.");
+        return (bytes, entry, null);
+    }
+
+    /// <summary>
+    /// Installs (or updates) one plugin from the MatCMS Store: only signed (see <see cref="FetchSignedAsync"/>), and only when the package's own
+    /// manifest names the same key and version. Arrives switched off, like every import.
+    /// </summary>
+    public async Task<(bool Ok, string Message, int? PluginId)> InstallAsync(string key, CancellationToken ct = default)
+    {
+        var (bytes, entry, error) = await FetchSignedAsync(GroupPlugin, key, ct);
+        if (bytes is null) return (false, error!, null);
+        var version = S(entry!["version"]);
         if (Manifest(bytes) is not { } m || !string.Equals(m.Key, key, StringComparison.OrdinalIgnoreCase) || m.Version != version)
             return (false, "Das Paket nennt einen anderen Plugin-Schlüssel oder eine andere Version als der Store – nichts installiert.", null);
 
@@ -185,6 +210,35 @@ public sealed class MatcmsStoreClient
         return (true, updated
             ? $"Plugin „{plugin.Name}“ aus dem MatCMS Store auf {plugin.Version} aktualisiert (Signatur geprüft). Es ist deaktiviert, bis du es freischaltest."
             : $"Plugin „{plugin.Name}“ {plugin.Version} aus dem MatCMS Store installiert (Signatur geprüft). Es ist deaktiviert, bis du es freischaltest.", plugin.Id);
+    }
+
+    /// <summary>
+    /// Installs (or updates) a template or a component from the MatCMS Store: only signed, and only when the file is what its key says — a
+    /// template whose NAME, a component whose TYPE gives this key (<see cref="StoreItemPackage.KeyOf"/>), so a package cannot overwrite a
+    /// template or component of another name on this site. Goes through the same importer as a pasted JSON (<see cref="DesignImport"/>): a
+    /// template is never activated, its tuned parameter values on this site survive.
+    /// </summary>
+    public async Task<(bool Ok, string Message)> InstallDesignAsync(string group, string key, CancellationToken ct = default)
+    {
+        if (group is not (GroupTemplate or GroupComponent)) return (false, "Unbekannte Art.");
+        var (bytes, entry, error) = await FetchSignedAsync(group, key, ct);
+        if (bytes is null) return (false, error!);
+        using var doc = StoreItemPackage.Parse(bytes);
+        if (doc is null || !string.Equals(StoreItemPackage.KeyOf(group, doc.RootElement), key, StringComparison.Ordinal))
+            return (false, "Die Datei ist nicht der Eintrag, den der Store nennt – nichts installiert.");
+        var version = S(entry!["version"]);
+        if (group == GroupTemplate)
+        {
+            var (row, isNew, _) = await DesignImport.TemplateAsync(_db, doc.RootElement, ct);
+            return (true, isNew
+                ? $"Template „{row.Name}“ {version} aus dem MatCMS Store installiert (Signatur geprüft). Unter Templates aktivieren, um es zu verwenden."
+                : $"Template „{row.Name}“ aus dem MatCMS Store auf {version} aktualisiert (Signatur geprüft).");
+        }
+        var (component, isNewComponent, importError) = await DesignImport.ComponentAsync(_db, doc.RootElement, ct);
+        if (component is null) return (false, importError ?? "Import fehlgeschlagen.");
+        return (true, isNewComponent
+            ? $"Komponente „{component.Name}“ {version} aus dem MatCMS Store installiert (Signatur geprüft)."
+            : $"Komponente „{component.Name}“ aus dem MatCMS Store auf {version} aktualisiert (Signatur geprüft).");
     }
 
     /// <summary>

@@ -142,7 +142,7 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
     {
         await _s.InstallAsync();
         var guest = _s.App.Browser();
-        Assert.Contains("Noch keine Einträge.", WebUtility.HtmlDecode(await guest.GetStringAsync("/store")));
+        Assert.DoesNotContain("acme-hello", await guest.GetStringAsync("/store"));                 // (other tests of this class may have published a template)
 
         var pub = await PublisherAsync(_s, "Acme Plugins", "acme@store.example");
         Assert.Contains("Acme Plugins", await pub.GetStringAsync("/store/konto"));
@@ -202,6 +202,57 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         var item = JsonNode.Parse(await guest.GetStringAsync("/store/api/plugins/acme-hello"))!;
         Assert.Equal(1, (int)item["downloads"]!);
         Assert.Single(item["versions"]!.AsArray());
+    }
+
+    private static async Task<HttpResponseMessage> UploadJsonAsync(HttpClient c, byte[] json, string version)
+    {
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent(await TokenOf(c, "/store/konto/hochladen")), "__RequestVerificationToken" },
+            { new ByteArrayContent(json), "package", "template.json" },
+            { new StringContent(version), "version" },
+            { new StringContent("Ein frisches Design."), "summary" }
+        };
+        return await c.PostAsync("/store/konto/hochladen", form);
+    }
+
+    [Fact]
+    public async Task Templates_and_components_are_json_files_signed_like_plugins_and_listed_in_their_own_arrays()
+    {
+        await _s.InstallAsync();
+        var pub = await PublisherAsync(_s, "Design Studio", "design@store.example");
+        var template = Encoding.UTF8.GetBytes(new JsonObject
+        {
+            ["Name"] = "Grüne Wiese 2", ["AccentColor"] = "#22aa77", ["HeadingFont"] = "Inter", ["LayoutHtml"] = "<main>{{content}}</main>", ["CustomJs"] = ""
+        }.ToJsonString());
+        var key = StoreItemPackage.Key("Grüne Wiese 2");                                   // the SHARED rule, what sites and clouds check
+        Assert.Equal("gruene-wiese-2", key);
+
+        Assert.Contains("Version", await ErrorOfAsync(await UploadJsonAsync(pub, template, "")));   // a JSON file names no version itself
+        var up = await UploadJsonAsync(pub, template, "1.0");
+        Assert.True(up.StatusCode == HttpStatusCode.Redirect, await ErrorOfAsync(up));
+        Assert.Equal("/store/konto/eintrag/" + key + "?ok=submitted", up.Headers.Location?.OriginalString);
+        // the key is a template's now: a plugin under it is refused
+        Assert.Matches("andere|another", await ErrorOfAsync(await UploadAsync(pub, Package(key, "2.0"))));
+
+        var admin = _s.App.Browser();
+        await AppFactory.LoginAsync(admin);
+        var vid = VersionIdIn(await admin.GetStringAsync("/admin/p/matcms-store/review"), "Grüne Wiese 2 1.0");
+        var sha = StoreSignature.Sha256Hex(template);
+        Assert.Contains("sign template " + key + " 1.0 " + sha, await admin.GetStringAsync("/admin/p/matcms-store/review/" + vid));
+        var sig = StoreSignature.Sign(StoreSignature.Text("template", key, "1.0", sha), _s.Key);
+        Assert.Equal(HttpStatusCode.Redirect, (await DecideAsync(admin, vid, "approve", _s.KeyId + ":" + sig)).StatusCode);
+
+        var guest = _s.App.Browser();
+        var catalog = JsonNode.Parse(await guest.GetStringAsync("/store/api/catalog"))!;
+        Assert.DoesNotContain(catalog["plugins"]!.AsArray(), p => (string?)p!["key"] == key);
+        var entry = catalog["templates"]!.AsArray().OfType<JsonObject>().Single(t => (string?)t["key"] == key);
+        Assert.Equal(("template", "#22aa77", "/store/api/items/" + key + "/1.0/package"), ((string?)entry["kind"], (string?)entry["accentColor"], (string?)entry["download"]));
+        var file = await guest.GetByteArrayAsync((string)entry["download"]!);
+        Assert.Equal(template, file);
+        Assert.True(StoreSignature.VerifyPackage(file, "template", key, "1.0", sha, (string?)entry["signature"], _s.KeyId, _s.Keys));
+        Assert.Contains("Grüne Wiese 2", WebUtility.HtmlDecode(await guest.GetStringAsync("/store?art=template")));
+        Assert.DoesNotContain("Grüne Wiese 2", WebUtility.HtmlDecode(await guest.GetStringAsync("/store?art=component")));
     }
 
     [Fact]

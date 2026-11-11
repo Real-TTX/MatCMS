@@ -34,7 +34,7 @@ internal static class StorePages
     {
         var db = new StoreDb(ctx.Data);
         var q = ctx.Request.Q("q").Trim();
-        var kind = ctx.Request.Q("art") is "script" or "native" ? ctx.Request.Q("art") : "";
+        var kind = ctx.Request.Q("art") is "script" or "native" or StorePackage.KindTemplate or StorePackage.KindComponent ? ctx.Request.Q("art") : "";
         var tag = ctx.Request.Q("tag").Trim();
         var items = await PublicItemsAsync(db, StoreText.Cut(q, 80), kind, StoreText.Cut(tag, 40), ct);
 
@@ -45,7 +45,8 @@ internal static class StorePages
         if (ctx.Settings.Get(StoreSettings.Intro) is { Length: > 0 } intro) sb.Append("<p class=\"mst-intro\">").Append(E(intro)).Append("</p>");
         sb.Append("</div><a class=\"btn btn-outline\" href=\"").Append(StoreUrls.Account).Append("\">").Append(E(ctx.T("store.submit"))).Append("</a></div>");
         sb.Append("<div class=\"mst-bar\"><div class=\"mst-tabs\">").Append(Tab("", ctx.T("store.all"))).Append(Tab("script", ctx.T("store.kind.script")))
-          .Append(Tab("native", ctx.T("store.kind.native")));
+          .Append(Tab("native", ctx.T("store.kind.native"))).Append(Tab(StorePackage.KindTemplate, ctx.T("store.kind.templates")))
+          .Append(Tab(StorePackage.KindComponent, ctx.T("store.kind.components")));
         if (tag.Length > 0)
             sb.Append($"<a class=\"mst-tab is-on\" href=\"{E(StoreUrls.Home + Query(q, kind, ""))}\" title=\"{E(ctx.T("store.removeTag"))}\">#{E(tag)} ×</a>");
         sb.Append("</div><form class=\"mst-search\" method=\"get\" action=\"").Append(StoreUrls.Home).Append("\">");
@@ -116,15 +117,16 @@ internal static class StorePages
             foreach (var t in tags) sb.Append("<a class=\"mst-tab\" href=\"").Append(E(StoreUrls.Home + "?tag=" + Uri.EscapeDataString(t))).Append("\">#").Append(E(t)).Append("</a>");
             sb.Append("</div>");
         }
-        sb.Append("<p class=\"mst-notice mst-info\">").Append(E(ctx.T("store.install"))).Append(item.LatestKind == "native" ? " " + E(ctx.T("store.installNative")) : "").Append("</p>");
+        var installKey = StorePackage.Group(item.LatestKind) switch { StorePackage.KindTemplate => "store.installTemplate", StorePackage.KindComponent => "store.installComponent", _ => "store.install" };
+        sb.Append("<p class=\"mst-notice mst-info\">").Append(E(ctx.T(installKey))).Append(item.LatestKind == "native" ? " " + E(ctx.T("store.installNative")) : "").Append("</p>");
         if (latest is not null)
-            sb.Append("<div class=\"mst-actions\"><a class=\"btn btn-outline\" href=\"").Append(E(StoreUrls.Bundle(item.Key, latest.Version))).Append("\">")
+            sb.Append("<div class=\"mst-actions\"><a class=\"btn btn-outline\" href=\"").Append(E(StoreUrls.Package(item.Key, latest.Version, latest.Kind))).Append("\">")
               .Append(E(ctx.T("store.downloadPackage", latest.Version))).Append("</a></div>");
         sb.Append("</div><dl class=\"mst-facts\">");
         void Fact(string label, string value) { if (value.Length > 0) sb.Append("<div><dt>").Append(E(label)).Append("</dt><dd>").Append(E(value)).Append("</dd></div>"); }
         Fact(ctx.T("store.fact.version"), latest?.Version ?? "");
         Fact(ctx.T("store.fact.updated"), Day(latest?.PublishedAt));
-        Fact(ctx.T("store.fact.kind"), ctx.T(item.LatestKind == "native" ? "store.kind.native" : "store.kind.script") + (latest?.Api is { Length: > 0 } api ? " · " + ctx.T("store.fact.api", api) : ""));
+        Fact(ctx.T("store.fact.kind"), ctx.T(StoreText.KindKey(item.LatestKind)) + (latest?.Api is { Length: > 0 } api ? " · " + ctx.T("store.fact.api", api) : ""));
         Fact(ctx.T("store.fact.publisher"), pub?.Name ?? "");
         Fact(ctx.T("store.fact.license"), item.License);
         Fact(ctx.T("store.fact.downloads"), N(item.Downloads));

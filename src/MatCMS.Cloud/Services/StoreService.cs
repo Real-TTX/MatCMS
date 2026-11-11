@@ -52,6 +52,7 @@ public class StoreService
         row.ParametersJson = b.ParametersJson ?? row.ParametersJson;
         row.ParamValuesJson = b.ParamValuesJson ?? row.ParamValuesJson;
         row.PartsJson = b.PartsJson ?? row.PartsJson;
+        row.Origin = ""; row.OriginVersion = "";   // an own save makes it the operator's (MatcmsStoreService sets it again after a take-over)
         await _db.SaveChangesAsync(ct);
         await TouchAsync(_db.ProfileStoreTemplates.Where(x => x.StoreTemplateId == row.Id).Select(x => x.ProfileId), ct);
         return isNew;
@@ -82,6 +83,7 @@ public class StoreService
         row.Icon = b.Icon ?? row.Icon;
         row.FieldsJson = b.FieldsJson ?? row.FieldsJson;
         row.TemplateHtml = b.TemplateHtml ?? row.TemplateHtml;
+        row.Origin = ""; row.OriginVersion = "";   // an own save makes it the operator's (MatcmsStoreService sets it again after a take-over)
         await _db.SaveChangesAsync(ct);
         await TouchAsync(_db.ProfileStoreComponents.Where(x => x.StoreComponentId == row.Id).Select(x => x.ProfileId), ct);
         return isNew;

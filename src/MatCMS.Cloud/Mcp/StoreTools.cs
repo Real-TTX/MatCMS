@@ -25,23 +25,31 @@ public class StoreTools
     }
 
     [McpServerTool(Name = "list_matcms_store"), Description(
-        "List the MatCMS Store on matcms.de (the official store server) with this cloud's state per plugin: new (not here), update (here, older), current, own (an own entry with that key, never overwritten). Read-only; any valid key.")]
+        "List the MatCMS Store on matcms.de (the official store server) — plugins, templates and components — with this cloud's state per entry: new (not here), update (here, older), current, own (an own entry with that key/name, never overwritten). Read-only; any valid key.")]
     public static async Task<object> ListMatcmsStore(McpContext me, MatcmsStoreService matcms,
         [Description("Ask matcms.de again instead of using the copy from the last five minutes.")] bool refresh = false, CancellationToken ct = default)
     {
         _ = me.Key;
         var (entries, error) = await matcms.ListAsync(refresh, ct);
-        return new { store = await matcms.BaseUrlAsync(ct), error, plugins = entries };
+        return new
+        {
+            store = await matcms.BaseUrlAsync(ct), error,
+            plugins = entries.Where(e => e.Group == MatcmsStoreService.GroupPlugin),
+            templates = entries.Where(e => e.Group == MatcmsStoreService.GroupTemplate),
+            components = entries.Where(e => e.Group == MatcmsStoreService.GroupComponent)
+        };
     }
 
     [McpServerTool(Name = "take_over_from_matcms_store"), Description(
-        "Take one plugin over from the MatCMS Store into this cloud's store: the package is checked against the store keys in this image (signature), its pictures and publisher come along, profiles that use it roll the new version out. An own entry with the same key is only replaced with replaceOwn=true (ask the operator first: the same key may be another plugin); the entry and its profile selections stay. Requires the store right.")]
+        "Take one entry over from the MatCMS Store into this cloud's store — a plugin, or with kind=template|component a template or component: the file is checked against the store keys in this image (signature), a plugin's pictures and publisher come along, profiles that use it roll the new version out. An own entry with the same key (template: name, component: type) is only replaced with replaceOwn=true (ask the operator first); the entry and its profile selections stay. Requires the store right.")]
     public static async Task<object> TakeOverFromMatcmsStore(McpContext me, MatcmsStoreService matcms,
         [Description("The plugin key, e.g. \"forum\".")] string key,
-        [Description("Replace an OWN store entry with the same key by the signed MatCMS Store version.")] bool replaceOwn = false, CancellationToken ct = default)
+        [Description("Replace an OWN store entry with the same key by the signed MatCMS Store version.")] bool replaceOwn = false,
+        [Description("plugin (default), template or component.")] string kind = "plugin", CancellationToken ct = default)
     {
         RequireStore(me);
-        var r = await matcms.ImportAsync(key, ct, replaceOwn);
+        var r = await matcms.ImportAsync(key, ct, replaceOwn,
+            kind is MatcmsStoreService.GroupTemplate or MatcmsStoreService.GroupComponent ? kind : MatcmsStoreService.GroupPlugin);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message, key = r.Key, version = r.Version };
     }

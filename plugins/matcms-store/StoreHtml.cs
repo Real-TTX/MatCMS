@@ -33,7 +33,7 @@ internal static class StoreHtml
     }
 
     public static string KindBadge(IPluginContext ctx, string kind) =>
-        $"<span class=\"mst-badge {(kind == "native" ? "mst-native" : "mst-script")}\">{E(ctx.T(kind == "native" ? "store.kind.native" : "store.kind.script"))}</span>";
+        $"<span class=\"mst-badge {(kind == "native" ? "mst-native" : "mst-script")}\">{E(ctx.T(StoreText.KindKey(kind)))}</span>";
 
     /// <summary>One card of the catalogue: cover (or the initials), name, publisher, the beginning of the text, version and downloads.</summary>
     public static string Card(IPluginContext ctx, Item item, Publisher? pub, Picture? cover)

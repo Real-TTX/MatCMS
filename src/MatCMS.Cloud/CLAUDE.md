@@ -497,7 +497,11 @@ downloads the package (only paths ON the store server — addresses come from a 
 then goes through `UpsertPluginAsync` like an upload, with publisher and pictures (replaced). The row keeps `Origin = "matcms"`, `Signature`,
 `SignatureKeyId` (passed on in `CatalogPlugin`, additive) and is NOT repacked on the Plugin page — that would change the signed bytes; an own upload
 clears the origin. The three fields also ride the rollout (`ConfigPlugin.Origin/Signature/SignatureKeyId`), so a site checks a store plugin that
-reaches it through a profile exactly as one it installs itself. An OWN entry with the same key is replaced only on an explicit request ("Ersetzen" with a confirmation, REST `?replaceOwn=true`, MCP `replaceOwn`) — the same key may be another plugin; the row stays, so profile selections survive. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
+reaches it through a profile exactly as one it installs itself. **Templates and components** are taken over too (same tab, `?kind=template|component` on REST,
+`kind` on MCP): the JSON file signed with kind template/component, its name/type must give the store key (`StoreItemPackage`), then `StoreService`'s own
+upsert; `StoreTemplate/StoreComponent.Origin` + `OriginVersion` (migration `StoreDesignOrigin`) drive the list's state. Unlike a plugin they stay
+editable here — every own save (page, REST, MCP, JSON import) clears the origin, so the next take-over asks ("Ersetzen") instead of overwriting the
+edit. Sites check no signature for these: they trust their cloud for templates like for its own; the check is where they enter the cloud. An OWN entry with the same key is replaced only on an explicit request ("Ersetzen" with a confirmation, REST `?replaceOwn=true`, MCP `replaceOwn`) — the same key may be another plugin; the row stays, so profile selections survive. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
 Store address = CloudSetting `store.matcms.url` (empty = https://matcms.de). Test seams `HandlerFactory`/`KeysOverride` (`MatcmsStoreTakeOverTests`).
 
 **The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the

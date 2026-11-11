@@ -26,6 +26,13 @@ die Seite mit `?cookie-vorschau`.
 (`detail.categories`). Ein Link mit `href="#cookie-einstellungen"` oder ein Element mit `data-cookie-settings`
 öffnet die Einstellungen.
 
+## Sprachen (seit 1.1)
+Deutsch und Englisch. Die Admin-Seite folgt der Sprache des Admins. Die Banner-Texte sind Einstellungen: ein Text, der
+noch dem mitgelieferten Standard entspricht (deutsch oder englisch, oder nie gespeichert), folgt der Sprache der Seite
+(`<html lang>`, also `/en/…`); ein selbst geschriebener Text gilt in jeder Sprache so, wie er dasteht. Gespeicherte Werte
+werden nie umgeschrieben. Der Banner wird beim Laden des Plugins in der Standardsprache der Seite gezeichnet und trägt
+beide Texttabellen; sein Skript nimmt die der Seite (ohne Skript bleibt die Standardsprache).
+
 ## Speicherung
 - Einstellungen: SiteSetting `plugin.cookie-consent.config` (wird wie alle Plugin-Daten von einem Restore ersetzt).
 - Entscheidung des Besuchers: Cookie `mcc` = `<version>|<kategorien>|<zeit>`, Laufzeit einstellbar (Standard 12 Monate).

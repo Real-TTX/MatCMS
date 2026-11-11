@@ -23,7 +23,7 @@ using MatCMS.Plugin;
 public static class SeShowcase
 {
     public const string BlockType = "store_einblick";
-    private const string Agent = "MatCMS-Store-Einblick/1.2";
+    private const string Agent = "MatCMS-Store-Einblick/1.3";
 
     public static void Configure(IPluginBuilder b)
     {
@@ -285,7 +285,7 @@ public static class SeShowcase
         Publisher(sb, ctx, p);
         if (description.Length > 0) sb.Append("<p class=\"se-desc\">").Append(E(description)).Append("</p>");
         sb.Append("<div class=\"se-foot\"><span class=\"se-chip\">").Append(E(ctx.T("se.version", S(p["version"])))).Append("</span>");
-        if (Day(S(p["updated"])) is { } day) sb.Append("<span>").Append(E(day)).Append("</span>");
+        if (Day(S(p["updated"]), ctx.Locale) is { } day) sb.Append("<span>").Append(E(day)).Append("</span>");
         sb.Append("<button type=\"button\" class=\"se-open\" data-se-open hidden>").Append(E(ctx.T("se.details"))).Append(" <span aria-hidden=\"true\">→</span></button></div></div>");
 
         sb.Append("<div class=\"se-detail\" role=\"dialog\" aria-modal=\"true\" aria-label=\"").Append(E(name)).Append("\" hidden><div class=\"se-dbox\">")
@@ -318,7 +318,7 @@ public static class SeShowcase
             sb.Append("<p>").Append(E(para)).Append("</p>");
         sb.Append("</div><dl class=\"se-facts\">");
         Fact(sb, ctx.T("se.fact.version"), S(p["version"]));
-        Fact(sb, ctx.T("se.fact.updated"), Day(S(p["updated"])) ?? "");
+        Fact(sb, ctx.T("se.fact.updated"), Day(S(p["updated"]), ctx.Locale) ?? "");
         Fact(sb, ctx.T("se.fact.kind"), native && S(p["api"]) is { Length: > 0 } api ? kindText + " · " + ctx.T("se.fact.api", api) : kindText);
         Fact(sb, ctx.T("se.fact.publisher"), S(p["publisher"]));
         if (pics.Count > 0) Fact(sb, ctx.T("se.fact.pictures"), N(pics.Count));
@@ -424,9 +424,11 @@ public static class SeShowcase
         };
     }
 
-    private static string? Day(string updated) =>
+    /// <summary>A catalogue day as the page's language writes it: 20.10.2026 in German, 20 Oct 2026 otherwise (the invariant culture's
+    /// month names are English — the image runs with invariant globalization, so "de-DE" would not help).</summary>
+    private static string? Day(string updated, string locale) =>
         updated.Length == 10 && DateTime.TryParseExact(updated, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
-            ? day.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : null;
+            ? day.ToString(locale.StartsWith("de", StringComparison.OrdinalIgnoreCase) ? "dd.MM.yyyy" : "d MMM yyyy", CultureInfo.InvariantCulture) : null;
 
     /// <summary>An address a visitor may be sent to: absolute http(s), nothing else — it comes from the cloud, not from this site.</summary>
     public static string SafeUrl(string url) =>

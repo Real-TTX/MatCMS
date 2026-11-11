@@ -46,8 +46,10 @@ public class IndexModel : PageModel
         // Topbar title: use the plugin's admin-menu label (its human name), matched by this page's URL —
         // not the lowercase route key. Strip a trailing " (N)" badge (e.g. "Bewertungen (3)"). Falls back to the key.
         var url = "/admin/plugin/" + Key;
-        var label = _registry.AdminMenu
-            .FirstOrDefault(m => string.Equals(m.Url, url, StringComparison.OrdinalIgnoreCase))?.Label;
+        var entry = _registry.AdminMenu.FirstOrDefault(m => string.Equals(m.Url, url, StringComparison.OrdinalIgnoreCase));
+        // A label that is a key of the plugin's own strings ("ls.nav.2") reads in the admin's language — as in the sidebar (AdminNav).
+        var label = entry is null ? null
+            : MatCMS.Services.Plugins.PluginStrings.Label(_registry.SliceOf(entry.Owner), MatCMS.Services.Plugins.PluginRequestContext.CurrentLocale(), entry.Label);
         if (!string.IsNullOrWhiteSpace(label))
             label = System.Text.RegularExpressions.Regex.Replace(label, @"\s*\(\d+\)\s*$", "");
         Title = string.IsNullOrWhiteSpace(label) ? Key : label!;

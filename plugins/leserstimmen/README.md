@@ -37,6 +37,10 @@ Gespeichert wird getrennt: `SiteSettings` `plugin.leserstimmen.<sammlung>` (JSON
   sonst Kontakt-Empfänger der Seite).
 - **Zähler im Menü**: „Leserstimmen (2)“ = Stimmen, die auf Freigabe warten; aktualisiert sich nach jeder
   Abgabe und Moderation, ohne die Plugins neu zu starten.
+- **Deutsch und Englisch** (seit 1.4): Admin-Seite, Menü (auch mit Zähler) und Block-Editor folgen der Sprache des Admins,
+  der Block der Sprache der Seite (`/en/…`: Formular, Durchschnitt „4.8 out of 5“, Monate, Danke-Meldung). Die Anrede
+  Sie/du gibt es nur im Deutschen. Was im Block eingetragen ist (Überschrift, Button-Text …), steht so da, wie es eingetragen
+  ist; leer gelassen kommt der Standard in der Sprache der Seite. Die Benachrichtigungs-Mail ist in der Standardsprache der Seite.
 - Konfiguration: `autoPublish=true` (ohne Freigabe).
 - Design: alle Farben aus den Template-Variablen (`--accent`, `--ink`, `--bg` …). Ein Template passt es
   über `--mls-*` an, **mit `body`-Präfix** (`body .mls{…}`), weil das Plugin-CSS im `<head>` später kommt.
@@ -47,6 +51,7 @@ Gespeichert wird getrennt: `SiteSettings` `plugin.leserstimmen.<sammlung>` (JSON
 - Neu per Restore/Store installiert = **deaktiviert**, einmal im Admin einschalten.
 - Ein Restore mit neuerem Code startet das Plugin **nicht** neu: bis zum Aus-/Einschalten (oder
   Neustart) läuft der alte Code weiter.
-- MatCMS läuft mit `InvariantGlobalization`: Zahlen/Monate werden im Code von Hand deutsch formatiert.
+- MatCMS läuft mit `InvariantGlobalization`: Zahlen/Monate werden im Code von Hand deutsch formatiert (englisch liefert die
+  invariante Kultur selbst).
 - `/plugin/{key}` lehnt einen `__return` mit `#anker` ab (Rücksprung auf „/“), deshalb scrollt ein
   kleines Skript zur Danke-Meldung.

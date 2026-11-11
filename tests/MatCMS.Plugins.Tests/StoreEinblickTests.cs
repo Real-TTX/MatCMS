@@ -98,11 +98,11 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
             new JsonObject { ["type"] = "quote", ["name"] = "Zitat", ["description"] = "Eine Stimme.", ["icon"] = "x\" onmouseover=\"alert(1)" })
     }.ToJsonString();
 
-    private async Task<int> PageWithBlockAsync(string slug)
+    private async Task<int> PageWithBlockAsync(string slug, string locale = "de")
     {
         using var scope = _app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var page = new Page { Title = "Store", Slug = slug, Locale = "de", IsPublished = true };
+        var page = new Page { Title = "Store", Slug = slug, Locale = locale, IsPublished = true };
         db.Pages.Add(page);
         await db.SaveChangesAsync();
         db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "store_einblick", DataJson = "{\"heading\":\"Aus dem Store\",\"show\":\"all\",\"counts\":\"yes\"}" });
@@ -209,6 +209,26 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         await InstallAsync(Native, stub.Url);
         var fromNative = Section(await visitor.GetStringAsync("/store-test"));
         Assert.Equal(fromScript, fromNative);
+    }
+
+    [Fact]
+    public async Task On_an_English_page_the_shop_window_speaks_English()
+    {
+        using var stub = new CatalogStub { Body = Catalog };
+        await ScriptPluginSite.SettingAsync(_app, SettingKeys.Languages, "de,en");
+        await PageWithBlockAsync("store-en", "en");
+        await PageWithBlockAsync("store-test-de");
+        await InstallAsync(Script, stub.Url);
+        var en = WebUtility.HtmlDecode(Section(await _app.Browser().GetStringAsync("/en/store-en")));
+        Assert.Contains(">Components<span>2</span>", en);
+        Assert.Contains("2 pictures", en);
+        Assert.Contains("<dt>Kind</dt><dd>Native · plugin API 2</dd>", en);
+        Assert.Contains("20 Oct 2026", en);                                // a day as English writes it
+        Assert.DoesNotContain("20.10.2026", en);
+        Assert.DoesNotContain("Komponenten", en);
+
+        var de = WebUtility.HtmlDecode(Section(await _app.Browser().GetStringAsync("/store-test-de")));
+        Assert.Contains("20.10.2026", de);
     }
 
     [Fact]

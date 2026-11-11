@@ -102,10 +102,189 @@ string UrlHost(string u)
     try { var h = new Uri(u).Host; return h.StartsWith("www.") ? h.Substring(4) : h; }
     catch { return ""; }
 }
+// ---- texts: German and English ---------------------------------------------------------------
+// Key, German, English. A key ending in ".sie"/".du" exists twice for the block's form of address (English has one form).
+// The back office and the block follow the request's language (the admin's choice, the page's /en/ prefix); the mail about a new
+// review goes out in the site's default language. Texts an editor typed into a block (heading, button …) are shown as typed.
+(string Key, string De, string En)[] LsRows =
+{
+    ("ls.nav", "Leserstimmen", "Reviews"),
+    ("ls.block.name", "Leserstimmen", "Reviews"),
+    ("ls.block.desc", "Rezensionen und Kundenstimmen – als Karten, großes Zitat, Liste oder Laufband, mit Sternen, Herzen, Punkten oder ohne Wertung, Durchschnitt und Formular.",
+        "Reviews and testimonials – as cards, a large quote, a list or a ticker, with stars, hearts, dots or no rating, an average and a form."),
+    ("ls.f.heading", "Überschrift", "Heading"),
+    ("ls.f.store", "Sammlung", "Collection"),
+    ("ls.f.storeHelp", "Name der Liste, z. B. ein Buchtitel. Blöcke mit derselben Sammlung zeigen dieselben Stimmen.", "Name of the list, e.g. a book title. Blocks with the same collection show the same reviews."),
+    ("ls.f.layout", "Darstellung", "Layout"),
+    ("ls.o.karten", "Karten (klassisch)", "Cards (classic)"),
+    ("ls.o.elegant", "Karten mit Zitatzeichen und Initialen", "Cards with quotation marks and initials"),
+    ("ls.o.zitat", "Großes Zitat, eins nach dem anderen", "Large quote, one after the other"),
+    ("ls.o.liste", "Schlichte Liste", "Simple list"),
+    ("ls.o.laufband", "Laufband", "Ticker"),
+    ("ls.f.look", "Farben", "Colours"),
+    ("ls.o.template", "Wie das Template", "Like the template"),
+    ("ls.o.hell", "Hell", "Light"),
+    ("ls.o.dunkel", "Dunkel", "Dark"),
+    ("ls.o.akzent", "Akzentfarbe", "Accent colour"),
+    ("ls.f.symbol", "Wertung mit", "Rating with"),
+    ("ls.o.stern", "Sternen", "Stars"),
+    ("ls.o.herz", "Herzen", "Hearts"),
+    ("ls.o.punkt", "Punkten", "Dots"),
+    ("ls.o.flamme", "Flammen", "Flames"),
+    ("ls.o.keine", "Ohne Wertung", "No rating"),
+    ("ls.f.address", "Anrede", "Form of address"),
+    ("ls.o.sie", "Sie", "Formal (German “Sie”)"),
+    ("ls.o.du", "du", "Informal (German “du”)"),
+    ("ls.f.addressHelp", "Wie das Formular die Besucher anspricht.", "How the form addresses visitors – only German has two forms, English pages read the same either way."),
+    ("ls.f.columns", "Spalten", "Columns"),
+    ("ls.f.showAverage", "Durchschnitt zeigen", "Show average"),
+    ("ls.f.showForm", "Formular zeigen", "Show form"),
+    ("ls.o.ja", "Ja", "Yes"),
+    ("ls.o.nein", "Nein", "No"),
+    ("ls.f.askLink", "Link-Feld (z. B. Instagram, Blog)", "Link field (e.g. Instagram, blog)"),
+    ("ls.f.askEmail", "E-Mail-Feld (wird nie gezeigt)", "E-mail field (never shown)"),
+    ("ls.o.optional", "Optional", "Optional"),
+    ("ls.o.pflicht", "Pflicht", "Required"),
+    ("ls.f.formTitle", "Formular-Überschrift", "Form heading"),
+    ("ls.f.formTitleHelp", "Leer = „Ihre Bewertung abgeben“ (bei du: „Deine Bewertung“), in der Sprache der Seite.", "Empty = “Submit your review”, in the language of the page."),
+    ("ls.f.intro", "Hinweis über dem Formular", "Note above the form"),
+    ("ls.f.introHelp", "z. B. Einverständnis zur Veröffentlichung", "e.g. consent to publication"),
+    ("ls.f.buttonText", "Button-Text", "Button text"),
+    ("ls.f.buttonTextHelp", "Leer = „Bewertung absenden“, in der Sprache der Seite.", "Empty = “Submit review”, in the language of the page."),
+
+    ("ls.avg", "{0} von 5 · {1}", "{0} out of 5 · {1}"),
+    ("ls.votes.1", "{0} Stimme", "{0} review"),
+    ("ls.votes.n", "{0} Stimmen", "{0} reviews"),
+    ("ls.thanks.sie", "Vielen Dank für Ihre Bewertung!", "Thank you for your review!"),
+    ("ls.thanks.du", "Danke für deine Bewertung!", "Thanks for your review!"),
+    ("ls.later.sie", "Sie erscheint nach einer kurzen Prüfung.", "It will appear after a short check."),
+    ("ls.later.du", "Sie erscheint, sobald ich sie freigegeben habe.", "It will appear as soon as I have approved it."),
+    ("ls.empty.sie", "Noch keine Bewertungen – seien Sie die oder der Erste!", "No reviews yet – be the first!"),
+    ("ls.empty.du", "Noch keine Stimmen – sei die oder der Erste!", "No reviews yet – be the first!"),
+    ("ls.slider", "Stimmen, zum Blättern wischen", "Reviews, swipe to browse"),
+    ("ls.prev", "Vorherige Stimme", "Previous review"),
+    ("ls.next", "Nächste Stimme", "Next review"),
+    ("ls.slide", "Stimme {0}", "Review {0}"),
+    ("ls.symLabel", "{0} von 5 {1}", "{0} out of 5 {1}"),
+    ("ls.n.stern.1", "Stern", "star"), ("ls.n.stern.n", "Sterne", "stars"),
+    ("ls.n.herz.1", "Herz", "heart"), ("ls.n.herz.n", "Herzen", "hearts"),
+    ("ls.n.punkt.1", "Punkt", "dot"), ("ls.n.punkt.n", "Punkte", "dots"),
+    ("ls.n.flamme.1", "Flamme", "flame"), ("ls.n.flamme.n", "Flammen", "flames"),
+    ("ls.formTitle.sie", "Ihre Bewertung abgeben", "Submit your review"),
+    ("ls.formTitle.du", "Deine Bewertung", "Your review"),
+    ("ls.name.sie", "Name", "Name"),
+    ("ls.name.du", "Name oder Account", "Name or account"),
+    ("ls.namePh.sie", "Ihr Name", "Your name"),
+    ("ls.namePh.du", "z. B. @buecherliebe", "e.g. @booklover"),
+    ("ls.email", "E-Mail", "E-mail"),
+    ("ls.emailNote.req", "(wird nicht veröffentlicht)", "(not published)"),
+    ("ls.emailNote.opt", "(wird nicht veröffentlicht, optional)", "(not published, optional)"),
+    ("ls.legend.sie", "Ihre {0}", "Your {0}"),
+    ("ls.legend.du", "Deine {0}", "Your {0}"),
+    ("ls.link.sie", "Link zu Ihrem Beitrag", "Link to your post"),
+    ("ls.link.du", "Link zu deinem Beitrag", "Link to your post"),
+    ("ls.optional", "(optional)", "(optional)"),
+    ("ls.linkPh", "Instagram, Blog, Shop …", "Instagram, blog, shop …"),
+    ("ls.text.sie", "Ihre Bewertung", "Your review"),
+    ("ls.text.du", "Deine Bewertung", "Your review"),
+    ("ls.textPh.sie", "Was hat Ihnen gefallen?", "What did you like?"),
+    ("ls.textPh.du", "Wie hat es dir gefallen?", "How did you like it?"),
+    ("ls.button", "Bewertung absenden", "Submit review"),
+
+    ("ls.mail.collection", "Leserstimmen · Sammlung „{0}“", "Reviews · collection “{0}”"),
+    ("ls.mail.heading", "Neue Stimme von {0}", "New review from {0}"),
+    ("ls.mail.email", "E-Mail: {0}", "E-mail: {0}"),
+    ("ls.mail.link", "Link: {0}", "Link: {0}"),
+    ("ls.mail.published", "Sie ist bereits veröffentlicht.", "It is already published."),
+    ("ls.mail.waiting", "Sie wartet auf deine Freigabe.", "It is waiting for your approval."),
+    ("ls.mail.open", "Leserstimmen öffnen", "Open reviews"),
+    ("ls.mail.check", "Jetzt prüfen und freigeben", "Review and approve now"),
+    ("ls.mail.subjPublished", "Neue Leserstimme von {0}", "New review from {0}"),
+    ("ls.mail.subjPending", "Neue Leserstimme zur Freigabe: {0}", "New review awaiting approval: {0}"),
+    ("ls.test.subject", "Test: Leserstimmen-Benachrichtigung", "Test: review notification"),
+    ("ls.test.text", "So sieht die Benachrichtigung aus, wenn jemand eine Stimme abgibt. Diese hier ist nur ein Test.", "This is what the notification looks like when someone submits a review. This one is only a test."),
+    ("ls.test.noRecipient", "Test-Mail nicht gesendet: kein Empfänger eingetragen.", "Test mail not sent: no recipient entered."),
+    ("ls.test.noService", "kein Mail-Dienst", "no mail service"),
+    ("ls.test.sent", "Test-Mail an {0} gesendet.", "Test mail sent to {0}."),
+    ("ls.test.failed", "Test-Mail fehlgeschlagen: {0}", "Test mail failed: {0}"),
+
+    ("ls.a.sub", "Neue Stimmen freigeben, verbergen oder löschen – oder eine Stimme von Hand eintragen.", "Approve, hide or delete new reviews – or enter one by hand."),
+    ("ls.a.auto", "Neue Stimmen erscheinen sofort (autoPublish).", "New reviews appear at once (autoPublish)."),
+    ("ls.a.pending", "Wartet auf Freigabe ({0})", "Awaiting approval ({0})"),
+    ("ls.a.nothingPending", "Nichts zu prüfen.", "Nothing to review."),
+    ("ls.a.published", "Veröffentlicht ({0})", "Published ({0})"),
+    ("ls.a.nothingPublished", "Noch nichts veröffentlicht.", "Nothing published yet."),
+    ("ls.a.ofFive", "{0} von 5", "{0} out of 5"),
+    ("ls.a.approve", "Freigeben", "Approve"),
+    ("ls.a.hide", "Verbergen", "Hide"),
+    ("ls.a.delete", "Löschen", "Delete"),
+    ("ls.a.deleteConfirm", "Diese Leserstimme wirklich löschen?", "Really delete this review?"),
+    ("ls.a.thRating", "Wertung", "Rating"),
+    ("ls.a.thName", "Name", "Name"),
+    ("ls.a.thText", "Text", "Text"),
+    ("ls.a.thStore", "Sammlung", "Collection"),
+    ("ls.a.thDate", "Datum", "Date"),
+    ("ls.a.storeHelp", "Muss zur Sammlung im Block passen.", "Must match the collection in the block."),
+    ("ls.a.link", "Link (optional)", "Link (optional)"),
+    ("ls.a.add", "Hinzufügen", "Add"),
+    ("ls.a.addTitle", "Von Hand hinzufügen", "Add by hand"),
+    ("ls.a.noMail", "Diese Seite kann noch keine Mails versenden. Unter Einstellungen → E-Mail den Versand einrichten (oder über die Cloud).",
+        "This site cannot send mail yet. Set up sending under Settings → E-mail (or through the cloud)."),
+    ("ls.a.notifyOn", "Bei neuen Stimmen per E-Mail benachrichtigen", "Notify by e-mail about new reviews"),
+    ("ls.a.when", "Wann", "When"),
+    ("ls.a.whenAll", "Bei jeder neuen Stimme", "For every new review"),
+    ("ls.a.whenPending", "Nur wenn eine Freigabe nötig ist", "Only when approval is needed"),
+    ("ls.a.users", "Empfänger aus den Benutzern", "Recipients from the users"),
+    ("ls.a.more", "Weitere Adressen", "Further addresses"),
+    ("ls.a.morePh", "eine pro Zeile", "one per line"),
+    ("ls.a.moreHelp", "Eine Adresse pro Zeile.", "One address per line."),
+    ("ls.a.save", "Speichern", "Save"),
+    ("ls.a.test", "Test-Mail senden", "Send test mail"),
+    ("ls.a.notifyTitle", "Benachrichtigung", "Notification"),
+    ("ls.a.lastTest", "Letzter Test ({0}): {1}", "Last test ({0}): {1}"),
+    ("ls.a.importOne", "Auf dieser Seite liegt noch eine Stimme aus dem früheren Plugin „Bewertungen“.", "There is still one review from the former plugin “Bewertungen” on this site."),
+    ("ls.a.importMany", "Auf dieser Seite liegen noch {0} Stimmen aus dem früheren Plugin „Bewertungen“.", "There are still {0} reviews from the former plugin “Bewertungen” on this site."),
+    ("ls.a.importHow", "Sie werden mit ihrer Sammlung und ihrem Freigabe-Status übernommen; danach auf der Seite den Block „Bewertungen“ durch „Leserstimmen“ ersetzen.",
+        "They are taken over with their collection and approval status; afterwards replace the block “Bewertungen” with “Reviews” on the page."),
+    ("ls.a.importBtn", "Übernehmen", "Take over"),
+    ("ls.a.importTitle", "Aus „Bewertungen“ übernehmen", "Take over from “Bewertungen”"),
+};
+var LsDe = LsRows.ToDictionary(r => r.Key, r => r.De);
+var LsEn = LsRows.ToDictionary(r => r.Key, r => r.En);
+// The menu label carries the number of reviews waiting ("Leserstimmen (2)"). The host translates a label only when it is a key, so
+// the counted labels are keys too (ls.nav.2), made here instead of written out.
+const int MaxBadge = 999;
+for (int i = 1; i <= MaxBadge; i++) { LsDe["ls.nav." + i] = "Leserstimmen (" + i + ")"; LsEn["ls.nav." + i] = "Reviews (" + i + ")"; }
+LsDe["ls.nav.more"] = "Leserstimmen (" + MaxBadge + "+)"; LsEn["ls.nav.more"] = "Reviews (" + MaxBadge + "+)";
+// Registered with the host: it translates the menu label and the block's name, fields and options (all keys of these tables).
+Plugin.Strings("de", LsDe);
+Plugin.Strings("en", LsEn);
+
+// German or English for a culture: as itself, else the site's default language, else English (as the host's own lookup does).
+string Lang(string culture)
+{
+    var c = (culture ?? "").Split('-')[0].ToLowerInvariant();
+    if (c is "de" or "en") return c;
+    return Localizer.DefaultCulture is "de" or "en" ? Localizer.DefaultCulture : "en";
+}
+// The request's language: the admin's choice in the back office, the page's language on the site.
+string ReqLang() => Lang(System.Globalization.CultureInfo.CurrentUICulture.Name);
+// The site's default language — for mail, which is read by the operator and not tied to a page.
+string SiteLang() => Lang(Localizer.DefaultCulture);
+string TIn(string lang, string key, params object[] args)
+{
+    var v = (lang == "en" ? LsEn : LsDe).TryGetValue(key, out var x) ? x : LsDe.TryGetValue(key, out var d) ? d : key;
+    return args.Length > 0 ? string.Format(v, args) : v;
+}
+string T(string key, params object[] args) => TIn(ReqLang(), key, args);
+// The form of address: key + .sie or key + .du.
+string TA(bool du, string key, params object[] args) => T(key + (du ? ".du" : ".sie"), args);
+
 // MatCMS runs with InvariantGlobalization: "de-DE" exists but carries invariant data, so it would
-// print "4.8" and "October". German formatting is therefore done by hand.
+// print "4.8" and "October". German formatting is therefore done by hand; the invariant culture's own is English.
 string[] Months = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
-string Month(DateTime d) => Months[d.Month - 1] + " " + d.Year;
+string Month(DateTime d) => ReqLang() == "en" ? d.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture) : Months[d.Month - 1] + " " + d.Year;
+string Day(DateTime d) => d.ToString(ReqLang() == "en" ? "yyyy-MM-dd" : "dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture);
 bool AutoPublish() => string.Equals(Config("autoPublish"), "true", StringComparison.OrdinalIgnoreCase);
 
 // ---- symbols: inline SVG in currentColor, so the theme colours them (an emoji ignores CSS) ----
@@ -117,17 +296,11 @@ string SymPath(string sym) => sym switch
     _ => "M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5l-5.9 3.1 1.2-6.5L2.5 9.5l6.6-.9z"
 };
 string Svg(string sym) => "<svg viewBox='0 0 24 24' aria-hidden='true' focusable='false'><path d='" + SymPath(sym) + "'/></svg>";
-string Noun(string sym, int n) => sym switch
-{
-    "flamme" => n == 1 ? "Flamme" : "Flammen",
-    "herz" => n == 1 ? "Herz" : "Herzen",
-    "punkt" => n == 1 ? "Punkt" : "Punkte",
-    _ => n == 1 ? "Stern" : "Sterne"
-};
+string Noun(string sym, int n) => T("ls.n." + (sym is "flamme" or "herz" or "punkt" ? sym : "stern") + (n == 1 ? ".1" : ".n"));
 string Symbols(int r, string sym)
 {
     if (sym == "keine" || r < 1) return "";
-    var sb = new StringBuilder("<span class='mls-sym' role='img' aria-label='" + r + " von 5 " + Noun(sym, 5) + "'>");
+    var sb = new StringBuilder("<span class='mls-sym' role='img' aria-label='" + Enc(T("ls.symLabel", r, Noun(sym, 5))) + "'>");
     for (int i = 1; i <= 5; i++) sb.Append("<span class='" + (i <= r ? "on" : "off") + "'>" + Svg(sym) + "</span>");
     return sb.Append("</span>").ToString();
 }
@@ -186,20 +359,22 @@ string SiteBase(IServiceProvider sp)
     var http = sp.GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>()?.HttpContext;
     return http == null ? "" : http.Request.Scheme + "://" + http.Request.Host.Value;
 }
-string MailHtml(string siteBase, string name, int rating, string email, string text, string link, bool published, string store)
+string MailHtml(string lang, string siteBase, string name, int rating, string email, string text, string link, bool published, string store)
 {
     string E(string x) => System.Net.WebUtility.HtmlEncode(x ?? "");
+    // The wording is encoded first, then the (already encoded or built) values go into its {0}.
+    string M(string key, string html) => string.Format(E(TIn(lang, key)), html);
     var stars = rating > 0 ? new string('★', rating) + new string('☆', 5 - rating) : "";
     return "<div style='font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;color:#222'>" +
-        "<p style='font-size:13px;color:#888;margin:0 0 6px'>Leserstimmen · Sammlung „" + E(store) + "“</p>" +
-        "<h2 style='margin:0 0 14px;font-size:20px'>Neue Stimme von " + E(name) + "</h2>" +
+        "<p style='font-size:13px;color:#888;margin:0 0 6px'>" + M("ls.mail.collection", E(store)) + "</p>" +
+        "<h2 style='margin:0 0 14px;font-size:20px'>" + M("ls.mail.heading", E(name)) + "</h2>" +
         (stars.Length > 0 ? "<p style='font-size:22px;letter-spacing:2px;color:#c98a2b;margin:0 0 12px'>" + stars + "</p>" : "") +
         "<blockquote style='margin:0 0 16px;padding:14px 18px;border-left:4px solid #c98a2b;background:#f7f4ef;font-size:15px;line-height:1.6'>" + E(text).Replace("\n", "<br>") + "</blockquote>" +
-        (email.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>E-Mail: " + E(email) + "</p>" : "") +
-        (link.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>Link: <a href='" + E(link) + "'>" + E(link) + "</a></p>" : "") +
-        "<p style='margin:18px 0'>" + (published ? "Sie ist bereits veröffentlicht." : "Sie wartet auf deine Freigabe.") + "</p>" +
+        (email.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>" + M("ls.mail.email", E(email)) + "</p>" : "") +
+        (link.Length > 0 ? "<p style='margin:0 0 6px;font-size:14px'>" + M("ls.mail.link", "<a href='" + E(link) + "'>" + E(link) + "</a>") + "</p>" : "") +
+        "<p style='margin:18px 0'>" + E(TIn(lang, published ? "ls.mail.published" : "ls.mail.waiting")) + "</p>" +
         (siteBase.Length > 0 ? "<p><a href='" + E(siteBase + AdminUrl) + "' style='display:inline-block;background:#222;color:#fff;text-decoration:none;padding:11px 20px;border-radius:8px;font-weight:600'>" +
-            (published ? "Leserstimmen öffnen" : "Jetzt prüfen und freigeben") + "</a></p>" : "") +
+            E(TIn(lang, published ? "ls.mail.open" : "ls.mail.check")) + "</a></p>" : "") +
         "</div>";
 }
 // Mail goes out after the response on its own scope: the request's services are disposed by then,
@@ -224,12 +399,13 @@ void Notify(IServiceProvider sp, string name, int rating, string email, string t
     var db = sp.GetService<AppDbContext>();
     var ns = NotifySettings(db);
     if (ns != null && (!NotifyOn(ns) || (S(ns, "when") == "pending" && published))) return;
-    SendMail(sp, Recipients(db, ns), (published ? "Neue Leserstimme von " : "Neue Leserstimme zur Freigabe: ") + name,
-        MailHtml(SiteBase(sp), name, rating, email, text, link, published, store));
+    var lang = SiteLang();
+    SendMail(sp, Recipients(db, ns), TIn(lang, published ? "ls.mail.subjPublished" : "ls.mail.subjPending", name),
+        MailHtml(lang, SiteBase(sp), name, rating, email, text, link, published, store));
 }
 // The admin menu shows how many reviews wait: "Leserstimmen (2)". The registry entry is replaced in place
-// after every change, so the number is current without re-running every plugin.
-string MenuLabel(AppDbContext db) { var n = db == null ? 0 : All(db).Count(x => !Approved(x.R)); return n > 0 ? "Leserstimmen (" + n + ")" : "Leserstimmen"; }
+// after every change, so the number is current without re-running every plugin. The label is a key (see LsRows).
+string MenuLabel(AppDbContext db) { var n = db == null ? 0 : All(db).Count(x => !Approved(x.R)); return n <= 0 ? "ls.nav" : n <= MaxBadge ? "ls.nav." + n : "ls.nav.more"; }
 void RefreshBadge(PluginRegistry reg, AppDbContext db)
 {
     if (reg == null || db == null) return;
@@ -394,26 +570,28 @@ AddPublicPage("leserstimmen", req =>
 });
 
 // ---- the block ------------------------------------------------------------------------------
+// Labels, help texts and option labels are KEYS of LsRows: the editor shows them in the admin's language. A placeholder is not
+// translated by the host, so the defaults are named in the help texts instead. Values (karten, sie, ja …) never change.
 const string Fields = """
 [
- {"id":"heading","label":"Überschrift","type":"text","placeholder":"Leserstimmen"},
- {"id":"store","label":"Sammlung","type":"text","default":"default","help":"Name der Liste, z. B. ein Buchtitel. Blöcke mit derselben Sammlung zeigen dieselben Stimmen."},
- {"id":"layout","label":"Darstellung","type":"select","default":"karten","options":[{"value":"karten","label":"Karten (klassisch)"},{"value":"elegant","label":"Karten mit Zitatzeichen und Initialen"},{"value":"zitat","label":"Großes Zitat, eins nach dem anderen"},{"value":"liste","label":"Schlichte Liste"},{"value":"laufband","label":"Laufband"}]},
- {"id":"look","label":"Farben","type":"select","default":"template","options":[{"value":"template","label":"Wie das Template"},{"value":"hell","label":"Hell"},{"value":"dunkel","label":"Dunkel"},{"value":"akzent","label":"Akzentfarbe"}]},
- {"id":"symbol","label":"Wertung mit","type":"select","default":"stern","options":[{"value":"stern","label":"Sternen"},{"value":"herz","label":"Herzen"},{"value":"punkt","label":"Punkten"},{"value":"flamme","label":"Flammen"},{"value":"keine","label":"Ohne Wertung"}]},
- {"id":"address","label":"Anrede","type":"select","default":"sie","options":[{"value":"sie","label":"Sie"},{"value":"du","label":"du"}]},
- {"id":"columns","label":"Spalten","type":"select","default":"3","options":[{"value":"1","label":"1"},{"value":"2","label":"2"},{"value":"3","label":"3"}]},
- {"id":"showAverage","label":"Durchschnitt zeigen","type":"select","default":"ja","options":[{"value":"ja","label":"Ja"},{"value":"nein","label":"Nein"}]},
- {"id":"showForm","label":"Formular zeigen","type":"select","default":"ja","options":[{"value":"ja","label":"Ja"},{"value":"nein","label":"Nein"}]},
- {"id":"askLink","label":"Link-Feld (z. B. Instagram, Blog)","type":"select","default":"nein","options":[{"value":"nein","label":"Nein"},{"value":"ja","label":"Ja"}]},
- {"id":"askEmail","label":"E-Mail-Feld (wird nie gezeigt)","type":"select","default":"nein","options":[{"value":"nein","label":"Nein"},{"value":"optional","label":"Optional"},{"value":"pflicht","label":"Pflicht"}]},
- {"id":"formTitle","label":"Formular-Überschrift","type":"text","placeholder":"Ihre Bewertung abgeben"},
- {"id":"intro","label":"Hinweis über dem Formular","type":"textarea","placeholder":"z. B. Einverständnis zur Veröffentlichung"},
- {"id":"buttonText","label":"Button-Text","type":"text","placeholder":"Bewertung absenden"}
+ {"id":"heading","label":"ls.f.heading","type":"text"},
+ {"id":"store","label":"ls.f.store","type":"text","default":"default","help":"ls.f.storeHelp"},
+ {"id":"layout","label":"ls.f.layout","type":"select","default":"karten","options":[{"value":"karten","label":"ls.o.karten"},{"value":"elegant","label":"ls.o.elegant"},{"value":"zitat","label":"ls.o.zitat"},{"value":"liste","label":"ls.o.liste"},{"value":"laufband","label":"ls.o.laufband"}]},
+ {"id":"look","label":"ls.f.look","type":"select","default":"template","options":[{"value":"template","label":"ls.o.template"},{"value":"hell","label":"ls.o.hell"},{"value":"dunkel","label":"ls.o.dunkel"},{"value":"akzent","label":"ls.o.akzent"}]},
+ {"id":"symbol","label":"ls.f.symbol","type":"select","default":"stern","options":[{"value":"stern","label":"ls.o.stern"},{"value":"herz","label":"ls.o.herz"},{"value":"punkt","label":"ls.o.punkt"},{"value":"flamme","label":"ls.o.flamme"},{"value":"keine","label":"ls.o.keine"}]},
+ {"id":"address","label":"ls.f.address","type":"select","default":"sie","help":"ls.f.addressHelp","options":[{"value":"sie","label":"ls.o.sie"},{"value":"du","label":"ls.o.du"}]},
+ {"id":"columns","label":"ls.f.columns","type":"select","default":"3","options":[{"value":"1","label":"1"},{"value":"2","label":"2"},{"value":"3","label":"3"}]},
+ {"id":"showAverage","label":"ls.f.showAverage","type":"select","default":"ja","options":[{"value":"ja","label":"ls.o.ja"},{"value":"nein","label":"ls.o.nein"}]},
+ {"id":"showForm","label":"ls.f.showForm","type":"select","default":"ja","options":[{"value":"ja","label":"ls.o.ja"},{"value":"nein","label":"ls.o.nein"}]},
+ {"id":"askLink","label":"ls.f.askLink","type":"select","default":"nein","options":[{"value":"nein","label":"ls.o.nein"},{"value":"ja","label":"ls.o.ja"}]},
+ {"id":"askEmail","label":"ls.f.askEmail","type":"select","default":"nein","options":[{"value":"nein","label":"ls.o.nein"},{"value":"optional","label":"ls.o.optional"},{"value":"pflicht","label":"ls.o.pflicht"}]},
+ {"id":"formTitle","label":"ls.f.formTitle","type":"text","help":"ls.f.formTitleHelp"},
+ {"id":"intro","label":"ls.f.intro","type":"textarea","help":"ls.f.introHelp"},
+ {"id":"buttonText","label":"ls.f.buttonText","type":"text","help":"ls.f.buttonTextHelp"}
 ]
 """;
 
-AddBlock("leserstimmen", "Leserstimmen", "Rezensionen und Kundenstimmen – als Karten, großes Zitat, Liste oder Laufband, mit Sternen, Herzen, Punkten oder ohne Wertung, Durchschnitt und Formular.", req =>
+AddBlock("leserstimmen", "ls.block.name", "ls.block.desc", req =>
 {
     JsonObject d = null;
     try { d = JsonNode.Parse(req.Data) as JsonObject; } catch { }
@@ -445,19 +623,20 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen und Kundenstimmen – als 
     if (!noRating && rated.Count > 0 && D("showAverage", "ja") == "ja")
     {
         var avg = rated.Average(n => (double)Rating(n));
-        sb.Append("<p class='mls-avg'>" + Symbols((int)Math.Round(avg), sym) + "<strong>" +
-            avg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace(".", ",") + "</strong> von 5 · " +
-            rated.Count + (rated.Count == 1 ? " Stimme" : " Stimmen") + "</p>");
+        var avgText = avg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        if (ReqLang() == "de") avgText = avgText.Replace(".", ",");
+        sb.Append("<p class='mls-avg'>" + Symbols((int)Math.Round(avg), sym) +
+            string.Format(Enc(T("ls.avg")), "<strong>" + avgText + "</strong>", Enc(T(rated.Count == 1 ? "ls.votes.1" : "ls.votes.n", rated.Count))) + "</p>");
     }
     if (req.Q("leserstimme") == "danke")
-        sb.Append("<div class='mls-ok' role='status'>" + (du ? "Danke für deine Bewertung!" : "Vielen Dank für Ihre Bewertung!") +
-            (AutoPublish() ? "" : (du ? " Sie erscheint, sobald ich sie freigegeben habe." : " Sie erscheint nach einer kurzen Prüfung.")) + "</div>" +
+        sb.Append("<div class='mls-ok' role='status'>" + Enc(TA(du, "ls.thanks")) +
+            (AutoPublish() ? "" : " " + Enc(TA(du, "ls.later"))) + "</div>" +
             // The redirect cannot carry a #fragment (the endpoint refuses such a return URL), so the
             // page would open at the top with the message out of sight below the hero.
             "<script>document.currentScript.previousElementSibling.scrollIntoView({block:'center'});</script>");
 
     if (shown.Count == 0)
-        sb.Append("<p class='mls-empty'>" + (du ? "Noch keine Stimmen – sei die oder der Erste!" : "Noch keine Bewertungen – seien Sie die oder der Erste!") + "</p>");
+        sb.Append("<p class='mls-empty'>" + Enc(TA(du, "ls.empty")) + "</p>");
     else if (layout == "karten")
     {
         sb.Append("<div class='mls-list'>");
@@ -507,14 +686,14 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen und Kundenstimmen – als 
         }
         else if (layout == "zitat")
         {
-            sb.Append("<div class='mls-slider' data-mls-slider><div class='mls-slider__track' tabindex='0' aria-label='Stimmen, zum Blättern wischen'>");
+            sb.Append("<div class='mls-slider' data-mls-slider><div class='mls-slider__track' tabindex='0' aria-label='" + Enc(T("ls.slider")) + "'>");
             foreach (var n in shown) sb.Append(Card(n, " mls-c--slide"));
             sb.Append("</div>");
             if (shown.Count > 1)
             {
-                sb.Append("<div class='mls-slider__nav'><button type='button' class='mls-slider__btn' data-dir='-1' aria-label='Vorherige Stimme'>‹</button><div class='mls-slider__dots'>");
-                for (int i = 0; i < shown.Count; i++) sb.Append("<button type='button' aria-label='Stimme " + (i + 1) + "'" + (i == 0 ? " aria-current='true'" : "") + "></button>");
-                sb.Append("</div><button type='button' class='mls-slider__btn' data-dir='1' aria-label='Nächste Stimme'>›</button></div>");
+                sb.Append("<div class='mls-slider__nav'><button type='button' class='mls-slider__btn' data-dir='-1' aria-label='" + Enc(T("ls.prev")) + "'>‹</button><div class='mls-slider__dots'>");
+                for (int i = 0; i < shown.Count; i++) sb.Append("<button type='button' aria-label='" + Enc(T("ls.slide", i + 1)) + "'" + (i == 0 ? " aria-current='true'" : "") + "></button>");
+                sb.Append("</div><button type='button' class='mls-slider__btn' data-dir='1' aria-label='" + Enc(T("ls.next")) + "'>›</button></div>");
             }
             sb.Append("</div>");
         }
@@ -539,33 +718,33 @@ AddBlock("leserstimmen", "Leserstimmen", "Rezensionen und Kundenstimmen – als 
         sb.Append("<input type='hidden' name='store' value='" + Enc(store) + "'/>");
         sb.Append("<input type='hidden' name='t' value='" + Enc(IssueToken(req.Services)) + "'/>");
         sb.Append("<div class='mls-hp' aria-hidden='true'><label>Website<input type='text' name='website' tabindex='-1' autocomplete='off'/></label></div>");
-        sb.Append("<h3>" + Enc(D("formTitle", du ? "Deine Bewertung" : "Ihre Bewertung abgeben")) + "</h3>");
+        sb.Append("<h3>" + Enc(D("formTitle", TA(du, "ls.formTitle"))) + "</h3>");
         var intro = D("intro", "");
         if (intro.Length > 0) sb.Append("<p class='mls-intro'>" + Enc(intro).Replace("\n", "<br>") + "</p>");
-        sb.Append("<label for='" + id + "-name'>Name" + (du ? " oder Account" : "") + "</label>");
-        sb.Append("<input type='text' id='" + id + "-name' name='name' maxlength='80' required autocomplete='name' placeholder='" + (du ? "z. B. @buecherliebe" : "Ihr Name") + "'/>");
+        sb.Append("<label for='" + id + "-name'>" + Enc(TA(du, "ls.name")) + "</label>");
+        sb.Append("<input type='text' id='" + id + "-name' name='name' maxlength='80' required autocomplete='name' placeholder='" + Enc(TA(du, "ls.namePh")) + "'/>");
         if (askEmail != "nein")
         {
-            sb.Append("<label for='" + id + "-email'>E-Mail <span class='mls-opt'>(wird nicht veröffentlicht" + (askEmail == "pflicht" ? "" : ", optional") + ")</span></label>");
+            sb.Append("<label for='" + id + "-email'>" + Enc(T("ls.email")) + " <span class='mls-opt'>" + Enc(T(askEmail == "pflicht" ? "ls.emailNote.req" : "ls.emailNote.opt")) + "</span></label>");
             sb.Append("<input type='email' id='" + id + "-email' name='email' maxlength='200' autocomplete='email'" + (askEmail == "pflicht" ? " required" : "") + "/>");
         }
         if (noRating) sb.Append("<input type='hidden' name='nr' value='1'/>");
         else
         {
-            sb.Append("<fieldset><legend>" + (du ? "Deine " : "Ihre ") + Noun(sym, 5) + "</legend><div class='mls-rate'>");
+            sb.Append("<fieldset><legend>" + Enc(TA(du, "ls.legend", Noun(sym, 5))) + "</legend><div class='mls-rate'>");
             for (int i = 5; i >= 1; i--)
                 sb.Append("<input type='radio' id='" + id + "-r" + i + "' name='rating' value='" + i + "'" + (i == 5 ? " required" : "") + "/>" +
-                    "<label for='" + id + "-r" + i + "' title='" + i + " " + Noun(sym, i) + "'>" + Svg(sym) + "</label>");
+                    "<label for='" + id + "-r" + i + "' title='" + i + " " + Enc(Noun(sym, i)) + "'>" + Svg(sym) + "</label>");
             sb.Append("</div></fieldset>");
         }
         if (D("askLink", "nein") == "ja")
         {
-            sb.Append("<label for='" + id + "-link'>Link zu " + (du ? "deinem" : "Ihrem") + " Beitrag <span class='mls-opt'>(optional)</span></label>");
-            sb.Append("<input type='url' id='" + id + "-link' name='link' maxlength='300' inputmode='url' placeholder='Instagram, Blog, Shop …'/>");
+            sb.Append("<label for='" + id + "-link'>" + Enc(TA(du, "ls.link")) + " <span class='mls-opt'>" + Enc(T("ls.optional")) + "</span></label>");
+            sb.Append("<input type='url' id='" + id + "-link' name='link' maxlength='300' inputmode='url' placeholder='" + Enc(T("ls.linkPh")) + "'/>");
         }
-        sb.Append("<label for='" + id + "-text'>" + (du ? "Deine" : "Ihre") + " Bewertung</label>");
-        sb.Append("<textarea id='" + id + "-text' name='text' maxlength='3000' required placeholder='" + (du ? "Wie hat es dir gefallen?" : "Was hat Ihnen gefallen?") + "'></textarea>");
-        sb.Append("<button class='btn' type='submit'>" + Enc(D("buttonText", "Bewertung absenden")) + "</button>");
+        sb.Append("<label for='" + id + "-text'>" + Enc(TA(du, "ls.text")) + "</label>");
+        sb.Append("<textarea id='" + id + "-text' name='text' maxlength='3000' required placeholder='" + Enc(TA(du, "ls.textPh")) + "'></textarea>");
+        sb.Append("<button class='btn' type='submit'>" + Enc(D("buttonText", T("ls.button"))) + "</button>");
         sb.Append("</form>");
     }
     sb.Append("</div></section>");
@@ -600,11 +779,13 @@ AddAdminPage("leserstimmen", req =>
             db.SaveChanges();
             req.Log("Leserstimmen: " + msg);
         }
-        if (to.Count == 0) { Remember("Test-Mail nicht gesendet: kein Empfänger eingetragen."); return ""; }
+        // The real notification is written in the site's language; the test shows exactly that one.
+        if (to.Count == 0) { Remember(T("ls.test.noRecipient")); return ""; }
         var mail = req.Service<EmailService>();
-        var (ok, err) = mail == null ? (false, "kein Mail-Dienst") : mail.SendAsync(to, "Test: Leserstimmen-Benachrichtigung",
-            MailHtml(SiteBase(req.Services), "Lena (Test)", 5, "", "So sieht die Benachrichtigung aus, wenn jemand eine Stimme abgibt. Diese hier ist nur ein Test.", "", false, "default"), null, true).GetAwaiter().GetResult();
-        Remember(ok ? "Test-Mail an " + string.Join(", ", to) + " gesendet." : "Test-Mail fehlgeschlagen: " + err);
+        var lang = SiteLang();
+        var (ok, err) = mail == null ? (false, T("ls.test.noService")) : mail.SendAsync(to, TIn(lang, "ls.test.subject"),
+            MailHtml(lang, SiteBase(req.Services), "Lena (Test)", 5, "", TIn(lang, "ls.test.text"), "", false, "default"), null, true).GetAwaiter().GetResult();
+        Remember(ok ? T("ls.test.sent", string.Join(", ", to)) : T("ls.test.failed", err));
         return "";
     }
     if (req.IsPost)
@@ -684,47 +865,47 @@ AddAdminPage("leserstimmen", req =>
         // Plain characters here: the block's stylesheet is only injected into the public site, and an
         // unstyled inline SVG in the admin would render at full width.
         var stars = new string('★', Rating(r)) + new string('☆', 5 - Rating(r));
-        var b = new StringBuilder("<tr><td style='white-space:nowrap;color:#c98a2b' title='" + Rating(r) + " von 5'>" + stars + "</td>");
+        var b = new StringBuilder("<tr><td style='white-space:nowrap;color:#c98a2b' title='" + Enc(T("ls.a.ofFive", Rating(r))) + "'>" + stars + "</td>");
         b.Append("<td><strong>" + Enc(S(r, "name")) + "</strong>" +
             (email.Length > 0 ? "<div class='muted' style='font-size:12px'>" + Enc(email) + "</div>" : "") +
             (link.Length > 0 ? "<div style='font-size:12px'><a href='" + Enc(link) + "' target='_blank' rel='noopener'>" + Enc(UrlHost(link)) + "</a></div>" : "") + "</td>");
         b.Append("<td style='max-width:520px'>" + Enc(S(r, "text")).Replace("\n", "<br>") + "</td>");
         b.Append("<td><span class='badge'>" + Enc(store) + "</span></td>");
-        var date = DateTime.TryParse(S(r, "date"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt.ToLocalTime().ToString("dd.MM.yyyy") : "";
+        var date = DateTime.TryParse(S(r, "date"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? Day(dt.ToLocalTime()) : "";
         b.Append("<td style='white-space:nowrap'>" + date + "</td><td><div class='actions'>");
         b.Append(isPending
-            ? req.Ui.ActionButton("Freigeben", new Dictionary<string, string>(f) { ["action"] = "approve" }, "")
-            : req.Ui.ActionButton("Verbergen", new Dictionary<string, string>(f) { ["action"] = "unpublish" }, "btn-ghost"));
-        b.Append(req.Ui.ActionButton("Löschen", new Dictionary<string, string>(f) { ["action"] = "delete" }, "btn-danger", "Diese Leserstimme wirklich löschen?"));
+            ? req.Ui.ActionButton(T("ls.a.approve"), new Dictionary<string, string>(f) { ["action"] = "approve" }, "")
+            : req.Ui.ActionButton(T("ls.a.hide"), new Dictionary<string, string>(f) { ["action"] = "unpublish" }, "btn-ghost"));
+        b.Append(req.Ui.ActionButton(T("ls.a.delete"), new Dictionary<string, string>(f) { ["action"] = "delete" }, "btn-danger", T("ls.a.deleteConfirm")));
         return b.Append("</div></td></tr>").ToString();
     }
     string Table(List<(string Store, JsonObject R)> list, bool isPending, string empty)
     {
-        var t = new StringBuilder("<table class='data'><thead><tr><th>Wertung</th><th>Name</th><th>Text</th><th>Sammlung</th><th>Datum</th><th></th></tr></thead><tbody>");
+        var t = new StringBuilder("<table class='data'><thead><tr><th>" + Enc(T("ls.a.thRating")) + "</th><th>" + Enc(T("ls.a.thName")) + "</th><th>" + Enc(T("ls.a.thText")) +
+            "</th><th>" + Enc(T("ls.a.thStore")) + "</th><th>" + Enc(T("ls.a.thDate")) + "</th><th></th></tr></thead><tbody>");
         if (list.Count == 0) t.Append("<tr><td colspan='99' class='muted' style='font-style:italic'>" + Enc(empty) + "</td></tr>");
         foreach (var x in list) t.Append(Row(x.Store, x.R, isPending));
         return t.Append("</tbody></table>").ToString();
     }
 
     var sb = new StringBuilder();
-    sb.Append(req.Ui.PageHead("Neue Stimmen freigeben, verbergen oder löschen – oder eine Stimme von Hand eintragen." +
-        (AutoPublish() ? " Neue Stimmen erscheinen sofort (autoPublish)." : "")));
-    sb.Append(req.Ui.Card(Table(pend, true, "Nichts zu prüfen."), "Wartet auf Freigabe (" + pend.Count + ")"));
-    sb.Append(req.Ui.Card(Table(pub, false, "Noch nichts veröffentlicht."), "Veröffentlicht (" + pub.Count + ")"));
+    sb.Append(req.Ui.PageHead(T("ls.a.sub") + (AutoPublish() ? " " + T("ls.a.auto") : "")));
+    sb.Append(req.Ui.Card(Table(pend, true, T("ls.a.nothingPending")), T("ls.a.pending", pend.Count)));
+    sb.Append(req.Ui.Card(Table(pub, false, T("ls.a.nothingPublished")), T("ls.a.published", pub.Count)));
 
-    var opts = string.Join("", Enumerable.Range(1, 5).Reverse().Select(i => "<option value='" + i + "'>" + i + " von 5</option>"));
+    var opts = string.Join("", Enumerable.Range(1, 5).Reverse().Select(i => "<option value='" + i + "'>" + Enc(T("ls.a.ofFive", i)) + "</option>"));
     var storeList = "<datalist id='mls-stores'>" + string.Join("", stores.Select(s => "<option value='" + Enc(s) + "'>")) + "</datalist>";
     var add =
         "<div class='form-grid'>" +
-        "<div class='form-field'><label>Name</label><input name='name' maxlength='80' required></div>" +
-        "<div class='form-field'><label>Wertung</label><select name='rating'>" + opts + "</select></div>" +
-        "<div class='form-field'><label>Sammlung</label><input name='store' list='mls-stores' value='" + Enc(stores.FirstOrDefault() ?? "default") + "' required>" + storeList +
-        "<div class='help'>Muss zur Sammlung im Block passen.</div></div>" +
-        "<div class='form-field'><label>Link (optional)</label><input name='link' maxlength='300' placeholder='https://…'></div>" +
+        "<div class='form-field'><label>" + Enc(T("ls.a.thName")) + "</label><input name='name' maxlength='80' required></div>" +
+        "<div class='form-field'><label>" + Enc(T("ls.a.thRating")) + "</label><select name='rating'>" + opts + "</select></div>" +
+        "<div class='form-field'><label>" + Enc(T("ls.a.thStore")) + "</label><input name='store' list='mls-stores' value='" + Enc(stores.FirstOrDefault() ?? "default") + "' required>" + storeList +
+        "<div class='help'>" + Enc(T("ls.a.storeHelp")) + "</div></div>" +
+        "<div class='form-field'><label>" + Enc(T("ls.a.link")) + "</label><input name='link' maxlength='300' placeholder='https://…'></div>" +
         "</div>" +
-        "<div class='form-field'><label>Text</label><textarea name='text' rows='4' maxlength='3000' required></textarea></div>" +
-        "<button type='submit' class='btn'>Hinzufügen</button>";
-    sb.Append(req.Ui.Card(req.Ui.Form(add, new Dictionary<string, string> { ["action"] = "add" }), "Von Hand hinzufügen"));
+        "<div class='form-field'><label>" + Enc(T("ls.a.thText")) + "</label><textarea name='text' rows='4' maxlength='3000' required></textarea></div>" +
+        "<button type='submit' class='btn'>" + Enc(T("ls.a.add")) + "</button>";
+    sb.Append(req.Ui.Card(req.Ui.Form(add, new Dictionary<string, string> { ["action"] = "add" }), T("ls.a.addTitle")));
 
     // ---- notification
     string LastTest(AppDbContext d)
@@ -732,8 +913,8 @@ AddAdminPage("leserstimmen", req =>
         var v = d.SiteSettings.FirstOrDefault(x => x.Key == NotifyKey + "-test")?.Value ?? "";
         var i = v.IndexOf('|');
         if (i < 0) return "";
-        var when = DateTime.TryParse(v.Substring(0, i), null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? t.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "";
-        return "<p class='help' style='margin-top:8px'>Letzter Test (" + when + "): " + Enc(v.Substring(i + 1)) + "</p>";
+        var when = DateTime.TryParse(v.Substring(0, i), null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? Day(t.ToLocalTime()) + t.ToLocalTime().ToString(" HH:mm") : "";
+        return "<p class='help' style='margin-top:8px'>" + Enc(T("ls.a.lastTest", when, v.Substring(i + 1))) + "</p>";
     }
     var ns = NotifySettings(db);
     var nOn = ns == null ? Recipients(db, null).Count > 0 : NotifyOn(ns);
@@ -742,29 +923,28 @@ AddAdminPage("leserstimmen", req =>
     var mailSvc = req.Service<EmailService>();
     var mailReady = mailSvc != null && mailSvc.IsConfiguredAsync().GetAwaiter().GetResult();
     var nb = new StringBuilder();
-    if (!mailReady) nb.Append(req.Ui.Alert("Diese Seite kann noch keine Mails versenden. Unter Einstellungen → E-Mail den Versand einrichten (oder über die Cloud).", "info"));
-    nb.Append("<div class='form-field'><label style='display:flex;gap:8px;align-items:center;font-weight:600'><input type='checkbox' name='n_on'" + (nOn ? " checked" : "") + "> Bei neuen Stimmen per E-Mail benachrichtigen</label></div>");
-    nb.Append("<div class='form-field'><label>Wann</label><select name='n_when'><option value='all'" + (ns == null || S(ns, "when") != "pending" ? " selected" : "") + ">Bei jeder neuen Stimme</option><option value='pending'" + (ns != null && S(ns, "when") == "pending" ? " selected" : "") + ">Nur wenn eine Freigabe nötig ist</option></select></div>");
+    if (!mailReady) nb.Append(req.Ui.Alert(T("ls.a.noMail"), "info"));
+    nb.Append("<div class='form-field'><label style='display:flex;gap:8px;align-items:center;font-weight:600'><input type='checkbox' name='n_on'" + (nOn ? " checked" : "") + "> " + Enc(T("ls.a.notifyOn")) + "</label></div>");
+    nb.Append("<div class='form-field'><label>" + Enc(T("ls.a.when")) + "</label><select name='n_when'><option value='all'" + (ns == null || S(ns, "when") != "pending" ? " selected" : "") + ">" + Enc(T("ls.a.whenAll")) + "</option><option value='pending'" + (ns != null && S(ns, "when") == "pending" ? " selected" : "") + ">" + Enc(T("ls.a.whenPending")) + "</option></select></div>");
     var admins = db.Users.Where(u => u.Email != null && u.Email != "").OrderBy(u => u.Username).ToList();
     if (admins.Count > 0)
     {
-        nb.Append("<div class='form-field'><label>Empfänger aus den Benutzern</label>");
+        nb.Append("<div class='form-field'><label>" + Enc(T("ls.a.users")) + "</label>");
         foreach (var u in admins)
             nb.Append("<label style='display:flex;gap:8px;align-items:center;font-weight:400;margin:4px 0'><input type='checkbox' name='nu_" + u.Id + "'" + (nIds.Contains(u.Id) ? " checked" : "") + "> " + Enc(string.IsNullOrWhiteSpace(u.DisplayName) ? u.Username : u.DisplayName) + " <span class='muted'>(" + Enc(u.Email) + ")</span></label>");
         nb.Append("</div>");
     }
-    nb.Append("<div class='form-field'><label>Weitere Adressen</label><textarea name='n_emails' rows='2' placeholder='eine pro Zeile'>" + Enc(nMails) + "</textarea><div class='help'>Eine Adresse pro Zeile.</div></div>");
-    nb.Append("<button type='submit' class='btn'>Speichern</button>");
+    nb.Append("<div class='form-field'><label>" + Enc(T("ls.a.more")) + "</label><textarea name='n_emails' rows='2' placeholder='" + Enc(T("ls.a.morePh")) + "'>" + Enc(nMails) + "</textarea><div class='help'>" + Enc(T("ls.a.moreHelp")) + "</div></div>");
+    nb.Append("<button type='submit' class='btn'>" + Enc(T("ls.a.save")) + "</button>");
     var nCard = req.Ui.Form(nb.ToString(), new Dictionary<string, string> { ["action"] = "notify-save" }) +
-        "<div style='margin-top:10px'>" + req.Ui.ActionButton("Test-Mail senden", new Dictionary<string, string> { ["action"] = "notify-test" }, "btn-ghost") + "</div>" +
+        "<div style='margin-top:10px'>" + req.Ui.ActionButton(T("ls.a.test"), new Dictionary<string, string> { ["action"] = "notify-test" }, "btn-ghost") + "</div>" +
         LastTest(db);
-    sb.Append(req.Ui.Card(nCard, "Benachrichtigung"));
+    sb.Append(req.Ui.Card(nCard, T("ls.a.notifyTitle")));
 
     var open = Legacy(db).Count(x => !Load(db, x.Store).Any(n => S(n, "name") == S(x.R, "name") && S(n, "text") == S(x.R, "text")));
     if (open > 0)
-        sb.Append(req.Ui.Card("<p>Auf dieser Seite " + (open == 1 ? "liegt noch eine Stimme" : "liegen noch " + open + " Stimmen") + " aus dem früheren Plugin „Bewertungen“. " +
-            "Sie werden mit ihrer Sammlung und ihrem Freigabe-Status übernommen; danach auf der Seite den Block „Bewertungen“ durch „Leserstimmen“ ersetzen.</p>" +
-            req.Ui.ActionButton("Übernehmen", new Dictionary<string, string> { ["action"] = "import" }, ""), "Aus „Bewertungen“ übernehmen"));
+        sb.Append(req.Ui.Card("<p>" + Enc((open == 1 ? T("ls.a.importOne") : T("ls.a.importMany", open)) + " " + T("ls.a.importHow")) + "</p>" +
+            req.Ui.ActionButton(T("ls.a.importBtn"), new Dictionary<string, string> { ["action"] = "import" }, ""), T("ls.a.importTitle")));
     return sb.ToString();
 });
 

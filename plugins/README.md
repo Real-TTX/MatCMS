@@ -8,11 +8,11 @@ Store der Cloud oder einen Bundle-Import.
 
 | Ordner | Plugin | Stand |
 | --- | --- | --- |
-| `leserstimmen/` | Leserstimmen — Rezensionen mit Sternen/Flammen/Herzen | aktuell, im Global Store |
-| `cookie-consent/` | Cookie-Banner — Einwilligung für Statistik/Marketing/externe Medien, blockiert bis zur Zustimmung | aktuell, im Global Store |
+| `leserstimmen/` | Leserstimmen — Rezensionen mit Sternen/Flammen/Herzen; Deutsch und Englisch (Admin, Block-Editor, Block auf `/en/…`-Seiten, Mail in der Standardsprache der Seite) | 1.4, im Global Store |
+| `cookie-consent/` | Cookie-Banner — Einwilligung für Statistik/Marketing/externe Medien, blockiert bis zur Zustimmung; Deutsch und Englisch (Admin; Banner-Standardtexte folgen der Sprache der Seite, eigene Texte bleiben wie geschrieben) | 1.1, im Global Store |
 | `bewertungen/` | Bewertungen (früher eingebaut) | Altbestand, ersetzt durch Leserstimmen (dort „Aus Bewertungen übernehmen“) |
 | `google-reviews/` | Google Bewertungen (früher eingebaut) | Altbestand; Vorgabe-Konfiguration steht in `meta.json` unter `DefaultConfig` (reist nicht im Bundle mit) |
-| `store-einblick/` | Store-Einblick — zeigt den Store einer MatCMS-Cloud als Block: Plugins mit Titelbild, weiteren Bildern, Art, Herausgeber und einer Detailansicht (Bilderleiste, Text, Fakten), Templates als kleine Seite in ihren eigenen Farben, Komponenten mit Symbol, dazu Reiter und Suche; liest `GET {cloud}/api/public/store`, ohne Schlüssel; die Bilder reicht die Website selbst durch (`/store-einblick/bild/{key}/{id}`) | 1.2, Skript-Variante (`plugin.csx` lädt `showcase.csx`) |
+| `store-einblick/` | Store-Einblick — zeigt den Store einer MatCMS-Cloud als Block: Plugins mit Titelbild, weiteren Bildern, Art, Herausgeber und einer Detailansicht (Bilderleiste, Text, Fakten), Templates als kleine Seite in ihren eigenen Farben, Komponenten mit Symbol, dazu Reiter und Suche; liest `GET {cloud}/api/public/store`, ohne Schlüssel; die Bilder reicht die Website selbst durch (`/store-einblick/bild/{key}/{id}`); Deutsch und Englisch | 1.3, Skript-Variante (`plugin.csx` lädt `showcase.csx`) |
 | `matcms-store/` | **MatCMS Store** — der Store-Server, nur für matcms.de: Katalog `/store`, Herausgeber registrieren sich und laden hoch, Prüfen und Freigeben mit Signatur im Admin (Schlüssel nur beim Betreiber, `tools/StoreSign`), API `/store/api` für Clouds und Websites (`docs/official-store.md`) | 0.1, nativ (`./pack-native.ps1 -Path ./matcms-store`) |
 | `store-einblick-native/` | Store-Einblick (Native) — **dieselbe** Code-Datei `../store-einblick/showcase.csx`, als DLL kompiliert; `StoreEinblickTests` prüft, dass beide Varianten dasselbe HTML zeichnen | aktuell, Native-Variante (`./pack-native.ps1 -Path ./store-einblick-native`) |
 | `coverage-map/` | Abdeckungskarte — Block mit anklickbarer Europakarte (Länder + Region Norditalien `IT-N`, Status verfügbar/teilweise/demnächst/geplant, Liste mit Hinweisen); Umrisse in `map.csx`, erzeugt von `tools/build-map.mjs` aus Natural Earth 1:50m (`tools/ne50.geojson`) | aktuell, im Global Store; benutzt auf corner-society.com |
@@ -26,6 +26,10 @@ Store der Cloud oder einen Bundle-Import.
 | `bot/` | **KI-Bot** (Native, Key `bot`) — bis CMS 1.14 eingebaut, jetzt ein Paket des MatCMS Store: Chat-Assistent für Besucher; das Widget (`assets/ai-bot.js`, `assets/ai-bot.css`) liegt unter `/plugin-assets/bot/`. Tabellen `p_bot_*` und Einstellungen wie eingebaut | 2.0, Paket mit `./pack-native.ps1 -Path ./bot`, danach `tools/StoreSign sign-code` (Matthias) |
 | `blog/` | **Blog (Native, signiert)** — bis 2026-11 eingebaut, jetzt Paket des MatCMS Store: Beiträge mit Titelbild, Galerie, Tags, Terminierung, Block „Beiträge“, Übersicht `/blog`, **mehrsprachig** (`/en/blog/…`, Übersetzungen verknüpft über `TranslationGroup`, Sprachumschalter führt zur Übersetzung, Admin: „Übersetzung anlegen“, Liste nach Sprache filtern). Übernimmt die **Kerntabelle `Posts`** (adoptiert — darf nur ein vom Store code-signiertes Paket; die Sicherung trägt `Posts` auch ohne das Plugin). Übernimmt beim Import die alte `builtin`-Zeile mit Ein/Aus und Einstellungen. | 2.0, Paket mit `./pack-native.ps1 -Path ./blog`, danach **signieren** (`tools/StoreSign sign-code`); unsigniert wird der Key `blog` abgelehnt |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
+
+**Jedes MatCMS-Plugin ist zweisprachig, Deutsch und Englisch** — Admin, Block-Editor (Namen, Felder, Optionen als Schlüssel
+der eigenen Texttabellen, `Plugin.Strings("de"/"en", …)`) und alles, was Besucher sehen (nach der Sprache der Seite, `/en/…`).
+Texte, die der Betreiber selbst eingibt, bleiben wie geschrieben; nur ein ungeänderter Standardtext folgt der Sprache.
 
 ## Aufbau eines Plugins
 - `plugin.csx` — der Code (weitere `*.csx` im Ordner packt `pack.ps1` als `files/<name>` mit, für `#load`; ein Ordner `assets/` wird als Asset-Dateien unter `/plugin-assets/<key>/` mitgepackt) (C#-Skript, Globals = `PluginContext` in `src/MatCMS/Services/PluginRuntime.cs`).

@@ -283,6 +283,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   = MatUi's `.mat-schedule` from JSON, `/mitglied/kalender` = a server-side grid, the public site has no MatUi) filters by type (events, meetings,
   birthdays, anniversaries of joining) and shows a member only what the member area shows them anyway; personal data (birthdays, names) never goes into
   an iCal feed (`/verein/termine.ics?art=` = public events of one kind; the member's secret feed `?typ=termine|sitzungen`).
+- **Every MatCMS plugin is German AND English** (owner's rule): back office, block editor (names, fields, options as keys of the plugin's
+  `Strings` tables) and what visitors see (the page's language). Texts an operator TYPED stay as typed; only an unchanged default follows the
+  language — stored values are never rewritten. Older scripts on the `PluginContext` API do it too: `Plugin.Strings(...)` + a local lookup on
+  `CultureInfo.CurrentUICulture`; a legacy `AddAdminMenu`/`AddBlock` label that is a key is translated by the host (sidebar, `/admin/plugin/{key}`
+  title, editor). Site-wide HTML (`AddBodyHtml`) is built once at load, so it carries both tables and picks by `<html lang>` (cookie-consent).
+  Logs stay German. Tests: `ScriptPluginLanguageTests` (every key in both languages; English page/admin).
 - **Debug builds keep every temporary alive until the method ends**, which alone keeps a load context from being
   collected. Code and tests that check unloading hold nothing of the plugin in their own frame (`NoInlining` helpers).
 - **Tests: `dotnet test tests/MatCMS.Plugins.Tests`.** They run on in-memory SQLite and temporary folders and never touch

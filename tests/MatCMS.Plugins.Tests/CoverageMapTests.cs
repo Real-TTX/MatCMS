@@ -39,11 +39,11 @@ public class CoverageMapTests : IClassFixture<AppFactory>
         Assert.True(registry.IsLoaded("coverage-map"), "did not load: " + string.Join(" | ", registry.Errors.Values));
     }
 
-    private async Task PageAsync(string slug, JsonObject data)
+    private async Task PageAsync(string slug, JsonObject data, string locale = "de")
     {
         using var scope = _app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var page = new Page { Title = "Abdeckung", Slug = slug, Locale = "de", IsPublished = true };
+        var page = new Page { Title = "Abdeckung", Slug = slug, Locale = locale, IsPublished = true };
         db.Pages.Add(page);
         await db.SaveChangesAsync();
         db.ContentBlocks.Add(new ContentBlock { PageId = page.Id, BlockType = "coverage_map", DataJson = data.ToJsonString() });
@@ -76,6 +76,22 @@ public class CoverageMapTests : IClassFixture<AppFactory>
         Assert.Contains(">Verfügbar<", WebUtility.HtmlDecode(block));
         Assert.Contains("fill:url(#", block);                                       // planned = hatched
         Assert.Contains("<path class=\"cov-land\"", block);                        // the rest of Europe as background
+    }
+
+    [Fact]
+    public async Task On_an_English_page_the_map_speaks_English()
+    {
+        await InstallAsync();
+        await ScriptPluginSite.SettingAsync(_app, SettingKeys.Languages, "de,en");
+        await PageAsync("coverage", new JsonObject { ["list"] = "DE | available\nIT-N | soon" }, "en");
+        var html = WebUtility.HtmlDecode(await _app.Browser().GetStringAsync("/en/coverage"));
+        var block = html[html.IndexOf("<section class=\"section cov\"", StringComparison.Ordinal)..];
+        Assert.Contains("Northern Italy", block);
+        Assert.Contains("Germany", block);
+        Assert.Contains(">Coming soon<", block);
+        Assert.Contains("Choose a country on the map or in the list.", block);
+        Assert.DoesNotContain("Norditalien", block);
+        Assert.DoesNotContain("Verfügbar", block);
     }
 
     [Fact]

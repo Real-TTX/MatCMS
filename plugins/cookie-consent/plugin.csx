@@ -15,30 +15,156 @@ using System.Text.Json.Nodes;
 //   * <script type="text/plain" data-consent="statistik"> … </script> anywhere on the site;
 //   * <iframe data-consent="medien" data-src="https://…"></iframe> (placeholder with "Inhalt laden").
 // JS API for templates/plugins: MatConsent.has('statistik'), MatConsent.open(), event "matconsent".
+//
+// Languages: every text is German and English (CcRows). The back office follows the admin's language. The visitor texts are
+// settings: one the operator WROTE is shown as written in every language; one still at its shipped default (German or English,
+// or never saved) follows the page's language. The banner is put on the page once at load time (AddBodyHtml cannot ask per
+// request), so it is drawn in the site's language and carries both tables; its script takes the one of <html lang>.
 
 const string SettingKey = "plugin.cookie-consent.config";
 string[] Optional = { "statistik", "marketing", "medien" };
 
 string Enc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
 
+// Key, German, English. "cc.v.*" are the visitor defaults (named after the setting they fill), the rest the back office.
+(string Key, string De, string En)[] CcRows =
+{
+    ("cc.v.title", "Datenschutz-Einstellungen", "Privacy settings"),
+    ("cc.v.text", "Wir verwenden Cookies und ähnliche Technologien. Einige sind technisch notwendig, andere helfen uns, die Website zu verbessern oder Inhalte externer Anbieter anzuzeigen. Sie entscheiden, was Sie zulassen – Ihre Auswahl können Sie jederzeit ändern.",
+        "We use cookies and similar technologies. Some are technically necessary, others help us improve the website or show content from external providers. You decide what you allow – you can change your choice at any time."),
+    ("cc.v.accept", "Alle akzeptieren", "Accept all"),
+    ("cc.v.reject", "Nur notwendige", "Necessary only"),
+    ("cc.v.settings", "Einstellungen", "Settings"),
+    ("cc.v.save", "Auswahl speichern", "Save selection"),
+    ("cc.v.reopenLabel", "Cookie-Einstellungen", "Cookie settings"),
+    ("cc.v.privacyLabel", "Datenschutz", "Privacy policy"),
+    ("cc.v.imprintLabel", "Impressum", "Legal notice"),
+    ("cc.v.necessaryLabel", "Notwendig", "Necessary"),
+    ("cc.v.necessaryDesc", "Für den Betrieb der Website erforderlich, z. B. Anmeldung, Spracheinstellung und das Speichern Ihrer Cookie-Auswahl. Immer aktiv.",
+        "Required for the website to work, e.g. sign-in, language setting and storing your cookie choice. Always active."),
+    ("cc.v.cat.statistik.label", "Statistik", "Statistics"),
+    ("cc.v.cat.statistik.desc", "Hilft uns zu verstehen, wie Besucher die Website nutzen (z. B. Google Analytics, Matomo).", "Helps us understand how visitors use the website (e.g. Google Analytics, Matomo)."),
+    ("cc.v.cat.marketing.label", "Marketing", "Marketing"),
+    ("cc.v.cat.marketing.desc", "Macht Werbung relevanter und misst ihren Erfolg (z. B. Meta Pixel, Google Ads).", "Makes advertising more relevant and measures its success (e.g. Meta Pixel, Google Ads)."),
+    ("cc.v.cat.medien.label", "Externe Medien", "External media"),
+    ("cc.v.cat.medien.desc", "Inhalte von Videoplattformen, Karten und sozialen Netzwerken (z. B. YouTube, Google Maps, Instagram).", "Content from video platforms, maps and social networks (e.g. YouTube, Google Maps, Instagram)."),
+    ("cc.v.phText", "Dieser Inhalt wird von {host} geladen. Dabei werden Daten an den Anbieter übertragen.", "This content is loaded from {host}. Data is transferred to the provider in the process."),
+    ("cc.v.phHost", "einem externen Anbieter", "an external provider"),
+    ("cc.v.phOnce", "Inhalt laden", "Load content"),
+    ("cc.v.phAlways", "{cat} immer erlauben", "Always allow {cat}"),
+
+    ("cc.nav", "Cookie-Banner", "Cookie banner"),
+    ("cc.noDb", "Keine Datenbank.", "No database."),
+    ("cc.sub", "Fragt Besucher, bevor Statistik, Marketing oder externe Medien geladen werden – und lädt sie erst danach.", "Asks visitors before statistics, marketing or external media are loaded – and only loads them afterwards."),
+    ("cc.lastSaved", "Zuletzt gespeichert: {0}.", "Last saved: {0}."),
+    ("cc.active", "Der Banner ist aktiv – Kategorien: {0}. Version {1}.", "The banner is active – categories: {0}. Version {1}."),
+    ("cc.activeNone", "Der Banner ist aktiv (Hinweis ohne optionale Kategorien). Version {0}.", "The banner is active (a notice without optional categories). Version {0}."),
+    ("cc.hidden", "Der Banner ist ausgeblendet: Keine optionale Kategorie ist eingeschaltet. Eine Seite, die nur technisch notwendige Cookies setzt (so wie MatCMS selbst), braucht keinen Banner.",
+        "The banner is hidden: no optional category is switched on. A site that only sets technically necessary cookies (like MatCMS itself) needs no banner."),
+    ("cc.catOn", "„{0}“ einschalten", "Switch on “{0}”"),
+    ("cc.label", "Bezeichnung", "Label"),
+    ("cc.desc", "Beschreibung", "Description"),
+    ("cc.code", "Code, der erst nach Zustimmung geladen wird (optional)", "Code that is only loaded after consent (optional)"),
+    ("cc.codeHelpMedia", "Für eingebettete Videos/Karten meist leer lassen und stattdessen im HTML-Block data-consent nutzen (siehe unten).",
+        "For embedded videos/maps usually leave this empty and use data-consent in the HTML block instead (see below)."),
+    ("cc.codeHelp", "z. B. das Google-Analytics- oder Matomo-Snippet. <script>-Tags werden nach der Zustimmung ausgeführt.", "e.g. the Google Analytics or Matomo snippet. <script> tags are run after consent."),
+    ("cc.h.cats", "Kategorien", "Categories"),
+    ("cc.necLabel", "Notwendig – Bezeichnung", "Necessary – label"),
+    ("cc.necDesc", "Notwendig – Beschreibung", "Necessary – description"),
+    ("cc.necHelp", "Immer aktiv, kann nicht abgewählt werden.", "Always active, cannot be deselected."),
+    ("cc.h.texts", "Texte", "Texts"),
+    ("cc.textsHelp", "Unverändert gelassene Standardtexte folgen der Sprache der Seite (Deutsch oder Englisch); eigene Texte gelten in jeder Sprache.",
+        "Default texts left unchanged follow the language of the page (German or English); texts of your own apply in every language."),
+    ("cc.f.title", "Überschrift", "Heading"),
+    ("cc.f.text", "Text", "Text"),
+    ("cc.f.reject", "Button „ablehnen“", "Button “reject”"),
+    ("cc.f.accept", "Button „akzeptieren“", "Button “accept”"),
+    ("cc.f.settings", "Link „Einstellungen“", "Link “settings”"),
+    ("cc.f.save", "Button „Auswahl speichern“", "Button “save selection”"),
+    ("cc.f.privacyLabel", "Link-Text Datenschutz", "Link text privacy policy"),
+    ("cc.f.privacyUrl", "Ziel Datenschutz", "Privacy policy target"),
+    ("cc.f.privacyHelp", "z. B. /datenschutz", "e.g. /privacy"),
+    ("cc.f.imprintLabel", "Link-Text Impressum", "Link text legal notice"),
+    ("cc.f.imprintUrl", "Ziel Impressum", "Legal notice target"),
+    ("cc.f.imprintHelp", "z. B. /impressum", "e.g. /imprint"),
+    ("cc.h.look", "Darstellung", "Appearance"),
+    ("cc.f.layout", "Position", "Position"),
+    ("cc.o.box", "Kasten unten links", "Box at the bottom left"),
+    ("cc.o.bar", "Leiste unten über die ganze Breite", "Bar across the bottom"),
+    ("cc.o.modal", "Fenster in der Mitte (Seite abgedunkelt)", "Window in the centre (page dimmed)"),
+    ("cc.f.theme", "Farbschema", "Colour scheme"),
+    ("cc.o.light", "Hell", "Light"),
+    ("cc.o.dark", "Dunkel", "Dark"),
+    ("cc.f.accent", "Akzentfarbe (optional)", "Accent colour (optional)"),
+    ("cc.f.accentHelp", "Leer = Akzentfarbe des Templates.", "Empty = the template's accent colour."),
+    ("cc.f.months", "Auswahl merken (Monate)", "Remember the choice (months)"),
+    ("cc.f.monthsHelp", "Danach wird erneut gefragt. Üblich: 12.", "Visitors are asked again afterwards. Usual: 12."),
+    ("cc.f.reopenLabel", "Beschriftung des Wieder-Öffnen-Buttons", "Label of the reopen button"),
+    ("cc.f.reopen", "Kleinen Cookie-Button unten links zeigen, um die Auswahl später zu ändern", "Show a small cookie button at the bottom left to change the choice later"),
+    ("cc.f.reopenHelp", "Alternativ oder zusätzlich: ein Link mit {0} (z. B. im Fußzeilen-Menü) öffnet die Einstellungen.", "Alternatively or as well: a link with {0} (e.g. in the footer menu) opens the settings."),
+    ("cc.h.adv", "Erweitert", "Advanced"),
+    ("cc.f.consentMode", "Google Consent Mode v2 senden", "Send Google Consent Mode v2"),
+    ("cc.f.consentModeHelp", "Setzt vor allen Google-Tags „abgelehnt“ als Standard und meldet die Entscheidung an gtag weiter.", "Sets “denied” as the default before all Google tags and passes the decision on to gtag."),
+    ("cc.f.showAlways", "Banner auch ohne optionale Kategorie zeigen", "Show the banner even without an optional category"),
+    ("cc.f.showAlwaysHelp", "Nur nötig, wenn ausdrücklich ein Hinweis gewünscht ist. Ohne optionale Kategorien gibt es nichts zu entscheiden.",
+        "Only needed if a notice is explicitly wanted. Without optional categories there is nothing to decide."),
+    ("cc.save", "Speichern", "Save"),
+    ("cc.preview", "Vorschau auf der Website", "Preview on the website"),
+    ("cc.h.settings", "Einstellungen", "Settings"),
+    ("cc.how.intro", "Bereits auf der Seite stehender Code wartet auf die Zustimmung, wenn er so markiert ist:", "Code already on the page waits for consent when it is marked like this:"),
+    ("cc.how.comment", "wird erst nach Zustimmung zu „Statistik“ ausgeführt", "only runs after consent to “Statistics”"),
+    ("cc.how.iframe", "Das iframe zeigt bis zur Zustimmung einen Platzhalter mit „Inhalt laden“.", "Until consent, the iframe shows a placeholder with “Load content”."),
+    ("cc.how.api", "Für Templates und Plugins: {0}, {1} und das Ereignis {2}.", "For templates and plugins: {0}, {1} and the event {2}."),
+    ("cc.h.how", "So bindet man Code und Einbettungen ein", "How to include code and embeds"),
+    ("cc.reask.text", "Erhöht die Version des Banners: Alle Besucher werden beim nächsten Besuch erneut gefragt – nötig, wenn neue Dienste dazukommen.",
+        "Raises the banner's version: every visitor is asked again on the next visit – needed when new services are added."),
+    ("cc.reask.btn", "Alle Besucher erneut fragen", "Ask all visitors again"),
+    ("cc.reask.confirm", "Alle Besucher beim nächsten Besuch erneut fragen?", "Ask all visitors again on their next visit?"),
+    ("cc.h.reask", "Erneut fragen", "Ask again"),
+    ("cc.reset.text", "Setzt Texte, Darstellung und Kategorien (samt eingefügtem Code) auf den Auslieferungszustand zurück. Bereits erteilte Zustimmungen der Besucher bleiben gültig.",
+        "Resets texts, appearance and categories (including pasted code) to how they were shipped. Consent visitors have already given stays valid."),
+    ("cc.reset.btn", "Auf Standard zurücksetzen", "Reset to default"),
+    ("cc.reset.confirm", "Alle Einstellungen des Cookie-Banners auf Standard zurücksetzen?", "Reset all settings of the cookie banner to default?"),
+    ("cc.h.reset", "Zurücksetzen", "Reset"),
+};
+var CcDe = CcRows.ToDictionary(r => r.Key, r => r.De);
+var CcEn = CcRows.ToDictionary(r => r.Key, r => r.En);
+// The host translates the menu label (a key of these tables) into the admin's language.
+Plugin.Strings("de", CcDe);
+Plugin.Strings("en", CcEn);
+
+// German or English for a culture: as itself, else the site's default language, else English (as the host's own lookup does).
+string Lang(string culture)
+{
+    var c = (culture ?? "").Split('-')[0].ToLowerInvariant();
+    if (c is "de" or "en") return c;
+    return Localizer.DefaultCulture is "de" or "en" ? Localizer.DefaultCulture : "en";
+}
+string TIn(string lang, string key) => (lang == "en" ? CcEn : CcDe).TryGetValue(key, out var v) ? v : CcDe.TryGetValue(key, out var d) ? d : key;
+// The back office's language is the request's UI culture (the admin's choice).
+string T(string key) => TIn(Lang(System.Globalization.CultureInfo.CurrentUICulture.Name), key);
+string TF(string key, params object[] args) => string.Format(T(key), args);
+
 JsonObject Defaults() => new JsonObject
 {
     ["version"] = 1, ["savedAt"] = "", ["layout"] = "box", ["theme"] = "light", ["reopen"] = true, ["showAlways"] = false,
     ["consentMode"] = false, ["months"] = 12, ["accent"] = "",
-    ["title"] = "Datenschutz-Einstellungen",
-    ["text"] = "Wir verwenden Cookies und ähnliche Technologien. Einige sind technisch notwendig, andere helfen uns, die Website zu verbessern oder Inhalte externer Anbieter anzuzeigen. Sie entscheiden, was Sie zulassen – Ihre Auswahl können Sie jederzeit ändern.",
-    ["accept"] = "Alle akzeptieren", ["reject"] = "Nur notwendige", ["settings"] = "Einstellungen", ["save"] = "Auswahl speichern",
-    ["reopenLabel"] = "Cookie-Einstellungen",
-    ["privacyUrl"] = "/datenschutz", ["privacyLabel"] = "Datenschutz", ["imprintUrl"] = "/impressum", ["imprintLabel"] = "Impressum",
-    ["necessaryLabel"] = "Notwendig",
-    ["necessaryDesc"] = "Für den Betrieb der Website erforderlich, z. B. Anmeldung, Spracheinstellung und das Speichern Ihrer Cookie-Auswahl. Immer aktiv.",
+    ["title"] = CcDe["cc.v.title"],
+    ["text"] = CcDe["cc.v.text"],
+    ["accept"] = CcDe["cc.v.accept"], ["reject"] = CcDe["cc.v.reject"], ["settings"] = CcDe["cc.v.settings"], ["save"] = CcDe["cc.v.save"],
+    ["reopenLabel"] = CcDe["cc.v.reopenLabel"],
+    ["privacyUrl"] = "/datenschutz", ["privacyLabel"] = CcDe["cc.v.privacyLabel"], ["imprintUrl"] = "/impressum", ["imprintLabel"] = CcDe["cc.v.imprintLabel"],
+    ["necessaryLabel"] = CcDe["cc.v.necessaryLabel"],
+    ["necessaryDesc"] = CcDe["cc.v.necessaryDesc"],
     ["cats"] = new JsonObject
     {
-        ["statistik"] = new JsonObject { ["on"] = false, ["label"] = "Statistik", ["desc"] = "Hilft uns zu verstehen, wie Besucher die Website nutzen (z. B. Google Analytics, Matomo).", ["code"] = "" },
-        ["marketing"] = new JsonObject { ["on"] = false, ["label"] = "Marketing", ["desc"] = "Macht Werbung relevanter und misst ihren Erfolg (z. B. Meta Pixel, Google Ads).", ["code"] = "" },
-        ["medien"] = new JsonObject { ["on"] = false, ["label"] = "Externe Medien", ["desc"] = "Inhalte von Videoplattformen, Karten und sozialen Netzwerken (z. B. YouTube, Google Maps, Instagram).", ["code"] = "" },
+        ["statistik"] = new JsonObject { ["on"] = false, ["label"] = CcDe["cc.v.cat.statistik.label"], ["desc"] = CcDe["cc.v.cat.statistik.desc"], ["code"] = "" },
+        ["marketing"] = new JsonObject { ["on"] = false, ["label"] = CcDe["cc.v.cat.marketing.label"], ["desc"] = CcDe["cc.v.cat.marketing.desc"], ["code"] = "" },
+        ["medien"] = new JsonObject { ["on"] = false, ["label"] = CcDe["cc.v.cat.medien.label"], ["desc"] = CcDe["cc.v.cat.medien.desc"], ["code"] = "" },
     }
 };
+// The visitor texts the operator can edit, by setting name; a category's as "cat.{id}.label|desc".
+string[] VisitorTexts = { "title", "text", "accept", "reject", "settings", "save", "reopenLabel", "privacyLabel", "imprintLabel", "necessaryLabel", "necessaryDesc" };
 
 // Stored settings over the defaults, key by key: an older save that lacks a newer key still works.
 JsonObject Load(AppDbContext db)
@@ -84,6 +210,25 @@ string SafeUrl(string u)
 }
 string SafeColor(string c) => System.Text.RegularExpressions.Regex.IsMatch((c ?? "").Trim(), "^#[0-9a-fA-F]{3,8}$") ? c.Trim() : "";
 bool Active(JsonObject cfg) => B(cfg, "showAlways") || Optional.Any(c => B(Cat(cfg, c), "on"));
+// A visitor text in `lang`. One still at a shipped default (German or English — never saved, Load filled in the German one) is
+// that language's default; anything else is the operator's own wording and stays as written in every language. An emptied text
+// stays empty, as it always did.
+string Vis(JsonObject cfg, string key, string lang)
+{
+    var parts = key.Split('.');
+    var stored = parts.Length == 3 ? S(Cat(cfg, parts[1]), parts[2]) : S(cfg, key);
+    var k = "cc.v." + key;
+    return stored == CcDe[k] || stored == CcEn[k] ? TIn(lang, k) : stored;
+}
+// Every visitor text of one language, for the banner's script (it switches to the page's language).
+Dictionary<string, string> VisTable(JsonObject cfg, string lang)
+{
+    var t = new Dictionary<string, string>();
+    foreach (var k in VisitorTexts) t[k] = Vis(cfg, k, lang);
+    foreach (var c in Optional) { t["cat." + c + ".label"] = Vis(cfg, "cat." + c + ".label", lang); t["cat." + c + ".desc"] = Vis(cfg, "cat." + c + ".desc", lang); }
+    foreach (var k in new[] { "phText", "phHost", "phOnce", "phAlways" }) t[k] = TIn(lang, "cc.v." + k);
+    return t;
+}
 
 // ------------------------------------------------------------------ the public side
 const string Css = """
@@ -151,6 +296,14 @@ const string Js = """
     document.cookie = NAME + '=' + encodeURIComponent(v) + ';path=/;max-age=' + (C.months * 2592000) + ';SameSite=Lax' + (location.protocol === 'https:' ? ';Secure' : '');
   }
   var granted = read(), loaded = {};
+  // The banner was drawn in the site's language; a page in another one (/en/…) gets that language's texts, when there are any.
+  var lang = (document.documentElement.getAttribute('lang') || '').toLowerCase().split('-')[0], L = (C.t && C.t[lang]) || null;
+  function tx(k, d) { return L && L[k] != null ? L[k] : d; }
+  function translate() {
+    if (!L || !root) return;
+    root.querySelectorAll('[data-mcc-t]').forEach(function (el) { var v = L[el.getAttribute('data-mcc-t')]; if (v != null) el.textContent = v; });
+    if (reopen && L.reopenLabel != null) { reopen.setAttribute('aria-label', L.reopenLabel); reopen.setAttribute('title', L.reopenLabel); }
+  }
   function has(c) { return c === 'notwendig' || !!(granted && granted.indexOf(c) >= 0); }
   function gmode() {
     if (!C.consentMode || typeof window.gtag !== 'function') return;
@@ -187,9 +340,9 @@ const string Js = """
       var ph = document.createElement('div'); ph.className = 'mcc-ph';
       var h = el.getAttribute('height'); if (h && /^\d+$/.test(h)) ph.style.minHeight = h + 'px';
       ph.innerHTML = '<p></p><div><button type="button" data-a="once"></button><button type="button" data-a="always"></button></div>';
-      ph.querySelector('p').textContent = C.phText.replace('{host}', host(el.getAttribute('data-src')) || 'einem externen Anbieter');
-      ph.querySelector('[data-a=once]').textContent = C.phOnce;
-      ph.querySelector('[data-a=always]').textContent = C.phAlways.replace('{cat}', cat.label);
+      ph.querySelector('p').textContent = tx('phText', C.phText).replace('{host}', host(el.getAttribute('data-src')) || tx('phHost', C.phHost));
+      ph.querySelector('[data-a=once]').textContent = tx('phOnce', C.phOnce);
+      ph.querySelector('[data-a=always]').textContent = tx('phAlways', C.phAlways).replace('{cat}', tx('cat.' + id + '.label', cat.label));
       ph.addEventListener('click', function (e) {
         var a = e.target.getAttribute && e.target.getAttribute('data-a'); if (!a) return;
         if (a === 'once') load(el); else { decide((granted || []).concat([id])); }
@@ -238,6 +391,7 @@ const string Js = """
     if (lum > .4) document.documentElement.style.setProperty('--mcc-on', '#1b1b1b');
   }
   function start() {
+    translate();
     contrast();
     placeholders();
     if (granted) { activate(); if (reopen && C.reopen) reopen.classList.add('is-on'); }
@@ -252,13 +406,18 @@ var db0 = Service<AppDbContext>();
 var cfg0 = db0 != null ? Load(db0) : Defaults();
 if (Active(cfg0))
 {
-    var cats = Optional.Where(c => B(Cat(cfg0, c), "on")).Select(c => new { id = c, label = S(Cat(cfg0, c), "label"), code = S(Cat(cfg0, c), "code") }).ToList();
+    // Drawn in the site's language: German unless the site's default language is English (a site in another language saw German
+    // before and still does; its English pages get the English table).
+    var lang0 = Localizer.DefaultCulture == "en" ? "en" : "de";
+    string V(string key) => Vis(cfg0, key, lang0);
+    var cats = Optional.Where(c => B(Cat(cfg0, c), "on")).Select(c => new { id = c, label = V("cat." + c + ".label"), code = S(Cat(cfg0, c), "code") }).ToList();
     var client = new
     {
         version = I(cfg0, "version", 1), months = Math.Clamp(I(cfg0, "months", 12), 1, 24), reopen = B(cfg0, "reopen"), consentMode = B(cfg0, "consentMode"),
         cats,
-        phText = "Dieser Inhalt wird von {host} geladen. Dabei werden Daten an den Anbieter übertragen.",
-        phOnce = "Inhalt laden", phAlways = "{cat} immer erlauben"
+        phText = TIn(lang0, "cc.v.phText"), phHost = TIn(lang0, "cc.v.phHost"),
+        phOnce = TIn(lang0, "cc.v.phOnce"), phAlways = TIn(lang0, "cc.v.phAlways"),
+        t = new Dictionary<string, Dictionary<string, string>> { ["de"] = VisTable(cfg0, "de"), ["en"] = VisTable(cfg0, "en") }
     };
     var accent = SafeColor(S(cfg0, "accent"));
     AddHeadHtml("<style>" + Css + (accent.Length > 0 ? ".mcc,.mcc-ph{--mcc-accent:" + accent + ";--accent:" + accent + "}" : "") + "</style>");
@@ -271,23 +430,24 @@ if (Active(cfg0))
     var layout = S(cfg0, "layout") is "bar" or "modal" ? S(cfg0, "layout") : "box";
     var sb = new StringBuilder();
     sb.Append("<div id='mcc' class='mcc mcc--" + layout + "' data-theme='" + (S(cfg0, "theme") == "dark" ? "dark" : "light") + "' role='dialog' aria-modal='" + (layout == "modal" ? "true" : "false") + "' aria-labelledby='mcc-title' aria-describedby='mcc-text'><div class='mcc__panel'>");
-    sb.Append("<p class='mcc__title' id='mcc-title'>" + Enc(S(cfg0, "title")) + "</p><p class='mcc__text' id='mcc-text'>" + Enc(S(cfg0, "text")) + "</p>");
+    // data-mcc-t names the text, so the script can put the page's language in (the visible words stay the site's without script).
+    sb.Append("<p class='mcc__title' id='mcc-title' data-mcc-t='title'>" + Enc(V("title")) + "</p><p class='mcc__text' id='mcc-text' data-mcc-t='text'>" + Enc(V("text")) + "</p>");
     sb.Append("<div class='mcc__cats'>");
-    sb.Append("<label class='mcc__cat'><span class='mcc__sw'><input type='checkbox' checked disabled><span></span></span><div><b>" + Enc(S(cfg0, "necessaryLabel")) + "</b><small>" + Enc(S(cfg0, "necessaryDesc")) + "</small></div></label>");
+    sb.Append("<label class='mcc__cat'><span class='mcc__sw'><input type='checkbox' checked disabled><span></span></span><div><b data-mcc-t='necessaryLabel'>" + Enc(V("necessaryLabel")) + "</b><small data-mcc-t='necessaryDesc'>" + Enc(V("necessaryDesc")) + "</small></div></label>");
     foreach (var c in cats)
-        sb.Append("<label class='mcc__cat'><span class='mcc__sw'><input type='checkbox' data-cat='" + c.id + "'><span></span></span><div><b>" + Enc(c.label) + "</b><small>" + Enc(S(Cat(cfg0, c.id), "desc")) + "</small></div></label>");
+        sb.Append("<label class='mcc__cat'><span class='mcc__sw'><input type='checkbox' data-cat='" + c.id + "'><span></span></span><div><b data-mcc-t='cat." + c.id + ".label'>" + Enc(c.label) + "</b><small data-mcc-t='cat." + c.id + ".desc'>" + Enc(V("cat." + c.id + ".desc")) + "</small></div></label>");
     sb.Append("</div>");
     var links = new StringBuilder();
-    var pu = SafeUrl(S(cfg0, "privacyUrl")); if (pu.Length > 0) links.Append("<a href='" + Enc(pu) + "'>" + Enc(S(cfg0, "privacyLabel")) + "</a>");
-    var iu = SafeUrl(S(cfg0, "imprintUrl")); if (iu.Length > 0) links.Append("<a href='" + Enc(iu) + "'>" + Enc(S(cfg0, "imprintLabel")) + "</a>");
+    var pu = SafeUrl(S(cfg0, "privacyUrl")); if (pu.Length > 0) links.Append("<a href='" + Enc(pu) + "' data-mcc-t='privacyLabel'>" + Enc(V("privacyLabel")) + "</a>");
+    var iu = SafeUrl(S(cfg0, "imprintUrl")); if (iu.Length > 0) links.Append("<a href='" + Enc(iu) + "' data-mcc-t='imprintLabel'>" + Enc(V("imprintLabel")) + "</a>");
     if (links.Length > 0) sb.Append("<div class='mcc__links'>" + links + "</div>");
     // Accept and reject side by side and alike: refusing must be as easy as agreeing.
-    sb.Append("<div class='mcc__btns'><button type='button' class='mcc__btn' data-mcc='reject'>" + Enc(S(cfg0, "reject")) + "</button>" +
-        "<button type='button' class='mcc__btn' data-mcc='accept'>" + Enc(S(cfg0, "accept")) + "</button>" +
-        (cats.Count > 0 ? "<button type='button' class='mcc__btn mcc__btn--link' data-mcc='settings'>" + Enc(S(cfg0, "settings")) + "</button>" +
-            "<button type='button' class='mcc__btn mcc__btn--link' data-mcc='save'>" + Enc(S(cfg0, "save")) + "</button>" : "") + "</div>");
+    sb.Append("<div class='mcc__btns'><button type='button' class='mcc__btn' data-mcc='reject' data-mcc-t='reject'>" + Enc(V("reject")) + "</button>" +
+        "<button type='button' class='mcc__btn' data-mcc='accept' data-mcc-t='accept'>" + Enc(V("accept")) + "</button>" +
+        (cats.Count > 0 ? "<button type='button' class='mcc__btn mcc__btn--link' data-mcc='settings' data-mcc-t='settings'>" + Enc(V("settings")) + "</button>" +
+            "<button type='button' class='mcc__btn mcc__btn--link' data-mcc='save' data-mcc-t='save'>" + Enc(V("save")) + "</button>" : "") + "</div>");
     sb.Append("</div></div>");
-    sb.Append("<button type='button' id='mcc-reopen' class='mcc-reopen' aria-label='" + Enc(S(cfg0, "reopenLabel")) + "' title='" + Enc(S(cfg0, "reopenLabel")) + "'>" +
+    sb.Append("<button type='button' id='mcc-reopen' class='mcc-reopen' aria-label='" + Enc(V("reopenLabel")) + "' title='" + Enc(V("reopenLabel")) + "'>" +
         "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M8 13v.01'/><path d='M12 17v.01'/><path d='M12 12v.01'/><path d='M16 14v.01'/><path d='M11 8v.01'/><path d='M13.148 3.476l2.667 1.104a4 4 0 0 0 4.656 6.14l.053 .132a3 3 0 0 1 0 2.296q -.745 1.18 -1.024 1.852q -.283 .684 -.66 2.216a3 3 0 0 1 -1.624 1.623q -1.572 .394 -2.216 .661q -.712 .295 -1.852 1.024a3 3 0 0 1 -2.296 0q -1.115 -.729 -1.852 -1.024q -.735 -.305 -2.216 -.66a3 3 0 0 1 -1.623 -1.624q -.39 -1.542 -.661 -2.216q -.271 -.676 -1.024 -1.852a3 3 0 0 1 0 -2.296q .73 -1.11 1.024 -1.852q .29 -.73 .66 -2.216a3 3 0 0 1 1.624 -1.623q 1.501 -.364 2.216 -.661q .647 -.268 1.852 -1.024a3 3 0 0 1 2.296 0'/></svg></button>");
     // System.Text.Json escapes < > & by default, so pasted code cannot close this <script> early.
     sb.Append("<script>window.__mcc=" + JsonSerializer.Serialize(client) + ";</script><script>" + Js + "</script>");
@@ -295,11 +455,12 @@ if (Active(cfg0))
 }
 
 // ------------------------------------------------------------------ admin
-AddAdminMenu("Cookie-Banner", "/admin/plugin/cookie-consent", "ti-cookie");
+AddAdminMenu("cc.nav", "/admin/plugin/cookie-consent", "ti-cookie");
 AddAdminPage("cookie-consent", req =>
 {
     var db = req.Service<AppDbContext>();
-    if (db == null) return req.Ui.Alert("Keine Datenbank.", "error");
+    if (db == null) return req.Ui.Alert(T("cc.noDb"), "error");
+    var lang = Lang(System.Globalization.CultureInfo.CurrentUICulture.Name);
     var cfg = Load(db);
 
     if (req.IsPost)
@@ -349,8 +510,9 @@ AddAdminPage("cookie-consent", req =>
         return "";
     }
 
+    // A visitor text shows in the admin's language while it is still a default; saved as shown, it stays a default (Vis knows both).
     string Txt(string name, string label, string help = "") =>
-        "<div class='form-field'><label>" + Enc(label) + "</label><input name='" + name + "' value='" + Enc(S(cfg, name)) + "'>" + (help.Length > 0 ? "<div class='help'>" + Enc(help) + "</div>" : "") + "</div>";
+        "<div class='form-field'><label>" + Enc(label) + "</label><input name='" + name + "' value='" + Enc(VisitorTexts.Contains(name) ? Vis(cfg, name, lang) : S(cfg, name)) + "'>" + (help.Length > 0 ? "<div class='help'>" + Enc(help) + "</div>" : "") + "</div>";
     string Area(string name, string label, string value, int rows, string help = "", bool mono = false) =>
         "<div class='form-field'><label>" + Enc(label) + "</label><textarea name='" + name + "' rows='" + rows + "'" + (mono ? " spellcheck='false' style='font-family:ui-monospace,Consolas,monospace;font-size:13px'" : "") + ">" + Enc(value) + "</textarea>" + (help.Length > 0 ? "<div class='help'>" + Enc(help) + "</div>" : "") + "</div>";
     string Check(string name, bool on, string label, string help = "") =>
@@ -359,63 +521,65 @@ AddAdminPage("cookie-consent", req =>
         "<div class='form-field'><label>" + Enc(label) + "</label><select name='" + name + "'>" + string.Join("", opts.Select(o => "<option value='" + o.v + "'" + (S(cfg, name) == o.v ? " selected" : "") + ">" + Enc(o.l) + "</option>")) + "</select></div>";
 
     var sb = new StringBuilder();
-    sb.Append(req.Ui.PageHead("Fragt Besucher, bevor Statistik, Marketing oder externe Medien geladen werden – und lädt sie erst danach."));
-    var on = Optional.Where(c => B(Cat(cfg, c), "on")).Select(c => S(Cat(cfg, c), "label")).ToList();
-    var saved = DateTime.TryParse(S(cfg, "savedAt"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var sd) ? " Zuletzt gespeichert: " + sd.ToLocalTime().ToString("dd.MM.yyyy HH:mm") + "." : "";
+    sb.Append(req.Ui.PageHead(T("cc.sub")));
+    var on = Optional.Where(c => B(Cat(cfg, c), "on")).Select(c => Vis(cfg, "cat." + c + ".label", lang)).ToList();
+    var saved = DateTime.TryParse(S(cfg, "savedAt"), null, System.Globalization.DateTimeStyles.RoundtripKind, out var sd)
+        ? " " + TF("cc.lastSaved", sd.ToLocalTime().ToString(lang == "en" ? "yyyy-MM-dd HH:mm" : "dd.MM.yyyy HH:mm")) : "";
     sb.Append(Active(cfg)
-        ? req.Ui.Alert("Der Banner ist aktiv" + (on.Count > 0 ? " – Kategorien: " + string.Join(", ", on) : " (Hinweis ohne optionale Kategorien)") + ". Version " + I(cfg, "version", 1) + "." + saved, "success")
-        : req.Ui.Alert("Der Banner ist ausgeblendet: Keine optionale Kategorie ist eingeschaltet. Eine Seite, die nur technisch notwendige Cookies setzt (so wie MatCMS selbst), braucht keinen Banner." + saved, "info"));
+        ? req.Ui.Alert((on.Count > 0 ? TF("cc.active", string.Join(", ", on), I(cfg, "version", 1)) : TF("cc.activeNone", I(cfg, "version", 1))) + saved, "success")
+        : req.Ui.Alert(T("cc.hidden") + saved, "info"));
 
     var cats = new StringBuilder();
     foreach (var c in Optional)
     {
         var n = Cat(cfg, c);
+        var label = Vis(cfg, "cat." + c + ".label", lang);
         cats.Append("<div style='border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px'>");
-        cats.Append(Check("on_" + c, B(n, "on"), "„" + S(n, "label") + "“ einschalten"));
+        cats.Append(Check("on_" + c, B(n, "on"), TF("cc.catOn", label)));
         cats.Append("<div class='form-grid'>" +
-            "<div class='form-field'><label>Bezeichnung</label><input name='label_" + c + "' value='" + Enc(S(n, "label")) + "'></div>" +
-            "<div class='form-field'><label>Beschreibung</label><input name='desc_" + c + "' value='" + Enc(S(n, "desc")) + "'></div></div>");
-        cats.Append(Area("code_" + c, "Code, der erst nach Zustimmung geladen wird (optional)", S(n, "code"), 4,
-            c == "medien" ? "Für eingebettete Videos/Karten meist leer lassen und stattdessen im HTML-Block data-consent nutzen (siehe unten)." : "z. B. das Google-Analytics- oder Matomo-Snippet. <script>-Tags werden nach der Zustimmung ausgeführt.", true));
+            "<div class='form-field'><label>" + Enc(T("cc.label")) + "</label><input name='label_" + c + "' value='" + Enc(label) + "'></div>" +
+            "<div class='form-field'><label>" + Enc(T("cc.desc")) + "</label><input name='desc_" + c + "' value='" + Enc(Vis(cfg, "cat." + c + ".desc", lang)) + "'></div></div>");
+        cats.Append(Area("code_" + c, T("cc.code"), S(n, "code"), 4, T(c == "medien" ? "cc.codeHelpMedia" : "cc.codeHelp"), true));
         cats.Append("</div>");
     }
 
     var form = new StringBuilder();
-    form.Append("<h3 style='margin:0 0 10px'>Kategorien</h3>");
-    form.Append("<div style='border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px'><div class='form-grid'>" + Txt("necessaryLabel", "Notwendig – Bezeichnung") + Txt("necessaryDesc", "Notwendig – Beschreibung") + "</div><div class='help'>Immer aktiv, kann nicht abgewählt werden.</div></div>");
+    form.Append("<h3 style='margin:0 0 10px'>" + Enc(T("cc.h.cats")) + "</h3>");
+    form.Append("<div style='border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 12px'><div class='form-grid'>" + Txt("necessaryLabel", T("cc.necLabel")) + Txt("necessaryDesc", T("cc.necDesc")) + "</div><div class='help'>" + Enc(T("cc.necHelp")) + "</div></div>");
     form.Append(cats);
-    form.Append("<h3 style='margin:22px 0 10px'>Texte</h3>");
-    form.Append(Txt("title", "Überschrift"));
-    form.Append(Area("text", "Text", S(cfg, "text"), 3));
-    form.Append("<div class='form-grid'>" + Txt("reject", "Button „ablehnen“") + Txt("accept", "Button „akzeptieren“") + Txt("settings", "Link „Einstellungen“") + Txt("save", "Button „Auswahl speichern“") + "</div>");
-    form.Append("<div class='form-grid'>" + Txt("privacyLabel", "Link-Text Datenschutz") + Txt("privacyUrl", "Ziel Datenschutz", "z. B. /datenschutz") + Txt("imprintLabel", "Link-Text Impressum") + Txt("imprintUrl", "Ziel Impressum", "z. B. /impressum") + "</div>");
-    form.Append("<h3 style='margin:22px 0 10px'>Darstellung</h3>");
+    form.Append("<h3 style='margin:22px 0 10px'>" + Enc(T("cc.h.texts")) + "</h3>");
+    form.Append("<p class='help' style='margin:0 0 12px'>" + Enc(T("cc.textsHelp")) + "</p>");
+    form.Append(Txt("title", T("cc.f.title")));
+    form.Append(Area("text", T("cc.f.text"), Vis(cfg, "text", lang), 3));
+    form.Append("<div class='form-grid'>" + Txt("reject", T("cc.f.reject")) + Txt("accept", T("cc.f.accept")) + Txt("settings", T("cc.f.settings")) + Txt("save", T("cc.f.save")) + "</div>");
+    form.Append("<div class='form-grid'>" + Txt("privacyLabel", T("cc.f.privacyLabel")) + Txt("privacyUrl", T("cc.f.privacyUrl"), T("cc.f.privacyHelp")) + Txt("imprintLabel", T("cc.f.imprintLabel")) + Txt("imprintUrl", T("cc.f.imprintUrl"), T("cc.f.imprintHelp")) + "</div>");
+    form.Append("<h3 style='margin:22px 0 10px'>" + Enc(T("cc.h.look")) + "</h3>");
     form.Append("<div class='form-grid'>" +
-        Sel("layout", "Position", new[] { ("box", "Kasten unten links"), ("bar", "Leiste unten über die ganze Breite"), ("modal", "Fenster in der Mitte (Seite abgedunkelt)") }) +
-        Sel("theme", "Farbschema", new[] { ("light", "Hell"), ("dark", "Dunkel") }) +
-        "<div class='form-field'><label>Akzentfarbe (optional)</label><input name='accent' value='" + Enc(S(cfg, "accent")) + "' placeholder='#2f6f5e'><div class='help'>Leer = Akzentfarbe des Templates.</div></div>" +
-        "<div class='form-field'><label>Auswahl merken (Monate)</label><input type='number' min='1' max='24' name='months' value='" + I(cfg, "months", 12) + "'><div class='help'>Danach wird erneut gefragt. Üblich: 12.</div></div>" +
-        Txt("reopenLabel", "Beschriftung des Wieder-Öffnen-Buttons") + "</div>");
-    form.Append(Check("reopen", B(cfg, "reopen"), "Kleinen Cookie-Button unten links zeigen, um die Auswahl später zu ändern", "Alternativ oder zusätzlich: ein Link mit href=\"#cookie-einstellungen\" (z. B. im Fußzeilen-Menü) öffnet die Einstellungen."));
-    form.Append("<h3 style='margin:22px 0 10px'>Erweitert</h3>");
-    form.Append(Check("consentMode", B(cfg, "consentMode"), "Google Consent Mode v2 senden", "Setzt vor allen Google-Tags „abgelehnt“ als Standard und meldet die Entscheidung an gtag weiter."));
-    form.Append(Check("showAlways", B(cfg, "showAlways"), "Banner auch ohne optionale Kategorie zeigen", "Nur nötig, wenn ausdrücklich ein Hinweis gewünscht ist. Ohne optionale Kategorien gibt es nichts zu entscheiden."));
-    form.Append("<div style='display:flex;gap:10px;flex-wrap:wrap;margin-top:8px'><button type='submit' class='btn'>Speichern</button>" +
-        (Active(cfg) ? "<a class='btn btn-ghost' href='/?cookie-vorschau' target='_blank' rel='noopener'>Vorschau auf der Website</a>" : "") + "</div>");
-    sb.Append(req.Ui.Card(req.Ui.Form(form.ToString(), new Dictionary<string, string> { ["action"] = "save" }), "Einstellungen"));
+        Sel("layout", T("cc.f.layout"), new[] { ("box", T("cc.o.box")), ("bar", T("cc.o.bar")), ("modal", T("cc.o.modal")) }) +
+        Sel("theme", T("cc.f.theme"), new[] { ("light", T("cc.o.light")), ("dark", T("cc.o.dark")) }) +
+        "<div class='form-field'><label>" + Enc(T("cc.f.accent")) + "</label><input name='accent' value='" + Enc(S(cfg, "accent")) + "' placeholder='#2f6f5e'><div class='help'>" + Enc(T("cc.f.accentHelp")) + "</div></div>" +
+        "<div class='form-field'><label>" + Enc(T("cc.f.months")) + "</label><input type='number' min='1' max='24' name='months' value='" + I(cfg, "months", 12) + "'><div class='help'>" + Enc(T("cc.f.monthsHelp")) + "</div></div>" +
+        Txt("reopenLabel", T("cc.f.reopenLabel")) + "</div>");
+    form.Append(Check("reopen", B(cfg, "reopen"), T("cc.f.reopen"), TF("cc.f.reopenHelp", "href=\"#cookie-einstellungen\"")));
+    form.Append("<h3 style='margin:22px 0 10px'>" + Enc(T("cc.h.adv")) + "</h3>");
+    form.Append(Check("consentMode", B(cfg, "consentMode"), T("cc.f.consentMode"), T("cc.f.consentModeHelp")));
+    form.Append(Check("showAlways", B(cfg, "showAlways"), T("cc.f.showAlways"), T("cc.f.showAlwaysHelp")));
+    form.Append("<div style='display:flex;gap:10px;flex-wrap:wrap;margin-top:8px'><button type='submit' class='btn'>" + Enc(T("cc.save")) + "</button>" +
+        (Active(cfg) ? "<a class='btn btn-ghost' href='/?cookie-vorschau' target='_blank' rel='noopener'>" + Enc(T("cc.preview")) + "</a>" : "") + "</div>");
+    sb.Append(req.Ui.Card(req.Ui.Form(form.ToString(), new Dictionary<string, string> { ["action"] = "save" }), T("cc.h.settings")));
 
     sb.Append(req.Ui.Card(
-        "<p>Bereits auf der Seite stehender Code wartet auf die Zustimmung, wenn er so markiert ist:</p>" +
-        "<pre style='white-space:pre-wrap;font-size:13px;background:var(--surface-2);padding:12px;border-radius:8px'>" + Enc("<script type=\"text/plain\" data-consent=\"statistik\">\n  // wird erst nach Zustimmung zu „Statistik“ ausgeführt\n</script>\n\n<iframe data-consent=\"medien\" data-src=\"https://www.youtube-nocookie.com/embed/…\" width=\"560\" height=\"315\"></iframe>") + "</pre>" +
-        "<p>Das iframe zeigt bis zur Zustimmung einen Platzhalter mit „Inhalt laden“. Für Templates und Plugins: <code>MatConsent.has('statistik')</code>, <code>MatConsent.open()</code> und das Ereignis <code>matconsent</code>.</p>",
-        "So bindet man Code und Einbettungen ein"));
+        "<p>" + Enc(T("cc.how.intro")) + "</p>" +
+        "<pre style='white-space:pre-wrap;font-size:13px;background:var(--surface-2);padding:12px;border-radius:8px'>" + Enc("<script type=\"text/plain\" data-consent=\"statistik\">\n  // " + T("cc.how.comment") + "\n</script>\n\n<iframe data-consent=\"medien\" data-src=\"https://www.youtube-nocookie.com/embed/…\" width=\"560\" height=\"315\"></iframe>") + "</pre>" +
+        "<p>" + Enc(T("cc.how.iframe")) + " " + string.Format(Enc(T("cc.how.api")), "<code>MatConsent.has('statistik')</code>", "<code>MatConsent.open()</code>", "<code>matconsent</code>") + "</p>",
+        T("cc.h.how")));
 
-    sb.Append(req.Ui.Card("<p>Erhöht die Version des Banners: Alle Besucher werden beim nächsten Besuch erneut gefragt – nötig, wenn neue Dienste dazukommen.</p>" +
-        req.Ui.ActionButton("Alle Besucher erneut fragen", new Dictionary<string, string> { ["action"] = "reask" }, "btn-ghost", "Alle Besucher beim nächsten Besuch erneut fragen?"),
-        "Erneut fragen"));
-    sb.Append(req.Ui.Card("<p>Setzt Texte, Darstellung und Kategorien (samt eingefügtem Code) auf den Auslieferungszustand zurück. Bereits erteilte Zustimmungen der Besucher bleiben gültig.</p>" +
-        req.Ui.ActionButton("Auf Standard zurücksetzen", new Dictionary<string, string> { ["action"] = "reset" }, "btn-danger", "Alle Einstellungen des Cookie-Banners auf Standard zurücksetzen?"),
-        "Zurücksetzen"));
+    sb.Append(req.Ui.Card("<p>" + Enc(T("cc.reask.text")) + "</p>" +
+        req.Ui.ActionButton(T("cc.reask.btn"), new Dictionary<string, string> { ["action"] = "reask" }, "btn-ghost", T("cc.reask.confirm")),
+        T("cc.h.reask")));
+    sb.Append(req.Ui.Card("<p>" + Enc(T("cc.reset.text")) + "</p>" +
+        req.Ui.ActionButton(T("cc.reset.btn"), new Dictionary<string, string> { ["action"] = "reset" }, "btn-danger", T("cc.reset.confirm")),
+        T("cc.h.reset")));
     return sb.ToString();
 });
 

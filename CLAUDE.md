@@ -123,6 +123,10 @@ src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
 plugins/                         # plugin SOURCES (plugin.csx + meta.json each) + pack.ps1 → store bundle
 ```
 
+**Every plugin is German AND English** (admin, public pages following `ctx.Locale`, settings labels/help, blocks, PDFs, store
+texts): one `(key, De, En)` table registered with `Strings("de"/"en")` (model: `plugins/forum/ForumStrings.cs`) and a test that every
+key the code uses has both. A plugin text written in German only is a bug. Setting keys and stored values never change for it.
+
 **MatCMS ships no plugins.** The seeder used to create three (a todo demo, Bewertungen, Google
 Bewertungen) and re-wrote the two review plugins' code on every start — a site could never keep its own
 fix to one, and an improved version under the same key was silently reverted by the next restart. Their

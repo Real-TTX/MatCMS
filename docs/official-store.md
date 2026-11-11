@@ -1,6 +1,6 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt; Websites laden selbst, wo erlaubt), **S4 gebaut** (a–c), noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
+Stand: 11.11.2026 — **S0–S4 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins, matcms-store 0.2 mit Templates, Komponenten und Bewertungen; cloud2 übernimmt; Websites laden selbst, wo erlaubt). Zweite Fassung nach Matthias' Klarstellung.
 
 **Gebaut:**
 - **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug

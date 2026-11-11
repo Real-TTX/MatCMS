@@ -50,6 +50,8 @@ public sealed class ForumApp : IDisposable
             await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(row.Id);
             var registry = scope.ServiceProvider.GetRequiredService<PluginRegistry>();
             Assert.True(registry.IsLoaded("forum"), "forum did not load: " + string.Join(" | ", registry.Errors.Values));
+            // The article discussions need the blog — the store's signed package since it left the image, a native plugin beside the forum.
+            await BlogFixture.InstallAsync(App.Services);
             _installed = true;
         }
         finally { _gate.Release(); }

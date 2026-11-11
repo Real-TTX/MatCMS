@@ -22,6 +22,7 @@ public class AdminNavTests
         using var h = new Harness(builtIns: true);
         h.AddScript("shop-like", Script("Content", 25, ""));
         await h.Runner.RunAllAsync();
+        await BlogFixture.InstallAsync(h);                  // the blog, the store's signed package since it left the image
         var nav = new AdminNav(h.Registry);
 
         var content = await nav.GroupAsync(AdminGroup.Content, Services());

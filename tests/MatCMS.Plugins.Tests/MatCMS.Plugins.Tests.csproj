@@ -31,6 +31,8 @@
     <ProjectReference Include="..\..\plugins\moments\Moments.csproj" ReferenceOutputAssembly="false" Private="false" />
     <!-- Holiday homes (plugins/booking), native: BookingTests run it inside the whole application. -->
     <ProjectReference Include="..\..\plugins\booking\Booking.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- The blog (plugins/blog), native since it left the image: imported as a test-signed package (BlogFixture) into harness and application. -->
+    <ProjectReference Include="..\..\plugins\blog\Blog.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -71,6 +73,12 @@
       <BookingFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\booking\bin\$(Configuration)\net10.0\Booking.dll" />
     </ItemGroup>
     <Copy SourceFiles="@(BookingFiles)" DestinationFolder="$(OutDir)fixtures\booking" />
+    <ItemGroup>
+      <BlogFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\blog\bin\$(Configuration)\net10.0\Blog.dll" />
+      <BlogAssets Include="$(MSBuildProjectDirectory)\..\..\plugins\blog\assets\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BlogFiles)" DestinationFolder="$(OutDir)fixtures\blog" />
+    <Copy SourceFiles="@(BlogAssets)" DestinationFolder="$(OutDir)fixtures\blog\assets" />
   </Target>
 
 </Project>

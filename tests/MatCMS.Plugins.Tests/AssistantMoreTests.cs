@@ -56,6 +56,7 @@ public class AssistantMoreTests : IClassFixture<AssistantApp>
     [Fact]
     public async Task Blog_posts_are_written_and_changed_through_the_blogs_actions_customers_data_is_never_offered_and_undo_takes_it_back()
     {
+        await BlogFixture.InstallAsync(_app.App.Services);      // the store's signed package since the blog left the image
         var admin = await AdminAsync();
         _app.Ai.Say(
             Act("plugin_action", """{"name":"post.create","args":{"title":"Herbst am Berg","contentHtml":"<p>Neu!</p><script>x()</script>","publish":true}}"""),

@@ -403,6 +403,15 @@ public class IndexModel : PageModel
         return RedirectToPage(new { tab = "code" });
     }
 
+    /// <summary>Settings → Domains: the mappings as typed (one per line). What cannot be read is skipped by <see cref="DomainRoutes.Parse"/> and simply
+    /// not shown in the table below the field — the text stays, so a half-typed line is not lost.</summary>
+    public async Task<IActionResult> OnPostDomainsAsync()
+    {
+        await SaveKeysAsync(SettingKeys.Domains);
+        TempData["Flash"] = HttpContext.RequestServices.GetRequiredService<Localizer>()["settings.domains.saved"];
+        return RedirectToPage(new { tab = "domains" });
+    }
+
     public async Task<IActionResult> OnPostTranslateAsync()
     {
         await SaveKeysAsync(SettingKeys.Translate);

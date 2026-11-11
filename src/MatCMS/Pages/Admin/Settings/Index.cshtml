@@ -19,6 +19,7 @@
     <button type="button" class="tab" data-tab="code">@T["settings.tabCode"]</button>
     <button type="button" class="tab" data-tab="maintenance">@T["settings.maint.tab"]</button>
     <button type="button" class="tab" data-tab="languages">@T["settings.tabLanguages"]</button>
+    <button type="button" class="tab" data-tab="domains">@T["settings.tabDomains"]</button>
     <button type="button" class="tab" data-tab="social">@T["settings.tabSocial"]</button>
     <button type="button" class="tab" data-tab="cloud">@T["settings.tabCloud"]</button>
 </div>
@@ -733,6 +734,36 @@
                 <div class="help">@Html.Raw(T["settings.codeBodyEndHelp"])</div>
             </div>
 
+            <div><button type="submit" class="btn">@T["action.save"]</button></div>
+        </div>
+    </form>
+</div>
+
+@* ============ DOMAINS (domain routing: a further domain shows one part of the site) ============ *@
+<div class="tab-panel" data-panel="domains" hidden>
+    <form method="post" asp-page-handler="Domains">
+        <div class="card">
+            <h2>@T["settings.domains.heading"]</h2>
+            <p class="muted">@T["settings.domains.intro"]</p>
+            <div class="form-field">
+                <label for="domain-routes">@T["settings.domains.label"]</label>
+                <textarea id="domain-routes" name="Values[@SettingKeys.DomainRouting]" rows="5" spellcheck="false" class="code-area" placeholder="docs.example.org | /docs | umleiten">@V(SettingKeys.DomainRouting)</textarea>
+                <div class="help">@T["settings.domains.help"]</div>
+            </div>
+            @{ var domainRoutes = MatCMS.Services.DomainRoutes.Parse(V(SettingKeys.DomainRouting)); }
+            @if (domainRoutes.Count > 0)
+            {
+                <table class="data">
+                    <thead><tr><th>@T["settings.domains.colHost"]</th><th>@T["settings.domains.colPath"]</th><th>@T["settings.domains.colRedirect"]</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in domainRoutes)
+                    {
+                        <tr><td><a href="https://@r.Host" target="_blank" rel="noopener">@r.Host</a></td><td><code>@r.Prefix</code></td><td>@(r.Redirect ? T["settings.domains.yes"] : T["settings.domains.no"])</td></tr>
+                    }
+                    </tbody>
+                </table>
+            }
+            <p class="muted">@T["settings.domains.dns"]</p>
             <div><button type="submit" class="btn">@T["action.save"]</button></div>
         </div>
     </form>

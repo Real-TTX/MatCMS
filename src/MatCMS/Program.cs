@@ -504,6 +504,70 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// --- Domain routing (Settings → Domains, DomainRoutes) -----------------------------------------------------
+// A further domain shows ONE part of the site: docs.matmon.eu/x is served as /docs/x — rewritten here, before static files, localization and
+// routing see the path, so everything after it (plugin routes, pages, the language) works as on the main address. The page that comes back has
+// its links written for the domain; a GET of /docs/… there is sent to the short form; and at the main address a mapping with "umleiten" sends
+// the part to its domain (not for a signed-in administrator, whose session lives on the main address — drafts stay reachable).
+app.Use(async (ctx, next) =>
+{
+    var site = ctx.RequestServices.GetRequiredService<MatCMS.Services.SiteContext>();
+    var routes = MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting));
+    if (routes.Count == 0) { await next(); return; }
+    var path = ctx.Request.Path.Value ?? "/";
+    var isRead = HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method);
+    var route = MatCMS.Services.DomainRoutes.ForHost(routes, ctx.Request.Host.Host);
+
+    if (route is null)
+    {
+        // The main address (or any other): the part of a redirecting mapping goes to its domain.
+        if (isRead && !ctx.Request.Cookies.ContainsKey("matcms.auth") && !MatCMS.Services.DomainRoutes.IsSystemPath(path)
+            && MatCMS.Services.DomainRoutes.Owning(routes, path) is { Redirect: true } owner
+            && MatCMS.Services.DomainRoutes.Strip(owner, path) is { } shortPath)
+        {
+            ctx.Response.Redirect($"{ctx.Request.Scheme}://{owner.Host}{shortPath}{ctx.Request.QueryString}", permanent: true);
+            return;
+        }
+        await next();
+        return;
+    }
+
+    if (MatCMS.Services.DomainRoutes.IsSystemPath(path)) { await next(); return; }
+    // An address that names the prefix itself (a link written for the main address, a bookmark): the short form is the one address.
+    if (isRead && MatCMS.Services.DomainRoutes.Strip(route, path) is { } own)
+    {
+        ctx.Response.Redirect(own + ctx.Request.QueryString, permanent: true);
+        return;
+    }
+    ctx.Items[MatCMS.Services.DomainRoutes.ItemKey] = route;
+    ctx.Request.Path = MatCMS.Services.DomainRoutes.Inbound(route, path);
+    var main = MatCMS.Services.DomainRoutes.MainOrigin(site.Get(MatCMS.Services.SettingKeys.CanonicalUrl), route);
+
+    ctx.Response.OnStarting(() =>
+    {
+        if (ctx.Response.Headers.Location.ToString() is { Length: > 0 } loc)
+            ctx.Response.Headers.Location = MatCMS.Services.DomainRoutes.RewriteLocation(route, loc, main);
+        return Task.CompletedTask;
+    });
+
+    // The page's links: only an HTML answer is read back and rewritten; anything else is passed through untouched.
+    var original = ctx.Response.Body;
+    using var buffer = new MemoryStream();
+    ctx.Response.Body = buffer;
+    try { await next(); }
+    finally { ctx.Response.Body = original; }
+    buffer.Position = 0;
+    if (ctx.Response.ContentType?.StartsWith("text/html", StringComparison.OrdinalIgnoreCase) == true
+        && !ctx.Response.Headers.ContainsKey("Content-Encoding"))
+    {
+        var html = await new StreamReader(buffer, System.Text.Encoding.UTF8).ReadToEndAsync();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(MatCMS.Services.DomainRoutes.RewriteHtml(html, route, ctx.Request.Scheme, main));
+        ctx.Response.ContentLength = bytes.Length;
+        await original.WriteAsync(bytes, ctx.RequestAborted);
+    }
+    else await buffer.CopyToAsync(original, ctx.RequestAborted);
+});
+
 
 // --- Create/upgrade schema + seed default data on startup ---
 using (var scope = app.Services.CreateScope())
@@ -1121,6 +1185,16 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
         .ToList();
 
     var baseUrl = site.CanonicalBaseUrl(ctx.Request);
+    // Domain routing: a sitemap names the addresses of ITS host. On a mapped domain only that domain's part, written short; at the main address
+    // everything else — a part that is sent to its own domain is listed there, not here.
+    var routes = MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting));
+    var mapped = MatCMS.Services.DomainRoutes.ForHost(routes, ctx.Request.Host.Host);
+    if (mapped is not null) baseUrl = $"{ctx.Request.Scheme}://{mapped.Host}";
+    string? Loc(string path)
+    {
+        if (mapped is not null) return MatCMS.Services.DomainRoutes.Strip(mapped, path) is { } own ? baseUrl + own : null;
+        return MatCMS.Services.DomainRoutes.Owning(routes, path) is { Redirect: true } ? null : baseUrl + path;
+    }
     var pluginEntries = await ctx.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>()
         .SitemapAsync(ctx.RequestServices, ctx.RequestAborted);
     var sb = new System.Text.StringBuilder();
@@ -1128,7 +1202,8 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
     sb.Append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
     foreach (var p in pages)
     {
-        var loc = baseUrl + MatCMS.Services.SiteContext.LocalizedUrl(p.Locale, p.Slug);
+        var loc = Loc(MatCMS.Services.SiteContext.LocalizedUrl(p.Locale, p.Slug));
+        if (loc is null) continue;
         sb.Append("  <url><loc>").Append(System.Security.SecurityElement.Escape(loc)).Append("</loc>")
           .Append("<lastmod>").Append(p.UpdatedAt.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).Append("</lastmod></url>\n");
     }
@@ -1137,8 +1212,8 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
     {
         var u = e.Url ?? "";
         var loc = u.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || u.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            ? u : u.StartsWith('/') && !u.StartsWith("//") ? baseUrl + u : "";
-        if (loc.Length == 0) continue;
+            ? (mapped is null ? u : null) : u.StartsWith('/') && !u.StartsWith("//") ? Loc(u) : null;
+        if (string.IsNullOrEmpty(loc)) continue;
         sb.Append("  <url><loc>").Append(System.Security.SecurityElement.Escape(loc)).Append("</loc>");
         if (e.LastModifiedUtc is { } lm) sb.Append("<lastmod>").Append(lm.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)).Append("</lastmod>");
         sb.Append("</url>\n");
@@ -1150,7 +1225,9 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
 app.MapGet("/robots.txt", (HttpContext ctx, MatCMS.Services.SiteContext site) =>
 {
     if (!site.SitemapEnabled) return Results.NotFound();
-    var body = $"User-agent: *\nDisallow: /admin/\n\nSitemap: {site.CanonicalBaseUrl(ctx.Request)}/sitemap.xml\n";
+    var mapped = MatCMS.Services.DomainRoutes.ForHost(MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting)), ctx.Request.Host.Host);
+    var origin = mapped is null ? site.CanonicalBaseUrl(ctx.Request) : $"{ctx.Request.Scheme}://{mapped.Host}";
+    var body = $"User-agent: *\nDisallow: /admin/\n\nSitemap: {origin}/sitemap.xml\n";
     return Results.Text(body, "text/plain", System.Text.Encoding.UTF8);
 });
 

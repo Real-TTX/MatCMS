@@ -1,11 +1,11 @@
-// Schema-driven block editor. Reads a field schema + current values, renders
-// controls, and serializes everything back into the hidden #DataJson field on submit.
+// Schema-driven block fields (window.MatBlockFields). Reads a field schema + current values, renders
+// controls, and serializes them back into a data object.
 (function () {
     "use strict";
 
     // Reusable, DOM-agnostic builder: renders `schema` into `container` with `data`, wires conditional
-    // visibility, and returns { serialize() }. Used by the in-page block editor below AND by the
-    // translation-compare dialog (diff-edit.js), so both share identical controls (rich text, image
+    // visibility, and returns { serialize() }. Used by the page editor's inspector (editor-v2.js) AND by
+    // the translation-compare dialog (diff-edit.js), so both share identical controls (rich text, image
     // picker, link picker, lists, conditions).
     // Ein per Skript gesetzter Wert löst KEIN input-Ereignis aus, und ein hinzugefügter, entfernter
     // oder verschobener DOM-Knoten erst recht nicht — das tut nur echte Eingabe des Bedieners.
@@ -46,53 +46,6 @@
         return { serialize: serialize, applyConditions: applyConditions, collectors: collectors };
     }
     window.MatBlockFields = { build: build };
-
-    // ---- In-page block editor (only present on the page/post editor) --------------------------------
-    var schemaEl = document.getElementById("block-schema");
-    var dataEl = document.getElementById("block-data");
-    var editor = document.getElementById("block-editor");
-    var form = document.getElementById("block-form");
-    var output = document.getElementById("DataJson");
-    if (!schemaEl || !editor || !form || !output) return;
-
-    var api = build(editor, safeParse(schemaEl.textContent, []), safeParse(dataEl ? dataEl.textContent : "{}", {}));
-    function serialize() { return api.serialize(); }
-    // Exposed so the AI "improve text" action can read the CURRENT editor state (unsaved edits and all)
-    // to propose a rewrite against, and apply the result via the normal SaveBlock.
-    window.matBlockSerialize = serialize;
-
-    form.addEventListener("submit", function () {
-        output.value = JSON.stringify(serialize());
-    });
-
-    // What the block looked like the moment it was built. Nothing here is persisted until the form
-    // is submitted, so anybody who wants to LEAVE the editor has to be able to ask whether that
-    // would throw work away — and comparing against this snapshot answers it exactly, where
-    // listening for "input" would already call an untouched block dirty (the controls fire events
-    // while they are being set up).
-    var pristine = JSON.stringify(serialize());
-    window.matBlockDirty = function () {
-        try { return JSON.stringify(serialize()) !== pristine; } catch (e) { return false; }
-    };
-    // After a save the page reloads, so the snapshot is taken fresh — no reset needed here.
-
-    // Live preview: on any field change, hand the block's current data up to the page editor, which
-    // updates its draft and re-renders the preview (nothing is persisted until "Speichern").
-    var liveT;
-    function pushLive() {
-        clearTimeout(liveT);
-        liveT = setTimeout(function () {
-            if (typeof window.matOnBlockDataChange === "function") {
-                try { window.matOnBlockDataChange(JSON.stringify(serialize())); } catch (e) { }
-            }
-        }, 250);
-    }
-    editor.addEventListener("input", pushLive);
-    editor.addEventListener("change", pushLive);
-
-    function safeParse(txt, fallback) {
-        try { return JSON.parse(txt) || fallback; } catch (e) { return fallback; }
-    }
 
     function buildField(field, value) {
         var type = (field.type || "text").toLowerCase();

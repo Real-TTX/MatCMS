@@ -23,7 +23,46 @@ public class DiffModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly BlockRegistry _registry;
-    public DiffModel(AppDbContext db, BlockRegistry registry) { _db = db; _registry = registry; }
+    private readonly Localizer _t;
+    public DiffModel(AppDbContext db, BlockRegistry registry, Localizer t) { _db = db; _registry = registry; _t = t; }
+
+    private static readonly System.Text.Json.JsonSerializerOptions SchemaOpts = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
+    /// <summary>One block's field schema (localised, dynamic option lists resolved — the same builder the page
+    /// editor uses) and its saved data, for the inline translation dialog (diff-edit.js). It used to scrape both
+    /// out of the classic page editor's HTML.</summary>
+    public async Task<IActionResult> OnGetBlockAsync(int blockId)
+    {
+        var block = await _db.ContentBlocks.AsNoTracking().FirstOrDefaultAsync(b => b.Id == blockId);
+        var def = block is null ? null : _registry.Get(block.BlockType);
+        if (block is null || def is null) return NotFound();
+        var sources = await BlockSchema.LoadSourcesAsync(_db, new[] { def },
+            HttpContext.RequestServices.GetRequiredService<MatCMS.Services.Plugins.PluginContributions>(), HttpContext.RequestServices);
+        var data = string.IsNullOrWhiteSpace(block.DataJson) ? "{}" : block.DataJson;
+        return Content(
+            "{\"schema\":" + System.Text.Json.JsonSerializer.Serialize(BlockSchema.For(def, _t, sources), SchemaOpts)
+            + ",\"data\":" + (EditorModel.IsJsonObject(data) ? data : "{}") + "}",
+            "application/json");
+    }
+
+    /// <summary>Saves ONE block's data from the translation dialog (a JSON object, nothing else).</summary>
+    public async Task<IActionResult> OnPostSaveBlockAsync(int blockId, string? dataJson)
+    {
+        var block = await _db.ContentBlocks.Include(b => b.Page).FirstOrDefaultAsync(b => b.Id == blockId);
+        if (block is null) return NotFound();
+        var json = string.IsNullOrWhiteSpace(dataJson) ? "{}" : dataJson;
+        if (!EditorModel.IsJsonObject(json)) return new JsonResult(new { ok = false }) { StatusCode = 400 };
+        block.DataJson = json;
+        if (block.Page is not null) block.Page.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return new JsonResult(new { ok = true });
+    }
 
     public PageEntity Source { get; private set; } = default!;   // the reference (default locale)
     public List<string> Locales { get; private set; } = new();   // translation locales (columns), in order

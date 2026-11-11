@@ -22,7 +22,7 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-back:hover i { background: var(--black); border-color: var(--black); color: var(--on-ink); }
 .ev2-back small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
 .ev2-title { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 0 1 auto; padding-left: 8px; }
-/* The shared page switcher (_PageSwitcher, same list as the classic editor) — but the TRIGGER is the bar's
+/* The page switcher (_PageSwitcher, the same richselect list the form editor uses) — but the TRIGGER is the bar's
    own title, not the classic boxed field: page title in the heading font, its path small underneath, a
    chevron; no border, no capitals, the nav's quiet hover instead of the ghost button's black. The language
    badge is left out here — the editor has its own language button right next to it. */
@@ -116,10 +116,8 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-add-root { margin-top: 12px; gap: 6px; }
 .ev2-sep { height: 1px; background: #dfe1e6; margin: 8px 0; }
 .ev2-empty { padding: 10px 8px; color: var(--muted); font-size: 13px; }
-.ev2-classic { display: flex; align-items: center; gap: 6px; margin: 18px 4px 0; font-size: 13px; color: var(--muted); text-decoration: none; }
-.ev2-classic:hover { color: var(--black); }
 
-/* --- middle: preview, as in the classic editor --- */
+/* --- middle: preview --- */
 .ev2-stage { overflow: auto; display: flex; justify-content: center; padding: 16px; min-height: 0; background: var(--surface-2); }
 .ev2-frame { width: 100%; max-width: 100%; height: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, .07);
     overflow: hidden; transition: max-width .25s, max-height .25s; box-sizing: border-box; }
@@ -143,7 +141,7 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-crumb button { border: 0; background: none; padding: 0; color: var(--muted); cursor: pointer; font: inherit; }
 .ev2-crumb button:hover { color: var(--black); text-decoration: underline; }
 .ev2-insp h3 { font-family: var(--font-head); font-size: 17px; margin: 6px 0 12px; display: flex; align-items: center; gap: 10px; }
-/* Same tile as a block's icon in the classic editor's list (.le-sidebar .b-icon). */
+/* The block icon tile, as in the admin's lists (.le-sidebar .b-icon). */
 .ev2-insp h3 .ic { width: 30px; height: 30px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent);
     display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .ev2-insp h3 .ic svg { width: 17px; height: 17px; }
@@ -199,6 +197,12 @@ body.ev2 { margin: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr)
 .ev2-langs .ev2-page .t { grid-column: 2; }
 .ev2-pop-head { padding: 4px 10px 6px; }
 .ev2-langs-form { margin: 0; }
+/* "Link an existing page as a version": label, choice and button stacked, inside the popover's padding. */
+.ev2-langs-link { display: flex; flex-direction: column; gap: 6px; padding: 6px 0 4px; margin-top: 4px; border-top: 1px solid var(--line); }
+.ev2-langs-link .ev2-pop-head { padding-bottom: 0; }
+.ev2-langs-link select { width: 100%; }
+.ev2-langs-link .btn { align-self: flex-start; }
+.ev2-ai-seo { margin-top: 6px; }
 .ev2-langs .ev2-add { margin: 2px 0; width: 100%; padding: 8px 10px; font-size: 14px; }
 .ev2-lang-btn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; font: inherit; font-size: 11.5px; }
 

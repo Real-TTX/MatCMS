@@ -226,6 +226,13 @@ public class AssistantTests : IClassFixture<AssistantApp>
             return (p.Id, ids[0], ids[1]);
         });
         var admin = await AdminAsync();
+        // The page editor (the only one) hands over to the assistant and offers the meta description proposal.
+        var editor = await admin.GetStringAsync($"/admin/pages/editor/{pageId}");
+        Assert.Contains($"data-href=\"/admin/ai?pageId={pageId}\"", editor);
+        Assert.Contains("id=\"ev2-aiblock-open\"", editor);
+        Assert.Contains("data-ai-seo", editor);
+        Assert.Contains("id=\"ai-seo-dialog\"", editor);
+        Assert.Contains("handler=AiMetaDescription", editor);
         // Opened from the editor: the address carries the scope ("page" itself is a route name Razor Pages keeps for itself).
         var opened = await admin.GetStringAsync($"/admin/ai?pageId={pageId}&blockId={a}");
         Assert.Contains($"data-page=\"{pageId}\"", opened);

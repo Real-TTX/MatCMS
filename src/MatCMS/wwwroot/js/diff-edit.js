@@ -1,7 +1,8 @@
 // Translation-compare inline editor. Clicking a block cell opens a dialog that shows the ORIGINAL
 // block (read-only, left) next to the TARGET-language block with its editable fields (right), so a
 // translation can be fixed on the spot. Both sides are built from the real block-editor schema
-// (fetched from the page editor) via window.MatBlockFields.build — same controls as the editor.
+// (Diff?handler=Block, the builder the page editor uses) via window.MatBlockFields.build — same
+// controls as the editor; a save goes to Diff?handler=SaveBlock.
 (function () {
     "use strict";
 
@@ -27,26 +28,23 @@
         });
     });
 
+    // This page's own address (/admin/pages/diff/{id}) carries the handlers; the antiforgery token is the layout's.
+    var self = location.pathname;
+    var tokEl = document.querySelector('input[name="__RequestVerificationToken"]');
+    var token = tokEl ? tokEl.value : "";
+
     async function loadBlock(pageId, blockId) {
-        var res = await fetch("/Admin/Pages/Edit/" + pageId + "?block=" + blockId, { credentials: "same-origin" });
+        var res = await fetch(self + "?handler=Block&blockId=" + blockId, { credentials: "same-origin" });
         if (!res.ok) throw new Error("load " + res.status);
-        var doc = new DOMParser().parseFromString(await res.text(), "text/html");
-        var s = doc.getElementById("block-schema");
-        var d = doc.getElementById("block-data");
-        var tok = doc.querySelector('#block-form input[name="__RequestVerificationToken"]')
-            || doc.querySelector('input[name="__RequestVerificationToken"]');
-        return {
-            schema: JSON.parse((s && s.textContent) || "[]"),
-            data: JSON.parse((d && d.textContent) || "{}"),
-            token: tok ? tok.value : ""
-        };
+        var json = await res.json();
+        return { schema: json.schema || [], data: json.data || {}, token: token };
     }
 
     async function save(pageId, blockId, dataObj, token) {
         var body = new URLSearchParams();
         body.set("DataJson", JSON.stringify(dataObj));
         if (token) body.set("__RequestVerificationToken", token);
-        var res = await fetch("/Admin/Pages/Edit/" + pageId + "?handler=SaveBlock&blockId=" + blockId, {
+        var res = await fetch(self + "?handler=SaveBlock&blockId=" + blockId, {
             method: "POST", credentials: "same-origin",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: body.toString()

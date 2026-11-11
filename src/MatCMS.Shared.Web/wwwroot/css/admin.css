@@ -1022,9 +1022,6 @@ a.tab { display: inline-block; text-decoration: none; }
 .b-type { font-weight: 600; font-size: 14px; }
 .b-sum { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.le-sidebar .block-children { margin: 8px 0 4px 16px; padding-left: 12px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
-.le-sidebar .block-child { background: var(--surface-2); }
-.le-sidebar .add-child { align-self: flex-start; }
 
 .le-add { margin-top: 12px; }
 .le-settings { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
@@ -1038,16 +1035,12 @@ a.tab { display: inline-block; text-decoration: none; }
 .le-delete { margin: 0; }
 .le-panel-actions .le-save { margin-left: auto; }
 
-/* Block family navigation in the edit panel — same look as the main block list, current highlighted. */
-.le-family { margin-bottom: 16px; }
-.le-family .block-list { margin-bottom: 0; }
 .block-item.active { outline: 2px solid var(--accent); outline-offset: -2px; }
 .block-item.active .b-type { color: var(--accent); }
 .le-sidebar .btn { white-space: nowrap; }
 
 .le-preview { display: flex; flex-direction: column; min-width: 0; background: var(--surface-2); }
 .le-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.le-url { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---- Page switcher in the toolbar -------------------------------------------------------------
    The dropdown itself is the form field "richselect" (.mat-rs*, mat-richselect.css) — everything
@@ -1059,7 +1052,6 @@ a.tab { display: inline-block; text-decoration: none; }
    instead of "centred in whatever is left over". :has() so the FORM editor's toolbar, which shares
    .le-toolbar and has no switcher, keeps its own two-item layout. */
 .le-toolbar:has(.le-pagepick)::before { content: ""; flex: 1 1 0; min-width: 0; }
-.le-toolbar .le-url { flex: 1 1 0; min-width: 0; }
 .le-toolbar-actions { flex: 1 1 0; justify-content: flex-end; flex-wrap: nowrap; }
 /* A FIXED basis, not a width that follows the title: at "Start" the trigger shrank to a stub and a
    long title made the whole bar jump on every switch. It is the resting element in the middle now —
@@ -1359,21 +1351,6 @@ a.tab { display: inline-block; text-decoration: none; }
 [data-list].list-view-tiles [data-list-table] { display: none; }
 @media (max-width: 640px) { .list-search { min-width: 0; flex: 1 1 auto; } }
 
-/* ===== Page version switcher (language versions) — dropdown in the block editor header ===== */
-.le-versions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; margin-bottom: 14px; }
-.le-ver-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.le-verselect {
-    flex: 1 1 100%; width: 100%; padding: 6px 10px; border-radius: 8px; font-size: 13px;
-    border: 1px solid var(--line, var(--line)); background: var(--surface); color: var(--ink); cursor: pointer;
-}
-.le-verselect:hover, .le-verselect:focus { border-color: var(--accent, #2563eb); outline: none; }
-.le-ver-addform { display: inline; margin: 0; padding: 0; }
-.le-ver-add {
-    display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer;
-}
-.le-ver-add:hover { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
-
 /* ===== Simple modal dialog (e.g. add-language on the Languages settings tab) ===== */
 .mat-dialog {
     border: 0; border-radius: 14px; padding: 22px 24px; min-width: 320px; max-width: 92vw;
@@ -1539,10 +1516,6 @@ a.tab { display: inline-block; text-decoration: none; }
 /* Mail preview: the finished message, rendered by the server. */
 .mail-preview { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 
-/* The ＋ buttons under the block tree in the settings panel. Wrapping, because a container can
-   allow several child types and the sidebar is narrow. */
-.le-add-child { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.le-add-child .add-child { align-self: auto; }
 
 /* Multi-select as tick-able chips. A native <select multiple> needs ctrl-click to add a second
    entry and drops the rest without a word if you forget — the exact mistake this field prevents. */

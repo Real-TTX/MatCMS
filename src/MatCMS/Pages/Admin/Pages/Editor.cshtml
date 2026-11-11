@@ -51,9 +51,9 @@
 @* .admin: the back office's own scope — without it the slim admin buttons (.admin .btn) and every
    other admin-scoped rule stay off, and the editor drifts away from the rest of the application. *@
 <body class="admin ev2" data-page-id="@p.Id"
-      data-render-url="@Url.Page("Edit", "RenderPreview", new { id = p.Id })"
-      data-save-url="@Url.Page("Edit", "SaveAll", new { id = p.Id })"
-      data-meta-url="@Url.Page("Edit", "Meta", new { id = p.Id, back = "json" })">
+      data-render-url="@Url.Page("Editor", "RenderPreview", new { id = p.Id })"
+      data-save-url="@Url.Page("Editor", "SaveAll", new { id = p.Id })"
+      data-meta-url="@Url.Page("Editor", "Meta", new { id = p.Id, back = "json" })">
     @Html.AntiForgeryToken()
     <script id="ev2-blocks" type="application/json">@Html.Raw(Model.BlocksJson.Replace("</", "<\\/"))</script>
     <script id="ev2-types" type="application/json">@Html.Raw(Model.TypesJson.Replace("</", "<\\/"))</script>
@@ -66,10 +66,10 @@
         </a>
         <button type="button" class="btn btn-ghost btn-icon ev2-tree-toggle" id="ev2-tree-toggle" title="@T["ev2.tree"]" aria-label="@T["ev2.tree"]"><i class="ti ti-list-tree"></i></button>
         <div class="ev2-title">
-            @* The page switcher of the classic editor (title, address, language; search, keyboard, groups by
+            @* The page switcher (title, address, language; search, keyboard, groups by
                translation) — the entries open this editor. Unsaved work is asked about through ev2Dirty. *@
             @await Html.PartialAsync("_PageSwitcher", new MatCMS.Pages.Admin.Pages.PageSwitcherModel(
-                p, Model.PublicUrl, Model.CurrentGroup, Model.SwitchGroups, "Editor", "ev2Dirty", ""))
+                p, Model.PublicUrl, Model.CurrentGroup, Model.SwitchGroups, "ev2Dirty"))
             <span class="badge @(p.IsPublished ? "badge-on" : "badge-off")">@(p.IsPublished ? T["ev2.published"] : T["ev2.draft"])</span>
             @if (Model.SupportedLocales.Count > 1)
             {
@@ -110,7 +110,6 @@
         <div class="admin-nav-label ev2-nav-head">@T["ev2.blocks"]</div>
         <div id="ev2-tree" role="tree"></div>
         <button type="button" class="btn btn-sm btn-block ev2-add-root" id="ev2-add-root"><i class="ti ti-plus"></i> @T["ev2.addSection"]</button>
-        <a class="ev2-classic" asp-page="Edit" asp-route-id="@p.Id"><i class="ti ti-layout-sidebar-left-collapse"></i> @T["ev2.classic"]</a>
     </aside>
 
     <main class="ev2-stage" id="ev2-stage">
@@ -142,7 +141,7 @@
         }
         <div class="ev2-body" id="ev2-body"></div>
         @* Page settings — shown here when "Seite" is chosen in the tree. A plain form posted by the
-           editor's own "Speichern" (Edit?handler=Meta&back=json), so it never reloads the editor. *@
+           editor's own "Speichern" (?handler=Meta&back=json), so it never reloads the editor. *@
         <div class="ev2-body ev2-page-body" id="ev2-page-body" hidden>
             <form id="ev2-page-form" autocomplete="off">
                 <label class="check ev2-published"><input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /> @T["editor.published"]</label>
@@ -164,7 +163,7 @@
                         }
                     </div>
                     <div class="field">
-                        <button type="submit" class="btn btn-ghost btn-sm" formaction="@Url.Page("Edit", "ResetPlugin", new { id = p.Id })" formmethod="post" formnovalidate
+                        <button type="submit" class="btn btn-ghost btn-sm" formaction="@Url.Page("Editor", "ResetPlugin", new { id = p.Id })" formmethod="post" formnovalidate
                                 data-confirm="@T["pages.pluginResetConfirm"]"><i class="ti ti-restore"></i> @T["pages.pluginReset"]</button>
                     </div>
                 }
@@ -195,7 +194,16 @@
                 <div class="admin-nav-label ev2-group">@T["ev2.pageSeo"]</div>
                 <div class="field">
                     <label>@T["editor.metaDescription"]</label>
-                    <textarea name="Meta.MetaDescription" rows="3">@p.MetaDescription</textarea>
+                    <textarea name="Meta.MetaDescription" id="ev2-meta-description" rows="3">@p.MetaDescription</textarea>
+                    @if (Model.AiEnabled)
+                    {
+                        @* The proposal is written into the field; it is saved with the editor's "Speichern" like any other edit. *@
+                        <button type="button" class="btn btn-ghost btn-sm ev2-ai-seo" data-ai-seo
+                                data-ai-url="@Url.Page("Editor", "AiMetaDescription", new { id = p.Id })"
+                                data-target="ev2-meta-description" data-title="@T["editor.aiMetaTitle"]">
+                            <i class="ti ti-sparkles" aria-hidden="true"></i> @T["editor.aiMetaButton"]
+                        </button>
+                    }
                 </div>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageAccess"]</div>
                 <div class="field">
@@ -229,10 +237,19 @@
                 <div class="field">
                     <label>@T["editor.pageCss"]</label>
                     <textarea name="Meta.CustomCss" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
+                    <div class="help">@T["editor.pageCss.help"]</div>
                 </div>
                 <div class="field">
                     <label>Template-Parameter (JSON)</label>
-                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono">@p.TemplateParamsJson</textarea>
+                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono" placeholder='{ "bereich": "intern" }'>@p.TemplateParamsJson</textarea>
+                    @if (Model.DeclaredParams.Count > 0)
+                    {
+                        <div class="help">Überschreibt Parameter dieser Seite. Verfügbar: <span class="mono">@string.Join(", ", Model.DeclaredParams)</span></div>
+                    }
+                    else
+                    {
+                        <div class="help">Überschreibt Template-Parameter nur für diese Seite (z. B. um mit <code>{{#if:…}}</code> ein anderes Menü zu zeigen). Das Template muss Parameter deklarieren.</div>
+                    }
                 </div>
             </form>
         </div>
@@ -248,7 +265,7 @@
         </div>
     </aside>
 
-    @* Block picker: the classic editor's dialog (same classes, same favourites and "recently used"),
+    @* Block picker: the admin's block picker (.bpick classes, favourites and "recently used"),
        filled by editor-v2.js for the level it is opened on — the page offers sections and templates,
        a container only what it may hold (AllowedChildren). *@
     <div class="modal-overlay" id="ev2-pick">
@@ -285,13 +302,27 @@
             }
             @foreach (var loc in Model.MissingLocales)
             {
-                <form method="post" asp-page="Edit" asp-page-handler="CreateTranslation" asp-route-id="@p.Id" asp-route-locale="@loc" asp-route-back="v2" class="ev2-langs-form">
+                <form method="post" asp-page-handler="CreateTranslation" asp-route-id="@p.Id" asp-route-locale="@loc" class="ev2-langs-form">
                     <button type="submit" class="ev2-add"><i class="ti ti-plus"></i> @T["editor.translationCreate", T["lang." + loc]]</button>
+                </form>
+            }
+            @if (Model.LinkCandidates.Count > 0)
+            {
+                @* An existing page in a language this one lacks becomes its version (joins this translation group). *@
+                <form method="post" asp-page-handler="LinkTranslation" asp-route-id="@p.Id" class="ev2-langs-form ev2-langs-link">
+                    <label for="ev2-link-target" class="admin-nav-label ev2-pop-head">@T["editor.translationLink"]</label>
+                    <select name="targetId" id="ev2-link-target" data-native>
+                        @foreach (var c in Model.LinkCandidates)
+                        {
+                            <option value="@c.Id">[@c.Locale.ToUpperInvariant()] @c.Title</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-link"></i> @T["editor.translationLinkSubmit"]</button>
                 </form>
             }
             @if (Model.TranslatorConfigured && p.Locale != MatCMS.Services.Localizer.DefaultCulture)
             {
-                <form method="post" asp-page="Edit" asp-page-handler="AutoTranslate" asp-route-id="@p.Id" asp-route-back="v2" class="ev2-langs-form"
+                <form method="post" asp-page-handler="AutoTranslate" asp-route-id="@p.Id" class="ev2-langs-form"
                       data-confirm="@T["editor.autoTranslateConfirm"]">
                     <button type="submit" class="ev2-add"><i class="ti ti-language"></i> @T["editor.autoTranslate"]</button>
                 </form>
@@ -310,6 +341,13 @@
     @if (TempData["FlashError"] is string flashError && !string.IsNullOrWhiteSpace(flashError))
     {
         <div class="ev2-toast is-error" role="alert">@flashError</div>
+    }
+
+    @if (Model.AiEnabled)
+    {
+        @* The meta description proposal ([data-ai-seo] in the page settings) — outside the inspector, so
+           <dialog>.showModal never hangs in a hidden panel. Brings its own script. *@
+        @await Html.PartialAsync("_AiSeoDialog")
     }
 
     <script src="~/js/media-picker.js" asp-append-version="true"></script>

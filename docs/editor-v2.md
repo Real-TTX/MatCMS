@@ -13,8 +13,8 @@ Ziel (Matthias, 2026-10-05; Mockup: `docs/mockups/editor-v2.html`):
 - Das Datenmodell ist ein Baum: `ContentBlock.ParentId`, Container mit `AllowedChildren`, rekursiv
   gerendert (`_BlockList` → `ContainerBlockModel`). **Das Speicherformat bleibt**, bestehende Seiten und
   Backups laufen unverändert.
-- Der heutige Editor hält die Seite schon als **Entwurf im Browser**: `Edit?handler=RenderPreview`
-  rendert einen Entwurf ohne zu speichern, `Edit?handler=SaveAll` gleicht den ganzen Baum in einer
+- Der heutige Editor hält die Seite schon als **Entwurf im Browser**: `?handler=RenderPreview`
+  rendert einen Entwurf ohne zu speichern, `?handler=SaveAll` gleicht den ganzen Baum in einer
   Transaktion ab (neue Blöcke mit negativer Id).
 - `MatBlockFields.build(container, schema, data)` (admin-blocks.js) rendert die Felder eines Blocks.
 
@@ -53,4 +53,13 @@ Editor entfällt.
   Überschrift, Text oder Button; die Vorschau meldet jeden Anschlag als Feldwert, gezeichnet wird erst
   nach dem Verlassen des Feldes) und **„In Elemente umwandeln“** für Hero, Bild & Text, Text und
   Call-to-Action (gleiche Inhalte als Abschnitt/Spalten; eine Sonderoptik, die ein Template nur dem
-  alten Blocktyp gibt, geht dabei verloren). Offen: klassischen Editor entfernen (erst nach Freigabe).
+  alten Blocktyp gibt, geht dabei verloren).
+
+**4 — Einziger Editor (fertig, 2026-11-11).** Der klassische Editor ist entfernt (Entscheidung vom 11.11.).
+Alle Handler (`Meta`, `SaveAll`, `RenderPreview`, `ResetPlugin`, Sprachversionen, `AiMetaDescription`) liegen
+jetzt auf `EditorModel`; die alte Adresse `/admin/pages/edit/{id}` leitet auf `/admin/pages/editor/{id}` weiter
+(`?block=` öffnet den Block). Nachgezogen, was nur der klassische Editor konnte: KI-Vorschlag für die
+Meta-Beschreibung, „Bestehende Seite als Übersetzung verknüpfen“ im Sprachen-Menü, Hilfetexte zu Seiten-CSS
+und Template-Parametern (mit den deklarierten Parametern). Der Übersetzungsvergleich liest und speichert
+einen Block über eigene Handler (`Diff?handler=Block` / `SaveBlock`). Die alte Einzelblock-Seite
+`/admin/blocks/edit/{id}` (von nichts mehr verlinkt) ist ebenfalls entfernt.

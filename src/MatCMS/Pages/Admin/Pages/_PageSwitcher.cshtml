@@ -1,23 +1,23 @@
 @model MatCMS.Pages.Admin.Pages.PageSwitcherModel
 @*
-   The page switcher of BOTH page editors (classic Edit and editor v2): every page of the site, grouped by
-   translation group exactly like the page list, with title, address, state and language. The entries are
-   links to Model.TargetPage; admin-page-switcher.js opens it, searches, drives the keyboard and asks before
-   leaving unsaved work (data-dirty-probe = a global returning true while something is unsaved,
-   data-dirty-forms = ids of settings forms to watch).
+   The page editor's page switcher: every page of the site, grouped by translation group exactly like the
+   page list, with title, address, state and language. The entries are links to the editor;
+   admin-page-switcher.js opens it, searches, drives the keyboard and asks before leaving unsaved work
+   (data-dirty-probe = a global returning true while something is unsaved — the editor's page settings are
+   part of its draft, so no settings forms are watched here; the form editor's own switcher lists some).
 *@
 @{
     var url = Model.CurrentUrl;
 }
 @{
-    string SwitchSearch(MatCMS.Pages.Admin.Pages.EditModel.SwitchVersion v) =>
+    string SwitchSearch(MatCMS.Pages.Admin.Pages.EditorModel.SwitchVersion v) =>
         (v.Title + " " + v.Url + " " + v.Locale + " " + MatCMS.Services.Localizer.DisplayName(v.Locale)).ToLowerInvariant();
 }
 <div class="mat-rs le-pagepick" data-page-switch
      data-confirm="@T["editor.switchUnsaved"]"
      data-confirm-block="@T["editor.switchUnsavedBlock"]"
      data-confirm-settings="@T["editor.switchUnsavedSettings"]"
-     data-dirty-probe="@Model.DirtyProbe" data-dirty-forms="@Model.DirtyForms">
+     data-dirty-probe="@Model.DirtyProbe">
     @{
         var curIsPrimary = Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary != false;
     }
@@ -57,7 +57,7 @@
                in it — a search that filters that page away used to take the heading with
                it, leaving a result list with no idea what it was a list of. *@
             @{
-                var switchSections = new List<(string Head, IReadOnlyList<MatCMS.Pages.Admin.Pages.EditModel.SwitchGroup> Groups)>();
+                var switchSections = new List<(string Head, IReadOnlyList<MatCMS.Pages.Admin.Pages.EditorModel.SwitchGroup> Groups)>();
                 if (Model.CurrentGroup is not null)
                     switchSections.Add((Model.CurrentGroup.Versions.Count > 1 ? T["editor.switchThisPage"] : T["editor.switchCurrent"],
                                         new[] { Model.CurrentGroup }));
@@ -76,7 +76,7 @@
                         var isCur = v.Id == Model.Current.Id;
                         <a class="mat-rs-opt" role="option" tabindex="-1" data-ps-opt
                            id="ps-opt-@v.Id"
-                           href="@Url.Page(Model.TargetPage, new { id = v.Id })"
+                           href="@Url.Page("Editor", new { id = v.Id })"
                            data-title="@v.Title"
                            data-search="@SwitchSearch(v)"
                            aria-selected="@(isCur ? "true" : "false")">

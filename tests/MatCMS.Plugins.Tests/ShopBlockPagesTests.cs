@@ -205,7 +205,9 @@ public class ShopBlockPagesTests : IClassFixture<AppFactory>, IAsyncLifetime
         Assert.Equal(HttpStatusCode.Redirect, del.StatusCode);
         Assert.NotNull(await Db(db => db.Pages.FindAsync(product.Id).AsTask()));                                      // it is still there
 
-        Assert.Equal(HttpStatusCode.Redirect, (await admin.GetAsync($"/admin/pages/edit/{product.Id}")).StatusCode);   // the classic editor sends it to editor v2
+        var old = await admin.GetAsync($"/admin/pages/edit/{product.Id}");                                         // the classic editor's old address
+        Assert.Equal(HttpStatusCode.Redirect, old.StatusCode);
+        Assert.Equal($"/admin/pages/editor/{product.Id}", old.Headers.Location!.OriginalString, ignoreCase: true);
         var editor = Decode(await admin.GetStringAsync($"/admin/pages/editor/{product.Id}"));
         Assert.Contains("id=\"ev2-vars\"", editor); Assert.DoesNotContain("ev2-vars-open", editor);          // the list sits in the inspector, not in the header bar
         Assert.Contains("data-var=\"product.title\"", editor);
@@ -230,7 +232,7 @@ public class ShopBlockPagesTests : IClassFixture<AppFactory>, IAsyncLifetime
             new { id = -2, blockType = "el-heading", parentId = (int?)-1, sortOrder = 0, dataJson = "{\"text\":\"VORSCHAU {{product.title}}\"}" }
         });
         var edit = await admin.GetStringAsync($"/admin/pages/editor/{product.Id}");
-        var res = await admin.PostAsync($"/admin/pages/edit/{product.Id}?handler=RenderPreview", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(edit)!, ["Draft"] = draft }));
+        var res = await admin.PostAsync($"/admin/pages/editor/{product.Id}?handler=RenderPreview", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(edit)!, ["Draft"] = draft }));
         var html = Decode(await res.Content.ReadAsStringAsync());
         Assert.Contains("VORSCHAU " + sample.Items[0].Title, html);
     }
@@ -242,7 +244,7 @@ public class ShopBlockPagesTests : IClassFixture<AppFactory>, IAsyncLifetime
         var cart = await PageOf("cart");
         await SetBlocksAsync("cart", ("el-heading", new() { ["text"] = "NUR DAS" }));
         var edit = await admin.GetStringAsync($"/admin/pages/editor/{cart.Id}");
-        var res = await admin.PostAsync($"/admin/pages/edit/{cart.Id}?handler=ResetPlugin", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(edit)! }));
+        var res = await admin.PostAsync($"/admin/pages/editor/{cart.Id}?handler=ResetPlugin", new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = AppFactory.Token(edit)! }));
         Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
         var after = await PageOf("cart");
         Assert.True(after.Blocks.Count >= 5);

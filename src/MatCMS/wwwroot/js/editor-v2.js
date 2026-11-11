@@ -1,7 +1,7 @@
 // Editor v2 (Pages/Admin/Pages/Editor.cshtml, docs/editor-v2.md).
 // The whole page is a DRAFT held here: the tree on the left, the fields of the selected block on the
-// right, the preview in the middle rendered from the draft by the server (Edit?handler=RenderPreview,
-// nothing persisted). "Speichern" hands the whole draft to Edit?handler=SaveAll in one go. New blocks
+// right, the preview in the middle rendered from the draft by the server (?handler=RenderPreview,
+// nothing persisted). "Speichern" hands the whole draft to ?handler=SaveAll in one go. New blocks
 // carry negative ids until then; the save answers with the real ids and the draft is renumbered.
 (function () {
     "use strict";
@@ -447,8 +447,8 @@
     document.getElementById("ev2-del").addEventListener("click", function () { if (selectedId != null) action("del", selectedId); });
 
     // ---------- picker ----------
-    // The classic editor's "Block hinzufügen" dialog — same look, same favourites and "recently used"
-    // (localStorage matBlockFav / matBlockRecent, shared with it). What it offers depends on where it
+    // The "Block hinzufügen" dialog — the admin's block picker look (.bpick), favourites and "recently used"
+    // (localStorage matBlockFav / matBlockRecent). What it offers depends on where it
     // was opened: the page gets templates and every block that may stand alone, a container only the
     // types it accepts.
     var pickEl = document.getElementById("ev2-pick"), pickSearch = document.getElementById("ev2-pick-search");
@@ -958,7 +958,10 @@
     treeEl.addEventListener("click", function (e) { if (e.target.closest(".ev2-node") && !e.target.closest("[data-act], .tw")) body.classList.remove("ev2-nav-open"); });
 
     // ---------- start ----------
-    renderTree();
-    renderInspector();
+    // ?block=<id> opens with that block selected — what the old classic editor's addresses
+    // (/admin/pages/edit/{id}?block=…) carry when they are redirected here.
+    var startBlock = parseInt(new URLSearchParams(location.search).get("block") || "", 10);
+    if (startBlock > 0 && byId(startBlock)) select(startBlock, true);
+    else { renderTree(); renderInspector(); }
     updateChrome();
 })();

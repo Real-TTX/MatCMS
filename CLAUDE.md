@@ -517,7 +517,7 @@ through the cloud relay — the key never lives on the site.
   is journalled; created things are journalled as null. Undo restores blocks and menu entries WITH THEIR OLD IDS (SQLite never reuses one)
   and only the newest run with changes may be undone, then the one before — a run may build on the previous one. A tool that fails half-way
   detaches everything unsaved (`AssistantTools.Discard`), or the next log line's save would write the half-change.
-- **Scope**: opened from editor v2 (sparkles in the top bar = this page, on a block = that block) or the classic editor, with
+- **Scope**: opened from the page editor (sparkles in the top bar = this page, on a block = that block), with
   `?pageId=&blockId=` — NOT `page`, which Razor Pages keeps as a route name (the query value never arrived). "Nur hier ändern" makes the
   tools refuse writes outside the page/block; reading stays allowed. The editor saves unsaved work before it hands over.
 - **The prompt** = the site's layers (below) → the assistant's own basic instruction (`assistant.prompt`, edited in the Grundanweisung tab;
@@ -675,7 +675,7 @@ Live site pictures in tile views (`.instance-tile-shot`, `.payload-tile-shot`) a
 `admin-shell.js` (`--shot-scale`), never by a fixed factor. The sign-in, 2FA, OAuth and error
 pages (`body.login-page.login-matui`) are MatUi's auth card through the same bridge. A state is a tint behind the WHOLE item
 plus icon and words (MatUi COLOR-04/08) — never a coloured bar on one side: the bridge turns the old bars of the attention
-rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor v2 (own layout) is not moved yet.
+rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor (own full-screen layout, `editor-v2.css`) is not moved yet.
 
 **On a phone a record table is a stack of cards** (MatUi TABLE-02): `admin-shell.js` writes each cell's column name as `data-label`
 (from the table head) and adds `.has-labels`; `admin-matui.css` (≤ 600 px) draws title, label/value rows and actions. Left as they
@@ -738,6 +738,17 @@ public at **`/_preview.webp`** (no-cache + ETag, so a new picture is seen at onc
 - **Where it is shown:** `img.site-shot[data-fallback]` (CSS in `admin-matui.css`). A site without a picture (or an older version
   without the endpoint) answers 404 and `admin-shell.js` swaps in the live frame it always had (never on a phone for the small ones).
   The instance Details page keeps its live frame on purpose.
+
+## The page editor (one, formerly "editor v2")
+
+`Pages/Admin/Pages/Editor` (`/admin/pages/editor/{id}`, own full-screen layout, `wwwroot/js/editor-v2.js` + `css/editor-v2.css`,
+design `docs/editor-v2.md`) is the ONLY page editor. The classic two-pane editor was removed on 2026-11-11; its address
+`/admin/pages/edit/{id}` (bookmarks, old cloud links) is a stub (`Pages/Edit`) that redirects (302) to the editor, `?block=` included —
+the editor opens with that block selected. Every handler lives on `EditorModel`: `Meta` (page settings, `back=json`), `SaveAll`,
+`RenderPreview`, `ResetPlugin` (plugin pages), `CreateTranslation`, `LinkTranslation`, `AutoTranslate`, `AiMetaDescription` (the
+`_AiSeoDialog` under the meta description). The language comparison (`Pages/Diff`) reads and saves one block itself
+(`?handler=Block` / `SaveBlock`) for its translation dialog (`diff-edit.js`). Never link to `/admin/pages/edit/` again; a new place that
+opens a page links `/admin/pages/editor/{id}` (`asp-page="/Admin/Pages/Editor"`). Tests: `PageEditorTests`.
 
 ## The media library ("Bild bearbeiten")
 

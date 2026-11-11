@@ -391,6 +391,20 @@ public interface IPluginSite
     /// or an outside source must pass here before it is ever drawn raw. A default member: an older host encodes the text instead
     /// (safe, only plainer).</summary>
     string SanitizeHtml(string? html) => System.Net.WebUtility.HtmlEncode(html ?? "");
+    /// <summary>The address prefix of a content language on this site (API 2.2): "" for the default language while it lives at the plain
+    /// addresses ("Standardsprache unter /"), otherwise <c>/{locale}</c> — <c>/en</c>, or <c>/de</c> when the default language has its own
+    /// prefix. A plugin that publishes per language builds its links as <c>LocalePrefix(locale) + "/blog/…"</c>, so they follow the site's
+    /// setting. A default member: an older host answers with the rule every site had before the setting.</summary>
+    string LocalePrefix(string? locale) => string.IsNullOrEmpty(locale) || locale == DefaultCulture ? "" : "/" + locale;
+    /// <summary>
+    /// Reads a post behind a link ONCE (Instagram or Facebook through the site's own access, else any page's public preview data) and hands
+    /// back its text, date and source; every picture is downloaded into the media library right away (API 2.2). Nothing else is saved. The
+    /// address must be a full http(s) link; outgoing requests reach only public addresses. A default member: an older host answers that it
+    /// cannot do this.
+    /// </summary>
+    Task<LinkImport> ImportFromLinkAsync(string url, CancellationToken ct = default) =>
+        Task.FromResult(new LinkImport(false, "Diese MatCMS-Version kann keine Beiträge aus Links übernehmen.", "", "", "", null, "", "",
+            Array.Empty<string>(), Array.Empty<string>(), ""));
     /// <summary>Draws one of the CMS's own content blocks (<c>gallery</c>, <c>text</c>, …) with the given field values, as the page editor would.</summary>
     Task<string> RenderBlockAsync(string blockType, JsonNode values, CancellationToken ct = default);
     /// <summary>The HTML of a layout part of the active template with its <c>{{token}}</c> placeholders still in it — to see which
@@ -443,6 +457,21 @@ public interface IPluginSite
     /// </summary>
     Task<IReadOnlyList<SiteSearchHit>> SearchPagesAsync(string query, int max = 5, PluginMember? visitor = null, string? locale = null, CancellationToken ct = default);
 }
+
+/// <summary>What <see cref="IPluginSite.ImportFromLinkAsync"/> read behind a link.</summary>
+/// <param name="Ok">Something usable was found.</param>
+/// <param name="Error">Why not, in words for the editor (German).</param>
+/// <param name="Title">A heading made from the text.</param>
+/// <param name="Excerpt">A short teaser made from the text.</param>
+/// <param name="Html">The text as simple HTML paragraphs (encoded; links made clickable).</param>
+/// <param name="PublishedAt">The original date, when the source says it.</param>
+/// <param name="SourceUrl">The link, cleaned.</param>
+/// <param name="SourceName">The source's name (account, page).</param>
+/// <param name="Images">The pictures, already in the media library (<c>/uploads/…</c>).</param>
+/// <param name="Notes">What the editor should know (an access missing, pictures that could not be loaded).</param>
+/// <param name="Via">How it was read (<c>Instagram-API</c>, <c>Vorschau-Daten</c> …).</param>
+public sealed record LinkImport(bool Ok, string? Error, string Title, string Excerpt, string Html, DateTime? PublishedAt,
+    string SourceUrl, string SourceName, IReadOnlyList<string> Images, IReadOnlyList<string> Notes, string Via);
 
 /// <summary>One message of a conversation with the site's AI.</summary>
 /// <param name="Role"><c>system</c>, <c>user</c> or <c>assistant</c>.</param>

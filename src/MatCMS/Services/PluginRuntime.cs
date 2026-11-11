@@ -498,7 +498,9 @@ public class PluginRunner
         var def = BuiltInPlugins.Find(p.Key);
         if (def is null)
         {
-            _registry.SetError(p.Id, "Dieses eingebaute Plugin kennt diese Version von MatCMS nicht.");
+            // A plugin that left the image (the blog → MatCMS Store): its row, settings and data stay as they are until the signed package
+            // takes the row over (PluginPackager keeps on/off and settings) — nothing runs in the meantime, nothing is lost.
+            _registry.SetError(p.Id, BuiltInPlugins.GoneMessage);
             return;
         }
         var info = new PluginInfo(p.Key, def.Name, def.Version, def.Description, typeof(IPlugin).Assembly.GetName().Version!.Major);

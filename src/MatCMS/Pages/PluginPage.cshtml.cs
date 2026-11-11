@@ -126,6 +126,8 @@ public class PluginPageModel : PageModel
         ViewData["Title"] = string.IsNullOrWhiteSpace(result.Title) ? route.Info.Name : result.Title;
         if (!string.IsNullOrWhiteSpace(result.Description)) ViewData["MetaDescription"] = result.Description;
         if (result.Meta.Count > 0) ViewData["HeadMeta"] = result.Meta.ToList();
+        // The page's translations, for the language switcher (SiteContext.LanguageLinks): plain strings only, nothing of the plugin is kept.
+        if (result.Alternates.Count > 0) HttpContext.Items[SiteContext.AlternatesItemKey] = SiteContext.CleanAlternates(result.Alternates);
         if (result.StatusCode != StatusCodes.Status200OK) Response.StatusCode = result.StatusCode;
         return Page();
     }

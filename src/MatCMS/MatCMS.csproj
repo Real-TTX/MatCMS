@@ -74,13 +74,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The blog's own texts travel inside the assembly (the plugin reads them at load), not as loose content files. -->
-    <Content Remove="Plugin\Blog\Strings\*.json" />
-    <!-- WithCulture="false": "blog.de.json" would otherwise be read as a German satellite resource and leave the assembly. -->
-    <EmbeddedResource Include="Plugin\Blog\Strings\*.json" WithCulture="false" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- The plugin tests build the registry, builder and loaders directly. -->
     <InternalsVisibleTo Include="MatCMS.Plugins.Tests" />
   </ItemGroup>

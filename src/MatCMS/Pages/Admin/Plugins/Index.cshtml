@@ -50,6 +50,7 @@
                         @if (kind == MatCMS.Models.PluginKind.BuiltIn)
                         {
                             <span class="badge badge-new">@T["plugins.kind.builtin"]</span>
+                            @if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p)) { <span class="badge badge-warn">@T["plugins.builtin.goneBadge"]</span> }
                         }
                         else if (kind == MatCMS.Models.PluginKind.Native)
                         {
@@ -78,7 +79,15 @@
                             <span class="badge badge-warn">@T["plugins.matcms.update", newer]</span>
                         }
                     </div>
-                    <div class="b-sum">@(string.IsNullOrWhiteSpace(p.Description) ? (err ?? "") : p.Description)</div>
+                    @if (MatCMS.Services.Plugins.BuiltInPlugins.IsGone(p))
+                    {
+                        @* left the image (the blog → MatCMS Store): its data and on/off wait for the signed package, which takes this row over *@
+                        <div class="b-sum">@T["plugins.builtin.gone"]</div>
+                    }
+                    else
+                    {
+                        <div class="b-sum">@(string.IsNullOrWhiteSpace(p.Description) ? (err ?? "") : p.Description)</div>
+                    }
                 </div>
                 @* Fixed slots, so the buttons line up from row to row: the toggle (its width changes with the word) on the left, then edit,
                    then settings and delete as icons — a plugin without one keeps an invisible stand-in of the same size. *@

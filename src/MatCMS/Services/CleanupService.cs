@@ -186,7 +186,9 @@ public class CleanupService
         foreach (var c in await _db.Components.AsNoTracking().Select(c => new { c.TemplateHtml, c.FieldsJson }).ToListAsync(ct))
         { Add(c.TemplateHtml); Add(c.FieldsJson); }
 
-        // Blog posts: the blog adopted the Posts table, so they are part of the plugin-table corpus below.
+        // Blog posts: Posts is a core table booked under the blog's key, so it is part of the plugin-table corpus below — booked here
+        // too, because a site that never installed the blog plugin (it left the image) would otherwise have posts nobody reads.
+        await PostsTable.EnsureAsync(_pluginData, _db, ct);
 
         // Plugin data: every plugin's tables are read whether the plugin is loaded or not (a shop switched off for a week
         // keeps its product images), plus what the loaded plugins name themselves — and if one of those cannot answer, the

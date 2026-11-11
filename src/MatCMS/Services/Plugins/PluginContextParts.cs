@@ -199,6 +199,16 @@ internal sealed class PluginSiteFacade : IPluginSite
 
     public string SanitizeHtml(string? html) => SafeHtml.Sanitize(html);
 
+    public string LocalePrefix(string? locale) => Localizer.PrefixFor(locale);
+
+    public async Task<LinkImport> ImportFromLinkAsync(string url, CancellationToken ct = default)
+    {
+        if (_services.GetService(typeof(PostImportService)) is not PostImportService import)
+            return new LinkImport(false, "Das Übernehmen aus Links ist in diesem Zusammenhang nicht verfügbar.", "", "", "", null, "", "", Array.Empty<string>(), Array.Empty<string>(), "");
+        var r = await import.ImportAsync(url, ct);
+        return new LinkImport(r.Ok, r.Error, r.Title, r.Excerpt, r.Html, r.PublishedAt, r.SourceUrl, r.SourceName, r.Images, r.Notes, r.Via);
+    }
+
     public string ImageUrl(string url, int width) => ThumbnailService.Url(url, width);
 
     // MediaFocus is per request (it loads the few pictures with a focal point once); outside a request there is none to ask.

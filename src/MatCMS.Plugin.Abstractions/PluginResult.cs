@@ -68,6 +68,21 @@ public sealed class PluginResult
     /// <summary>Extra response headers (<see cref="WithHeader"/>).</summary>
     public IReadOnlyList<KeyValuePair<string, string>> Headers { get; private set; } = Array.Empty<KeyValuePair<string, string>>();
 
+    /// <summary>The same page in other languages (content language → local address), for the site's language switcher (API 2.2).</summary>
+    public IReadOnlyList<KeyValuePair<string, string>> Alternates { get; private set; } = Array.Empty<KeyValuePair<string, string>>();
+
+    /// <summary>
+    /// The same public page with its translations named (API 2.2): the site's language switcher then leads to them instead of the other
+    /// language's home page. <paramref name="alternates"/> maps a content language (<c>en</c>) to a LOCAL address (<c>/en/blog/hello</c>);
+    /// anything else is ignored by the host, and a language without an entry keeps the switcher's usual target.
+    /// </summary>
+    public PluginResult WithAlternates(IEnumerable<KeyValuePair<string, string>> alternates)
+    {
+        var copy = (PluginResult)MemberwiseClone();
+        copy.Alternates = (alternates ?? Array.Empty<KeyValuePair<string, string>>()).ToList();
+        return copy;
+    }
+
     /// <summary>The same answer with another HTTP status — a page inside the layout that is a 404 ("no such product"), or a form that came back with a 422.</summary>
     public PluginResult WithStatus(int statusCode)
     {

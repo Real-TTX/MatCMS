@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace MatCMS.Pages.Admin.Plugins;
 
 /// <summary>
-/// The page of a plugin that is part of the CMS (the blog). It can be switched on and off and has its settings, like any plugin —
+/// The page of a plugin that is part of the CMS (the shop, the AI bot). It can be switched on and off and has its settings, like any plugin —
 /// but there is no source to edit, nothing to export and nothing to delete: it comes with the image and is updated with it.
 /// Switching it off keeps its data; the page says so.
 /// </summary>

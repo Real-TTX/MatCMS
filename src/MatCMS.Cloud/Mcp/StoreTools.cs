@@ -35,12 +35,13 @@ public class StoreTools
     }
 
     [McpServerTool(Name = "take_over_from_matcms_store"), Description(
-        "Take one plugin over from the MatCMS Store into this cloud's store: the package is checked against the store keys in this image (signature), its pictures and publisher come along, profiles that use it roll the new version out. Never overwrites an own entry with the same key. Requires the store right.")]
+        "Take one plugin over from the MatCMS Store into this cloud's store: the package is checked against the store keys in this image (signature), its pictures and publisher come along, profiles that use it roll the new version out. An own entry with the same key is only replaced with replaceOwn=true (ask the operator first: the same key may be another plugin); the entry and its profile selections stay. Requires the store right.")]
     public static async Task<object> TakeOverFromMatcmsStore(McpContext me, MatcmsStoreService matcms,
-        [Description("The plugin key, e.g. \"forum\".")] string key, CancellationToken ct = default)
+        [Description("The plugin key, e.g. \"forum\".")] string key,
+        [Description("Replace an OWN store entry with the same key by the signed MatCMS Store version.")] bool replaceOwn = false, CancellationToken ct = default)
     {
         RequireStore(me);
-        var r = await matcms.ImportAsync(key, ct);
+        var r = await matcms.ImportAsync(key, ct, replaceOwn);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, message = r.Message, key = r.Key, version = r.Version };
     }

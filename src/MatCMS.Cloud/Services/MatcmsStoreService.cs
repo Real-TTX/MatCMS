@@ -108,16 +108,18 @@ public sealed class MatcmsStoreService
     /// <summary>
     /// Takes one entry over into this cloud's store: the package (only with a valid signature of exactly these bytes, key, kind and version), its
     /// publisher and its pictures. Profiles that selected the entry roll the new version out, as after any store upload.
+    /// <para><paramref name="replaceOwn"/>: an OWN entry with the same key is replaced only when the operator says so in that very request (the UI
+    /// asks first) — the same key may be somebody else's plugin. The row stays (upsert by key), so profiles that selected it keep it.</para>
     /// </summary>
-    public async Task<ImportResult> ImportAsync(string key, CancellationToken ct = default)
+    public async Task<ImportResult> ImportAsync(string key, CancellationToken ct = default, bool replaceOwn = false)
     {
         var (data, error) = await CatalogJsonAsync(fresh: true, ct);
         if (data is null) return new(false, error ?? "Der MatCMS Store ist nicht erreichbar.");
         var entry = (data["plugins"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
         if (entry is null) return new(false, $"„{key}“ gibt es im MatCMS Store nicht.");
         var mine = await _db.StorePlugins.AsNoTracking().FirstOrDefaultAsync(p => p.Key == key, ct);
-        if (mine is not null && mine.Origin != Origin)
-            return new(false, $"Im Store dieser Cloud gibt es schon ein eigenes Plugin „{key}“ – es wird nicht überschrieben.");
+        if (mine is not null && mine.Origin != Origin && !replaceOwn)
+            return new(false, $"Im Store dieser Cloud gibt es schon ein eigenes Plugin „{key}“ – es wird nur auf ausdrücklichen Wunsch ersetzt („Ersetzen“).");
 
         var baseUrl = await BaseUrlAsync(ct);
         var download = S(entry["download"]);

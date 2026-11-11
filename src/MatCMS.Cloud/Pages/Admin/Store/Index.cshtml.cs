@@ -73,9 +73,9 @@ public class IndexModel : PageModel
     public int Uses(Dictionary<int, int> map, int id) => map.TryGetValue(id, out var c) ? c : 0;
 
     /// <summary>Takes one entry of the MatCMS Store over into this store (signature checked, pictures and publisher with it).</summary>
-    public async Task<IActionResult> OnPostTakeOverAsync(string? key)
+    public async Task<IActionResult> OnPostTakeOverAsync(string? key, bool replace = false)
     {
-        var r = await _matcms.ImportAsync((key ?? "").Trim());
+        var r = await _matcms.ImportAsync((key ?? "").Trim(), replaceOwn: replace);
         TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
         return RedirectToPage(new { tab = "matcms" });
     }

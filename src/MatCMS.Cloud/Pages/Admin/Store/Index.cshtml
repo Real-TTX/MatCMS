@@ -73,6 +73,14 @@
                                         <button type="submit" class="btn btn-sm">@(e.State == "new" ? T["store.matcms.take"] : T["store.matcms.takeUpdate"])</button>
                                     </form>
                                 }
+                                else if (e.State == "own")
+                                {
+                                    <form method="post" asp-page-handler="TakeOver" class="inline-form" data-confirm="@T["store.matcms.replaceConfirm", e.Name, e.LocalVersion, e.Version]">
+                                        <input type="hidden" name="key" value="@e.Key" />
+                                        <input type="hidden" name="replace" value="true" />
+                                        <button type="submit" class="btn btn-sm btn-ghost">@T["store.matcms.replace"]</button>
+                                    </form>
+                                }
                             </div>
                         </td>
                     </tr>

@@ -212,6 +212,8 @@
   "store.matcms.takeUpdate": "Update",
   "store.matcms.help": "From {0}. “Take over” checks the signature against the store keys of this version and puts the plugin with its pictures and publisher into this store; profiles then use it like any other. An own entry with the same key is never overwritten.",
   "store.matcms.fromStore": "Taken over from the MatCMS Store, signed with store key {0}. It is not edited here – a new version comes through “Update” in the MatCMS Store tab. An own package makes it an own entry.",
+  "store.matcms.replace": "Replace",
+  "store.matcms.replaceConfirm": "Replace the own entry “{0}” ({1}) by the signed version {2} from the MatCMS Store? Profiles using it keep it and roll the new version out. It is not edited here afterwards.",
   "store.title": "Global store",
   "store.images": "Pictures",
   "store.publisher": "Publisher",

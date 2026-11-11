@@ -21,7 +21,7 @@ Stand: 11.11.2026 — **S0 und S1 gebaut und live** (matcms.de/store, 7 MATTHIX-
   mit dem Eintrag rollen aus), Herausgeber und Bilder (ersetzt) mit. `StorePlugin.Origin = matcms`, `Signature`, `SignatureKeyId` (Migration
   `StorePluginOrigin`), additiv im Katalog für die Websites (`CatalogPlugin.Origin/Signature/SignatureKeyId`). Ein übernommener Eintrag wird in der
   Cloud nicht bearbeitet (Repack würde die Signatur brechen); ein eigenes Paket macht ihn wieder zum eigenen Eintrag. Ein **eigener** Eintrag mit
-  demselben Key wird nie überschrieben. Store-Adresse: Cloud-Einstellung `store.matcms.url` (leer = https://matcms.de). Tests
+  demselben Key wird nur auf ausdrücklichen Wunsch ersetzt („Ersetzen“ mit Rückfrage; der Eintrag bleibt derselbe, Profile behalten ihn). Store-Adresse: Cloud-Einstellung `store.matcms.url` (leer = https://matcms.de). Tests
   `MatcmsStoreTakeOverTests`; einmal gegen das echte matcms.de mit dem echten Schlüssel: alle 7 Plugins übernommen.
   **Anders als §8:** kein eigener Knopf im Profil — übernommen wird im Store, ins Profil kommt der Eintrag wie jeder andere über „Aus Global
   hinzufügen“; kein stündliches Abfragen und kein „automatisch übernehmen“ — die Liste fragt matcms.de beim Öffnen (5 Minuten zwischengespeichert)

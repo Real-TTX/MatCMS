@@ -50,12 +50,12 @@ public static class StoreApi
             return Results.Ok(new { store = await matcms.BaseUrlAsync(ctx.RequestAborted), error = problem, plugins = entries });
         }).RequireRateLimiting("operatorApi");
 
-        app.MapPost("/api/v1/store/matcms/{pluginKey}/take-over", async (HttpContext ctx, string pluginKey, ApiKeyService keys, MatcmsStoreService matcms) =>
+        app.MapPost("/api/v1/store/matcms/{pluginKey}/take-over", async (HttpContext ctx, string pluginKey, ApiKeyService keys, MatcmsStoreService matcms, bool? replaceOwn) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
             if (RequireStore(key!) is { } g) return g;
-            var r = await matcms.ImportAsync(pluginKey, ctx.RequestAborted);
+            var r = await matcms.ImportAsync(pluginKey, ctx.RequestAborted, replaceOwn == true);
             return r.Ok ? Results.Ok(new { ok = true, message = r.Message, key = r.Key, version = r.Version })
                         : Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status422UnprocessableEntity);
         }).RequireRateLimiting("operatorApi");

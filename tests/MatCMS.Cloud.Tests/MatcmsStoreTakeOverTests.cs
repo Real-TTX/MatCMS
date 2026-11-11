@@ -127,8 +127,15 @@ public sealed class MatcmsStoreTakeOverTests : IDisposable
         Assert.Equal("own", (await _matcms.ListAsync(fresh: true)).Entries.Single().State);
         var r = await _matcms.ImportAsync("forum");
         Assert.False(r.Ok);
-        Assert.Equal("0.9", (await _db.StorePlugins.AsNoTracking().SingleAsync(p => p.Key == "forum")).Version);
+        var own = await _db.StorePlugins.AsNoTracking().SingleAsync(p => p.Key == "forum");
+        Assert.Equal("0.9", own.Version);
         Assert.False((await _matcms.ImportAsync("gibtsnicht")).Ok);
+
+        // Only when asked in that very request: the SAME row (profiles that selected it keep it) becomes the signed store version.
+        Assert.True((await _matcms.ImportAsync("forum", replaceOwn: true)).Ok);
+        var replaced = await _db.StorePlugins.AsNoTracking().SingleAsync(p => p.Key == "forum");
+        Assert.Equal((own.Id, "1.0", MatcmsStoreService.Origin), (replaced.Id, replaced.Version, replaced.Origin));
+        Assert.Equal("current", (await _matcms.ListAsync(fresh: true)).Entries.Single().State);
     }
 
     [Fact]

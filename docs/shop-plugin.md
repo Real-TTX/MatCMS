@@ -4,6 +4,19 @@ Stand: 15.10.2026 — **gebaut** (Entwurf unten, Stand der Umsetzung gleich daru
 zweite Prüfstein der Plugin-API nach dem Blog: alles, was er braucht und die API nicht kann, wird **in die API** gebaut,
 nicht im Shop vorbei.
 
+## Seit 11.11.2026: ein natives Paket (Release B)
+
+Der Shop ist nicht mehr im Image. Der Code liegt in **`plugins/shop/`** (`Shop.csproj`, Namespace weiter `MatCMS.Plugin.Shop`, nur gegen
+`MatCMS.Plugin.Abstractions` gebaut), gepackt mit `plugins/pack-native.ps1 -Path ./plugins/shop` und von Matthias mit `tools/StoreSign sign-code`
+signiert; der MatCMS Store verteilt ihn. Signiert läuft er ohne „Native Plugins erlauben“ und **übernimmt die eingebaute Zeile** einer Website
+(Ein/Aus, Einstellungen, Tabellen `p_shop_*`, Seiten, Menüelemente, Dateien — alle Namen unverändert). Eine Website, deren Image den Shop schon
+verloren hat, bevor das Paket kam, zeigt unter Plugins „Nicht mehr im Image“ und behält alles (`BuiltInPlugins.FormerKeys`). Was vorher vom Kern
+kam: `PluginText.Slugify`, `IPluginSite.SanitizeHtml`/`DefaultCulture`, die Suchtext-Regeln als Kopie (`ShopSearchText.cs`, gleiche Bewertung wie
+`SiteSearch`), JSON über eigene Typen quellgeneriert (`ShopJson.cs`). Testnähte (`StripeClient`/`PayPalClient.HandlerFactory`,
+`ShopReminders.MailSender`) liegen in `AppContext`, weil Test und Anwendung je eine eigene Kopie der DLL haben. Tests: `AppFactory` installiert
+Shop und KI-Bot signiert und aus (`tests/MatCMS.Plugins.Tests/StorePackages.cs`). Die Entscheidung E1 unten („eingebautes Plugin“) ist damit
+überholt: `docs/builtin-extraction.md`.
+
 ## Stand der Umsetzung (15.10.2026)
 
 **Entschieden** (Empfehlungen des Entwurfs, Matthias: „Bitte mach den Shop erstmal fertig“): **E1** eingebautes Plugin, Standard **aus** (`BuiltInPlugin.EnabledOnNewSite`);

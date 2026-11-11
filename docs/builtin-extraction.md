@@ -72,6 +72,19 @@ geladen werden**, und **bei jedem Laden** geprüft werden (wie heute die Prüfsu
 3. **Release B (CMS 1.15):** eingebauter Code raus. Eine Website mit einer `builtin`-Zeile ohne Code zeigt unter Plugins
    „nicht mehr im Image — aus dem Store installieren oder ein Paket importieren" statt still zu fehlen; ihre Daten bleiben unberührt.
 
+## Stand (11.11.)
+
+- **Erledigt:** Code-Signatur + `NativeTrust` + Übernahme eingebauter Keys + Abzeichen; API 2.1 (`DefaultCulture`, `SanitizeHtml`, `PluginText.Slugify`).
+- **Erledigt — Bot und Shop als Pakete (Release-B-Teil):** `plugins/bot` (2.0, Assets `ai-bot.js`/`ai-bot.css` unter `/plugin-assets/bot/`) und
+  `plugins/shop` (2.0), beide nur gegen die Abstractions; `pack-native.ps1` baut `dist/bot-2.0.zip` und `dist/shop-2.0.zip` (unsigniert — `sign-code`
+  macht Matthias). Im Kern sind sie raus: `BuiltInPlugins.All` = nur der Blog, `BuiltInPlugins.FormerKeys` = `shop`, `bot` (Keys bleiben reserviert,
+  `IsBuiltInKey` true; eine übrig gebliebene `builtin`-Zeile läuft nicht, zeigt „Nicht mehr im Image – aus dem Store installieren oder ein Paket
+  importieren“ und behält Daten und Einstellungen; ein Restore einer älteren Sicherung legt Ein/Aus und Einstellungen auf diese Zeile). Die Tests laden
+  die gebauten DLLs signiert mit einem Testschlüssel (`StorePackages`, `TestStoreKey`), Übernahme der Zeile mit Ein/Aus, Einstellungen und Daten
+  durch das signierte Paket ist getestet (`ShopSwitchAndBackupTests`).
+- **Offen:** Pakete signieren und in den Store (Matthias), Blog (parallel), danach Release B ausliefern — vorher müssen die Pakete auf den Websites sein,
+  die Shop oder Bot eingeschaltet haben.
+
 ## Reihenfolge der Arbeit
 
 1. Host: Code-Signatur + Laden ohne Schalter + Übernahme + Abzeichen; StoreSign `sign-code`; Tests (signiert läuft ohne Schalter,

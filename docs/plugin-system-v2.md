@@ -85,7 +85,7 @@ Gebaut und **gegen die echte App und das echte Linux-Image geprüft**:
   Und die Texte eines Plugin-Blocks werden im Editor über die Strings des Plugins aufgelöst (`Localizer` fragt `PluginRegistry.TextOf` nach den Kernschlüsseln — vorher standen dort
   rohe Schlüssel wie „shop.block.name“). Eingebaute Plugins können
   jetzt **aus** starten (`BuiltInPlugin.EnabledOnNewSite`). **Nicht gebaut:** eigene Template-Teile (L10) — der Shop liefert sein Aussehen als eigenes, überschreibbares CSS.
-- **Phase 4b–4f — der Shop** (`src/MatCMS/Plugin/Shop/`, eingebaut, Standard aus): Katalog, Varianten, Bestand, Warenkorb, Kasse, Vorkasse, Stripe Checkout mit Webhook,
+- **Phase 4b–4f — der Shop** (`src/MatCMS/Plugin/Shop/`, eingebaut, Standard aus; seit Release B das native Paket `plugins/shop/`): Katalog, Varianten, Bestand, Warenkorb, Kasse, Vorkasse, Stripe Checkout mit Webhook,
   Bestellstatus mit einer einzigen Zustandsmaschine, Rechnung (HTML, lückenlos nummeriert), digitale Produkte mit privaten Downloads, Kundenbereich `/konto`,
   Datenschutz-Export/-Löschung, Versandarten, Kleinunternehmer-Modus, Back-Office, Cloud-Aktionen `product.create` (MCP `create_product`) und `coupon.create` (MCP `create_coupon`), Gutscheine, Rechnung/Gutschrift als PDF, Steuer nach Lieferland, PayPal.
 - **Gelernt (SQLite unter Last):** `UPDATE … RETURNING` über den Microsoft.Data.Sqlite-Treiber wartet bei belegter Datenbank nur im ersten Schritt — der Commit im

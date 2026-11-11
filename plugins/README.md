@@ -22,6 +22,8 @@ Store der Cloud oder einen Bundle-Import.
 | `moments/` | Moments (Native) — Gästebereich privater Veranstaltungen: Zugang je Haushalt per Code/QR (ohne E-Mail), Galerie, Hochladen vom Handy mit Freigabe, Personen/Stichworte, Herzen, Kommentare, Moderation, Zugangskarten (siehe `moments/README.md`) | neu, Paket mit `./pack-native.ps1 -Path ./moments`; erster Einsatz Grit & Steffen |
 | `matmon-live/` | Matmon Live — für matmon.eu: Blöcke **Partner** (`/api/partners`, Logos über die eigene Seite durchgereicht: `/matmon-live/partner-logo/{id}`), **Dienststatus** (`/api/status` der Matmon Cloud, alle 5 min per Job) und **Sensorkatalog** (`/api/sensor-types`, alle 6 h; mitgelieferter Stand in `snapshot.csx` aus `tools/snapshot.mjs`, ein älterer Katalog verdrängt nie einen neueren) und **Templates** (`templates.csx`: die veröffentlichten Sets aus `/api/store/templates` der Cloud, alle 10 min, Details aufklappbar, Download über die eigene Seite `/matmon-live/template/{slug}`; Einreichen und Prüfen nur in der Cloud — Konto → Templates, Admin → Template store) | aktuell, auf matmon.eu |
 | `mx-easter-egg/` | MATTHIX Arcade von matthix.de: nur Dateien unter `assets/` (egg.js = Hülle, spiel-leben.js, spiel-kaltgang.js = Raycaster mit drei Leveln), ausgeliefert unter `/plugin-assets/mx-easter-egg/`; das Template „MATTHIX Klar“ lädt sie beim Klick auf „Spielen“ | aktuell, auf matthix.de |
+| `shop/` | **Shop** (Native, Key `shop`) — bis CMS 1.14 eingebautes Plugin, seit Release B ein Paket des MatCMS Store: Produkte, Varianten, Eigenschaften, Marken, Warenkorb, Kasse mit Stripe/PayPal/Vorkasse, Bestellungen, Rechnungen, Downloads, Gutscheine, Kundenkonto, ERP-API (Entwurf und Regeln: `docs/shop-plugin.md`). Tabellen `p_shop_*`, Einstellungen, Seiten und Menüelemente sind dieselben wie eingebaut — das signierte Paket übernimmt die Zeile einer Website mit Ein/Aus und Einstellungen | 2.0, Paket mit `./pack-native.ps1 -Path ./shop`, danach `tools/StoreSign sign-code` (Matthias) |
+| `bot/` | **KI-Bot** (Native, Key `bot`) — bis CMS 1.14 eingebaut, jetzt ein Paket des MatCMS Store: Chat-Assistent für Besucher; das Widget (`assets/ai-bot.js`, `assets/ai-bot.css`) liegt unter `/plugin-assets/bot/`. Tabellen `p_bot_*` und Einstellungen wie eingebaut | 2.0, Paket mit `./pack-native.ps1 -Path ./bot`, danach `tools/StoreSign sign-code` (Matthias) |
 | `todo-verwaltung-beispiel/` | Todo-Verwaltung (Beispiel, früher eingebaut) | Anschauungsbeispiel für die Plugin-API |
 
 ## Aufbau eines Plugins
@@ -44,7 +46,9 @@ Was man vor dem ersten eigenen wissen muss:
 - JSON über eigene Typen **quellgeneriert** (`JsonSerializerContext`) oder über `JsonNode` — Reflexions-JSON hält das
   Plugin im Speicher fest; ebenso ein `DbContext`, der den Provider des Hosts teilt (`UseInternalServiceProvider`).
 - Es läuft nur, wenn der Betreiber unter Plugins **„Native Plugins erlauben“** eingeschaltet hat — nie durch Import,
-  Cloud oder Backup. Es gibt keinen Sandkasten.
+  Cloud oder Backup. Es gibt keinen Sandkasten. **Ausnahme:** vom MatCMS Store code-signierte Pakete
+  (`tools/StoreSign sign-code`, geprüft bei jedem Laden) laufen ohne den Schalter — so kommen Shop und KI-Bot auf die Websites
+  (`docs/builtin-extraction.md`). Ihre Keys `shop`/`bot` nimmt nur ein signiertes Paket an.
 
 Der Weg zu einem eigenen Native-Plugin (auch außerhalb dieses Repos):
 1. **Paket der API bereitstellen.** `MatCMS.Plugin.Abstractions` ist als NuGet-Paket packbar, aber **nirgends

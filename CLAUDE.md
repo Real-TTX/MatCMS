@@ -128,7 +128,8 @@ Bewertungen) and re-wrote the two review plugins' code on every start — a site
 fix to one, and an improved version under the same key was silently reverted by the next restart. Their
 sources now live in `plugins/` (see its README) and reach a site through the cloud's store or a bundle
 import; rows already on existing instances are left untouched. Do not add a plugin back into the
-seeder. `plugins/` is not in any workflow's `paths:` — it is not compiled into an image.
+seeder. `plugins/` is not in any workflow's `paths:` — it is not compiled into an image. Since Release B that includes the
+shop and the AI bot (`plugins/shop`, `plugins/bot`): they reach a site as the MatCMS Store's signed native packages; only the blog is still built in.
 
 `docker compose up -d --build` inside either app folder still works — but the **build context is the
 repo root** (`context: ../..` + `dockerfile: src/<app>/Dockerfile`), because the image needs the two
@@ -203,7 +204,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   personal stands ALONE — orders/customer data), optional expiry, revoke. 600 calls/min per key, JSON body ≤ 4 MB (`RequestData.Json()`), answers `no-store`.
   The handler never sees the key — only its name (`RequestData.ApiCaller`), which goes into history as `api:{name}`. Antiforgery off, the route is exempt
   from maintenance mode (an ERP sync must keep running). Keys are **not in backups** (a restored copy elsewhere must not accept the live site's ERP).
-  The shop's ERP endpoints: `Plugin/Shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
+  The shop's ERP endpoints: `plugins/shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
 - **Holiday homes** (`plugins/booking`, native, key `booking`; design `docs/booking-plugin.md`, built in phases B1–B6 — all done, 0.6): houses, units (a "whole house" unit
   CONTAINS others), seasons with a rank (the higher wins on overlap), rates per unit and season, fees and tourist tax, `GET /buchung/preis`. The request form's dates are ONE field: the site's own date picker (`src/MatCMS/wwwroot/js/mat-datepicker.js`, the form builder's "Anreise–Abreise") with
   `data-dp-busy-url` → `/buchung/belegung` (taken nights widened by the buffer days, the change-over day allowed as departure, least stay and arrival days of the
@@ -289,8 +290,15 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **"MatCMS ships no plugins" still holds for script plugins and the seeder.** What does ship is the *built-in* plugin
   (`Kind = builtin`, `Services/Plugins/BuiltInPlugins.cs`): compiled into the image, written against the same API, enabled on a
   new site, can be switched off, never deleted, exported or overwritten (a bundle or cloud rollout with its key is refused).
-  Three exist: **the AI bot** (`src/MatCMS/Plugin/Bot/`, off on a new site — see "The AI bot" below), **the shop** (`src/MatCMS/Plugin/Shop/`, namespace `MatCMS.Plugin.Shop`, **off on a new site** — `BuiltInPlugin.EnabledOnNewSite` — see `docs/shop-plugin.md`
-  and "The shop" below) and **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
+  **The AI bot and the shop LEFT the image (Release B, `docs/builtin-extraction.md`):** they are native packages of the MatCMS Store now —
+  `plugins/bot/` and `plugins/shop/` (namespaces unchanged, only `MatCMS.Plugin.Abstractions`), code-signed by Matthias (`tools/StoreSign sign-code`), so
+  they run without "Native Plugins erlauben" and the signed package TAKES OVER a site's old `builtin` row (on/off, settings, tables, pages, menu elements
+  keep their names). Their keys stay reserved (`BuiltInPlugins.FormerKeys`, `IsBuiltInKey` still true: an unsigned package under `shop`/`bot` is
+  refused); a site whose row is still `builtin` after the update shows "Nicht mehr im Image" under Plugins (`BuiltInPlugins.IsGone`), runs nothing of
+  it and keeps its data; a restore of an older backup puts on/off and settings onto that row (or the package's). Tests: `AppFactory` installs both
+  signed and OFF (`tests/MatCMS.Plugins.Tests/StorePackages.cs`, test key `TestStoreKey`); the test project ALSO compiles against them, so a seam a
+  test sets must not be a static field of the plugin (the shop's `HandlerFactory`/`MailSender` live in `AppContext`).
+  The one built-in left is **the blog** (`src/MatCMS/Plugin/Blog/`, namespace `MatCMS.Plugin.Blog`): it *adopts* the existing `Posts`
   table (nothing moved), registers `/blog/{slug}`, the `posts` block, its admin section, the dashboard tile, the sitemap
   entries and the cloud operation `post.create`. The core no longer knows posts except for the backup, which reads the table
   through `BlogStore.Table(db)` — so posts are in every backup whether or not the blog is on.
@@ -398,8 +406,8 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 
 ## The shop
 
-A built-in plugin (off until switched on), written against the plugin API and nothing else — the core does not know it. Read `docs/shop-plugin.md` before touching
-`src/MatCMS/Plugin/Shop/`. The rules that are easy to break:
+A native plugin of the MatCMS Store (it was built in until Release B; off until switched on), written against the plugin API and nothing else — the core does not
+know it. Read `docs/shop-plugin.md` before touching `plugins/shop/`. The rules that are easy to break:
 
 - **Money is whole cents, prices are GROSS, and the server prices everything** (`ShopOrders.PriceAsync`); nothing a form sends as a price or total is read. An order and its lines
   are a **snapshot** (title, price, tax) — later product edits never touch them; the invoice is written ONCE when the order is paid and stored as HTML.
@@ -572,10 +580,11 @@ through the cloud relay — the key never lives on the site.
 - Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay), `OwnAiTests` (shared provider clients, the KI tab,
   encryption, backup exclusion).
 
-## The AI bot (built-in plugin `bot`)
+## The AI bot (plugin `bot`)
 
-A chat assistant for a site's VISITORS (not the editors' assistant above): `src/MatCMS/Plugin/Bot/`, `wwwroot/js/ai-bot.js` + `wwwroot/css/ai-bot.css`.
-Built in, **off on a new site** (`EnabledOnNewSite: false`). Name, greeting, avatar, colour (template accent by default), bubble on/off + position,
+A chat assistant for a site's VISITORS (not the editors' assistant above): `plugins/bot/` — a native package of the MatCMS Store since Release B (built in
+before; key, settings and tables unchanged), its widget the package's assets `assets/ai-bot.js` + `assets/ai-bot.css`, served at `/plugin-assets/bot/`.
+**Off until switched on.** Name, greeting, avatar, colour (template accent by default), bubble on/off + position,
 basic instruction, fallback, sources, customer data, limits and history are its settings (`BotConfig`).
 
 - **What it needed became general plugin API** (on `IPluginSite`, one implementation in `PluginSiteFacade`): `AiEnabled` + `AskAiAsync(PluginAiCall)` —

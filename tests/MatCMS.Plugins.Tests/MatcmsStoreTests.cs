@@ -71,7 +71,7 @@ public sealed class StoreServerApp : IDisposable
 public class MatcmsStoreTests : IClassFixture<StoreServerApp>
 {
     private readonly StoreServerApp _s;
-    public MatcmsStoreTests(StoreServerApp s) => _s = s;
+    public MatcmsStoreTests(StoreServerApp s) { _s = s; MatCMS.Services.Plugins.PluginPostLimiter.Reset(); }   // one address for every test of the class
 
     private static readonly byte[] Png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
 
@@ -307,6 +307,46 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
             { ["action"] = "hide", ["id"] = reviewId, ["__RequestVerificationToken"] = AppFactory.Token(list)! }));
         Assert.DoesNotContain("doch gut", await guest.GetStringAsync("/store/labs-rated"));
         Assert.Equal(0, (int)JsonNode.Parse(await guest.GetStringAsync("/store/api/plugins/labs-rated"))!["rating"]!["count"]!);
+    }
+
+    [Fact]
+    public async Task An_entry_has_english_texts_shown_on_the_english_store_and_carried_in_the_catalogue()
+    {
+        await _s.InstallAsync();
+        var pub = await PublisherAsync(_s, "Lingua", "lingua@store.example");
+        var package = Package("lingua-hello", "1.0", "Grüßer");
+        Assert.Equal(HttpStatusCode.Redirect, (await UploadAsync(pub, package)).StatusCode);
+        var save = await PostFormAsync(pub, "/store/konto/eintrag/lingua-hello", "/store/konto/eintrag/lingua-hello", new()
+        {
+            ["action"] = "save", ["name"] = "Grüßer", ["summary"] = "Ein Gruß auf jeder Seite.", ["description"] = "Sagt Hallo.",
+            ["name_en"] = "Greeter", ["summary_en"] = "A greeting on every page.", ["description_en"] = ""   // an empty field falls back to German
+        });
+        Assert.Equal("/store/konto/eintrag/lingua-hello?ok=saved", save.Headers.Location?.OriginalString);
+        Assert.Contains("value=\"Greeter\"", await pub.GetStringAsync("/store/konto/eintrag/lingua-hello"));
+        var admin = _s.App.Browser();
+        await AppFactory.LoginAsync(admin);
+        var vid = VersionIdIn(await admin.GetStringAsync("/admin/p/matcms-store/review"), "Grüßer 1.0");
+        var sig = StoreSignature.Sign(StoreSignature.Text("script", "lingua-hello", "1.0", StoreSignature.Sha256Hex(package)), _s.Key);
+        Assert.Equal(HttpStatusCode.Redirect, (await DecideAsync(admin, vid, "approve", _s.KeyId + ":" + sig)).StatusCode);
+
+        var guest = _s.App.Browser();
+        var de = WebUtility.HtmlDecode(await guest.GetStringAsync("/store"));
+        Assert.Contains("Grüßer", de);
+        Assert.DoesNotContain("Greeter", de);
+        var en = WebUtility.HtmlDecode(await guest.GetStringAsync("/en/store"));
+        Assert.Contains("Greeter", en);
+        Assert.Contains("A greeting on every page.", en);
+        Assert.Contains("href=\"/en/store/lingua-hello\"", en);                       // the visitor stays in English
+        Assert.DoesNotContain("href=\"/en/store/api/", en);                          // packages and pictures keep one address
+        var page = WebUtility.HtmlDecode(await guest.GetStringAsync("/en/store/lingua-hello"));
+        Assert.Contains("<h1>Greeter</h1>", page);
+        Assert.Contains("Sagt Hallo.", page);                                        // no English description: the German one
+        Assert.Contains("Grüßer", WebUtility.HtmlDecode(await guest.GetStringAsync("/store?q=greeting")));    // found by its English words too
+
+        var entry = JsonNode.Parse(await guest.GetStringAsync("/store/api/plugins/lingua-hello"))!;
+        Assert.Equal("Grüßer", (string?)entry["name"]);                               // the catalogue keeps German as the base …
+        Assert.Equal(("Greeter", "A greeting on every page.", ""), ((string?)entry["translations"]!["en"]!["name"],
+            (string?)entry["translations"]!["en"]!["summary"], (string?)entry["translations"]!["en"]!["description"]));   // … and carries English beside it
     }
 
     [Fact]

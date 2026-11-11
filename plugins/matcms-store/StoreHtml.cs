@@ -18,11 +18,33 @@ internal static class StoreHtml
 
     public static PluginResult Page(IPluginContext ctx, string title, string body, string? description = null, int status = 200, bool noIndex = false)
     {
-        var html = "<style>" + Css + "</style><section class=\"section mst\"><div class=\"container\">" + body + "</div></section>";
+        var html = "<style>" + Css + "</style><section class=\"section mst\"><div class=\"container\">" + Localize(ctx, body) + "</div></section>";
         var meta = noIndex ? new[] { new KeyValuePair<string, string>("robots", "noindex") } : null;
         var r = PluginResult.Page(html, title, description, meta);
         return status == 200 ? r : r.WithStatus(status);
     }
+
+    private static readonly System.Text.RegularExpressions.Regex StoreLink =
+        new("(href|action)=\"/store(?=[/?\"])(?!/api/)", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// On a page served in another language than the site's default (<c>/en/store</c>), the store's own links keep that prefix, so a visitor who
+    /// came in English stays in English. The package and picture addresses (<c>/store/api/…</c>) are the same in every language and stay as they are.
+    /// </summary>
+    internal static string Localize(IPluginContext ctx, string body) =>
+        Prefix(ctx) is { Length: > 0 } p ? StoreLink.Replace(body, m => m.Groups[1].Value + "=\"" + p + "/store") : body;
+
+    /// <summary>"/en" on a page in another language than the site's default, "" otherwise.</summary>
+    private static string Prefix(IPluginContext ctx)
+    {
+        var locales = ctx.Site.Locales;
+        if (string.IsNullOrEmpty(ctx.Locale) || locales.Count == 0 || string.Equals(ctx.Locale, locales[0], StringComparison.OrdinalIgnoreCase)) return "";
+        return "/" + ctx.Locale.ToLowerInvariant();
+    }
+
+    /// <summary>A redirect to one of the store's own pages, in the language the visitor is in (see <see cref="Localize"/>).</summary>
+    internal static PluginResult Go(IPluginContext ctx, string url) =>
+        PluginResult.Redirect(url.StartsWith("/store", StringComparison.Ordinal) && !url.StartsWith("/store/api/", StringComparison.Ordinal) ? Prefix(ctx) + url : url);
 
     public static string Notice(string text, string tone = "ok") => $"<p class=\"mst-notice mst-{tone}\">{E(text)}</p>";
 

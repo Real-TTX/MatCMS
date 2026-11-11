@@ -114,6 +114,7 @@ public sealed class MatcmsStoreClient
         var (catalog, error) = await CatalogAsync(false, ct);
         if (catalog is null) return (new(), error);
         var list = new List<Entry>();
+        var english = System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] == "en";   // as the Localizer reads it
         foreach (var p in Items(catalog, group).OfType<JsonObject>())
         {
             var key = S(p["key"]);
@@ -122,7 +123,10 @@ public sealed class MatcmsStoreClient
                 .Select(i => (Id: i["id"] is JsonValue iv && iv.TryGetValue<long>(out var id) ? id : 0, Caption: S(i["caption"])))
                 .Where(i => i.Id > 0).Take(8).ToList();
             var accent = S(p["accentColor"]);
-            list.Add(new Entry(key, S(p["name"]), S(p["version"]), S(p["kind"]), S(p["summary"]), S(p["description"]), S(p["publisher"]), S(p["publisherUrl"]),
+            // The store's own texts in the admin's language where the publisher wrote them (catalogue field "translations", each field on its own).
+            var en = english ? p["translations"]?["en"] as JsonObject : null;
+            string L(string field) => S(en?[field]) is { Length: > 0 } t ? t : S(p[field]);
+            list.Add(new Entry(key, L("name"), S(p["version"]), S(p["kind"]), L("summary"), L("description"), S(p["publisher"]), S(p["publisherUrl"]),
                 p["publisherVerified"] is JsonValue pv && pv.TryGetValue<bool>(out var b) && b, images,
                 p["downloads"] is JsonValue dv && dv.TryGetValue<long>(out var dl) ? dl : 0,
                 Colour.IsMatch(accent) ? accent : null, RatingOf(p["rating"])));

@@ -140,15 +140,15 @@ internal static class StoreReviews
         if (item is null || !Enabled(ctx)) return PluginResult.NotFound();
         var back = StoreUrls.Item(item.Key);
         var m = ctx.Member!;
-        if (pub is not null && pub.MemberId == m.Id) return PluginResult.Redirect(back + "?rev=own");
+        if (pub is not null && pub.MemberId == m.Id) return Go(ctx, back + "?rev=own");
         var mine = await Table(ctx).FindAsync(DataQuery.Everything.Eq("item_id", item.Id).Eq("member_id", m.Id), ct);
         if (ctx.Request.Action == "delete")
         {
             if (mine is not null) await Table(ctx).DeleteAsync(mine.Id, ct);
-            return PluginResult.Redirect(back + "?rev=deleted");
+            return Go(ctx, back + "?rev=deleted");
         }
         if (!int.TryParse(ctx.Request.F("stars"), NumberStyles.None, CultureInfo.InvariantCulture, out var stars) || stars is < 1 or > 5)
-            return PluginResult.Redirect(back + "?rev=invalid");
+            return Go(ctx, back + "?rev=invalid");
         var name = StoreText.Cut(OneLine(ctx.Request.F("name")), MaxName);
         var values = new Dictionary<string, object?>
         {
@@ -165,7 +165,7 @@ internal static class StoreReviews
             values["reported"] = 0L;
             await Table(ctx).UpdateAsync(mine.Id, values, ct);
         }
-        return PluginResult.Redirect(back + "?rev=saved");
+        return Go(ctx, back + "?rev=saved");
     }
 
     /// <summary>POST <c>/store/{key}/melden</c> (anybody): marks a review as reported — the operator sees it first in the admin.</summary>
@@ -176,7 +176,7 @@ internal static class StoreReviews
         if (item is null || !Enabled(ctx)) return PluginResult.NotFound();
         if (long.TryParse(ctx.Request.F("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) && await Table(ctx).GetAsync(id, ct) is { } row && row.Int("item_id") == item.Id)
             await Table(ctx).IncrementAsync(id, "reported", 1, ct: ct);
-        return PluginResult.Redirect(StoreUrls.Item(item.Key) + "?rev=reported");
+        return Go(ctx, StoreUrls.Item(item.Key) + "?rev=reported");
     }
 
     private static string OneLine(string s) => string.Join(' ', (s ?? "").Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)).Trim();

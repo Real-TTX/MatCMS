@@ -57,6 +57,13 @@ Stand: 11.11.2026 — **S0–S4 live** (matcms.de/store mit 7 signierten MATTHIX
   Meldung erledigt, löschen; gemeldete zählen in die Plakette). Durchschnitt und Anzahl stehen im Katalog (`rating`) und im Store-Dialog der
   Websites. Einstellung „Bewertungen erlauben“ (an). Ein gelöschtes Konto nimmt seine Bewertungen mit, der Datenexport listet sie.
   **Bewusst nicht:** kostenpflichtige Plugins (eigenes Projekt: Zahlung, Lizenzen, Auszahlung, Steuern).
+- **Englische Einträge** (matcms-store 0.3): ein Eintrag hat neben den deutschen Texten freiwillig Name, Kurzbeschreibung und Beschreibung auf
+  Englisch (Spalten `name_en`, `summary_en`, `description_en`; Formulare „Hochladen“ und „Meine Einträge“). Jedes Feld für sich: ein leeres
+  zeigt den deutschen Text. Die Store-Seiten antworten jetzt auch unter `/en/store…` (nicht mehr nur in der Standardsprache) und behalten die
+  Sprache in Links und Weiterleitungen (`StoreHtml.Localize`/`Go`); die Suche findet auch englische Wörter. Der Katalog bleibt deutsch und
+  trägt `translations.en` {name, summary, description} daneben (nur wenn etwas da ist; ältere Leser übersehen es). Der Store-Dialog der
+  Websites zeigt die englischen Texte, wenn die Verwaltung auf Englisch läuft (`MatcmsStoreClient.ListAsync`). Die Cloud übernimmt nur die
+  deutschen Texte (ihr Store ist einsprachig). Die Texte der MATTHIX-Einträge: `matcms-websites/matcms-site/store-texte-en.json`.
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

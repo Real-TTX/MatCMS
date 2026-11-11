@@ -46,6 +46,10 @@ internal static class StoreApiRoutes
             ["sha256"] = latest?.Sha256 ?? "", ["size"] = latest?.Size ?? 0, ["signature"] = latest?.Signature ?? "", ["keyId"] = latest?.KeyId ?? "",
             ["download"] = latest is null ? "" : StoreUrls.Package(item.Key, latest.Version, latest.Kind)
         };
+        // The English texts, where the publisher wrote them (additive: a reader that does not know it shows the German ones). Each field on its
+        // own — an empty one means "use the German text".
+        if (item.HasEnglish)
+            o["translations"] = new JsonObject { ["en"] = new JsonObject { ["name"] = item.NameEn, ["summary"] = item.SummaryEn, ["description"] = item.DescriptionEn } };
         // A template's look (colours, fonts) and a component's icon, as the package carried them — a showcase draws them, a site never applies them.
         if (latest is not null && latest.Look.Length > 0 && JsonNode.Parse(latest.Look) is JsonObject look)
         {

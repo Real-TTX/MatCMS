@@ -26,7 +26,7 @@ internal static class StoreAccount
     {
         var member = ctx.Member!;
         var pub = await db.PublisherOfMemberAsync(member.Id, ct);
-        if (pub is null) return (null, PluginResult.Redirect(StoreUrls.Account));
+        if (pub is null) return (null, Go(ctx, StoreUrls.Account));
         if (pub.Blocked) return (null, AccountPage(ctx, ctx.T("store.account"), Notice(ctx.T("store.err.blocked"), "err"), 403));
         if (ctx.Settings.GetBool(StoreSettings.RequireTwoFactor) && !member.TwoFactorEnabled)
             return (null, AccountPage(ctx, ctx.T("store.account"),
@@ -39,7 +39,7 @@ internal static class StoreAccount
 
     public static async Task<PluginResult> RegisterAsync(IPluginContext ctx, CancellationToken ct)
     {
-        if (ctx.Member is not null) return PluginResult.Redirect(StoreUrls.Account);
+        if (ctx.Member is not null) return Go(ctx, StoreUrls.Account);
         if (!ctx.Settings.GetBool(StoreSettings.Registration))
             return AccountPage(ctx, ctx.T("store.register"), $"<h1>{E(ctx.T("store.register"))}</h1>" + Notice(ctx.T("store.registrationClosed"), "info"));
 
@@ -63,7 +63,7 @@ internal static class StoreAccount
                     case MemberCreateStatus.Created when res.Account is { } acc:
                         await new StoreDb(ctx.Data).CreatePublisherAsync(acc.Id, name, StoreText.SafeUrl(website), ct);
                         await ctx.Members.SignInAsync(acc, persistent: true, ct);
-                        return PluginResult.Redirect(StoreUrls.Account + "?ok=welcome");
+                        return Go(ctx, StoreUrls.Account + "?ok=welcome");
                     case MemberCreateStatus.EmailTaken: error = ctx.T("store.err.emailTaken"); break;
                     case MemberCreateStatus.InvalidEmail: error = ctx.T("store.err.email"); break;
                     case MemberCreateStatus.WeakPassword: error = ctx.T("store.err.password"); break;
@@ -132,7 +132,7 @@ internal static class StoreAccount
                 else
                 {
                     await db.CreatePublisherAsync(member.Id, name, StoreText.SafeUrl(website), ct);
-                    return PluginResult.Redirect(StoreUrls.Account + "?ok=welcome");
+                    return Go(ctx, StoreUrls.Account + "?ok=welcome");
                 }
             }
             var become = new StringBuilder($"<h1>{E(ctx.T("store.become"))}</h1><p class=\"mst-intro\">{E(ctx.T("store.becomeIntro"))}</p>");
@@ -153,7 +153,7 @@ internal static class StoreAccount
                 {
                     ["website"] = StoreText.SafeUrl(website), ["about"] = StoreText.Cut(ctx.Request.F("about").Trim(), 1000)
                 }, ct);
-                return PluginResult.Redirect(StoreUrls.Account + "?ok=saved");
+                return Go(ctx, StoreUrls.Account + "?ok=saved");
             }
         }
 
@@ -203,7 +203,7 @@ internal static class StoreAccount
         if (ctx.Request.IsPost)
         {
             var (key, err) = await AcceptAsync(ctx, db, pub!, ct);
-            if (err is null) return PluginResult.Redirect(StoreUrls.AccountItem(key!) + "?ok=submitted");
+            if (err is null) return Go(ctx, StoreUrls.AccountItem(key!) + "?ok=submitted");
             error = err;
         }
         var maxMb = StoreSettings.MaxPackageBytes(ctx) / (1024 * 1024);
@@ -217,6 +217,7 @@ internal static class StoreAccount
           .Append($"<h2>{E(ctx.T("store.newEntryTexts"))}</h2><p class=\"mst-hint\">{E(ctx.T("store.newEntryTextsHint"))}</p>")
           .Append(Field("summary", ctx.T("store.field.summary"), ctx.Request.F("summary"), max: 200))
           .Append(Area("description", ctx.T("store.field.description"), ctx.Request.F("description"), ctx.T("store.field.descriptionHint"), 8))
+          .Append(EnglishFields(ctx, ctx.Request.F("name_en"), ctx.Request.F("summary_en"), ctx.Request.F("description_en")))
           .Append(Field("tags", ctx.T("store.field.tags"), ctx.Request.F("tags"), hint: ctx.T("store.field.tagsHint")))
           .Append(Field("license", ctx.T("store.field.license"), ctx.Request.F("license"), max: 60))
           .Append(Field("homepage", ctx.T("store.field.homepage"), ctx.Request.F("homepage"), type: "url"))
@@ -270,6 +271,8 @@ internal static class StoreAccount
                     ["key"] = info.Key, ["name"] = info.Name, ["publisher_id"] = pub.Id, ["status"] = ItemStatus.Draft,
                     ["summary"] = StoreText.Cut(ctx.Request.F("summary").Trim(), 200),
                     ["description"] = StoreText.Cut(ctx.Request.F("description").Trim() is { Length: > 0 } d ? d : info.Description, 8000),
+                    ["name_en"] = StoreText.Cut(ctx.Request.F("name_en").Trim(), 80), ["summary_en"] = StoreText.Cut(ctx.Request.F("summary_en").Trim(), 200),
+                    ["description_en"] = StoreText.Cut(ctx.Request.F("description_en").Trim(), 8000),
                     ["tags"] = StoreText.CleanTags(ctx.Request.F("tags")), ["license"] = StoreText.Cut(ctx.Request.F("license").Trim(), 60),
                     ["homepage"] = StoreText.SafeUrl(ctx.Request.F("homepage").Trim()), ["created"] = now, ["updated"] = now
                 }, ct);
@@ -297,6 +300,13 @@ internal static class StoreAccount
             throw;
         }
     }
+
+    /// <summary>The entry's English texts — optional, each field on its own (an empty one shows the German text).</summary>
+    private static string EnglishFields(IPluginContext ctx, string name, string summary, string description) =>
+        $"<h3>{E(ctx.T("store.textsEn"))}</h3><p class=\"mst-hint\">{E(ctx.T("store.textsEnHint"))}</p>" +
+        Field("name_en", ctx.T("store.field.nameEn"), name, max: 80) +
+        Field("summary_en", ctx.T("store.field.summaryEn"), summary, max: 200) +
+        Area("description_en", ctx.T("store.field.descriptionEn"), description, ctx.T("store.field.descriptionHint"), 8);
 
     /// <summary>Stores the pictures posted under "pictures", up to the limit; type by the first bytes, never what the browser claims.</summary>
     private static async Task<int> AddPicturesAsync(IPluginContext ctx, StoreDb db, long itemId, CancellationToken ct)
@@ -351,27 +361,29 @@ internal static class StoreAccount
                     {
                         ["name"] = ctx.Request.F("name").Trim() is { Length: >= 2 } nm ? StoreText.Cut(nm, 80) : item.Name,
                         ["summary"] = StoreText.Cut(ctx.Request.F("summary").Trim(), 200), ["description"] = StoreText.Cut(ctx.Request.F("description").Trim(), 8000),
+                        ["name_en"] = StoreText.Cut(ctx.Request.F("name_en").Trim(), 80), ["summary_en"] = StoreText.Cut(ctx.Request.F("summary_en").Trim(), 200),
+                        ["description_en"] = StoreText.Cut(ctx.Request.F("description_en").Trim(), 8000),
                         ["tags"] = StoreText.CleanTags(ctx.Request.F("tags")), ["license"] = StoreText.Cut(ctx.Request.F("license").Trim(), 60),
                         ["homepage"] = StoreText.SafeUrl(homepage)
                     }, ct);
-                    return PluginResult.Redirect(here + "?ok=saved");
+                    return Go(ctx, here + "?ok=saved");
                 case "pictures":
                     var added = await AddPicturesAsync(ctx, db, item.Id, ct);
                     if (added > 0) await db.UpdateItemAsync(item.Id, new Dictionary<string, object?>(), ct);
-                    return PluginResult.Redirect(here + "?ok=" + (added > 0 ? "pictures" : "nopictures"));
+                    return Go(ctx, here + "?ok=" + (added > 0 ? "pictures" : "nopictures"));
                 case "caption" when pic is not null:
                     await db.Pictures.UpdateAsync(pic.Id, new Dictionary<string, object?> { ["caption"] = StoreText.Cut(ctx.Request.F("caption").Trim(), 140) }, ct);
-                    return PluginResult.Redirect(here + "?ok=saved");
+                    return Go(ctx, here + "?ok=saved");
                 case "cover" when pic is not null:
                     var all = (await db.PicturesOfAsync(item.Id, ct)).OrderBy(p => p.Id == pic.Id ? 0 : 1).ThenBy(p => p.Sort).ToList();
                     for (var i = 0; i < all.Count; i++) await db.Pictures.UpdateAsync(all[i].Id, new Dictionary<string, object?> { ["sort"] = (long)(i + 1) * 10 }, ct);
-                    return PluginResult.Redirect(here + "?ok=saved");
+                    return Go(ctx, here + "?ok=saved");
                 case "answer":
-                    return PluginResult.Redirect(here + "?ok=" + (await StoreReviews.AnswerAsync(ctx, item, ct) ? "saved" : "nothing"));
+                    return Go(ctx, here + "?ok=" + (await StoreReviews.AnswerAsync(ctx, item, ct) ? "saved" : "nothing"));
                 case "delpic" when pic is not null:
                     await db.Pictures.DeleteAsync(pic.Id, ct);
                     await ctx.Files.DeleteAsync(pic.File, ct);
-                    return PluginResult.Redirect(here + "?ok=deleted");
+                    return Go(ctx, here + "?ok=deleted");
             }
         }
 
@@ -393,6 +405,7 @@ internal static class StoreAccount
           .Append(Field("name", ctx.T("store.field.name"), item.Name, required: true, max: 80))
           .Append(Field("summary", ctx.T("store.field.summary"), item.Summary, max: 200))
           .Append(Area("description", ctx.T("store.field.description"), item.Description, ctx.T("store.field.descriptionHint"), 10))
+          .Append(EnglishFields(ctx, item.NameEn, item.SummaryEn, item.DescriptionEn))
           .Append(Field("tags", ctx.T("store.field.tags"), item.Tags, hint: ctx.T("store.field.tagsHint")))
           .Append(Field("license", ctx.T("store.field.license"), item.License, max: 60))
           .Append(Field("homepage", ctx.T("store.field.homepage"), item.Homepage, type: "url"))

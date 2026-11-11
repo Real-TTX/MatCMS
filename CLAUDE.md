@@ -239,6 +239,9 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   `reviews`; an erased account takes its reviews, an export lists them). Downloads count once per address, version and day (`download_marks`).
   The entry page carries the review forms, so its route has antiforgery on; a redirect never carries a `#fragment` (SafeLocal), so the answer
   to a review action is a notice at the TOP of the page (`StoreReviews.NoticeFor`).
+  An entry may have **English texts** (`name_en/summary_en/description_en`, each falling back to the German one on its own): the pages answer
+  under `/en/store…` too and keep the prefix in links and redirects (`StoreHtml.Localize`/`Go` — a new store link or redirect must go through
+  them), the catalogue stays German and carries `translations.en` beside it, and a site whose admin is English shows those in its store dialog.
 - **Sites install from the MatCMS Store themselves** (`Services/MatcmsStoreClient.cs`, docs/official-store.md S3): Admin → Plugins → "Weitere durchsuchen"
   gets a "MatCMS Store" tab next to the cloud's store (the dialog's tabs are links, `?browse=matcms`, so only the store looked at is asked; pictures are fetched
   and served by the SITE, `?handler=MatcmsImage`). Install = package only from the store server, `StoreSignature.VerifyPackage` against `StoreKeys.Known`

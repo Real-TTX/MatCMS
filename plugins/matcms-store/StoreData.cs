@@ -22,7 +22,21 @@ internal static class VersionStatus
 internal sealed record Publisher(long Id, long MemberId, string Name, string Slug, string Website, string About, bool Verified, bool Blocked, DateTime? Created);
 
 internal sealed record Item(long Id, string Key, string Name, string Summary, string Description, long PublisherId, string Tags, string License, string Homepage,
-    string Status, string LatestVersion, string LatestKind, long Downloads, DateTime? Created, DateTime? Updated);
+    string Status, string LatestVersion, string LatestKind, long Downloads, DateTime? Created, DateTime? Updated,
+    string NameEn = "", string SummaryEn = "", string DescriptionEn = "")
+{
+    /// <summary>The entry in the visitor's language: English texts where the publisher wrote them (each field on its own), the German ones
+    /// otherwise — an English visitor never sees an empty card because one field is missing.</summary>
+    public Item For(string locale) => !StoreText.IsEnglish(locale) ? this : this with
+    {
+        Name = NameEn.Length > 0 ? NameEn : Name,
+        Summary = SummaryEn.Length > 0 ? SummaryEn : Summary,
+        Description = DescriptionEn.Length > 0 ? DescriptionEn : Description
+    };
+
+    /// <summary>Whether the publisher wrote anything in English.</summary>
+    public bool HasEnglish => NameEn.Length > 0 || SummaryEn.Length > 0 || DescriptionEn.Length > 0;
+}
 
 internal sealed record PackageVersion(long Id, long ItemId, string Version, string Kind, string Api, string MinCms, long Size, string Sha256, string File,
     string Signature, string KeyId, string Notes, string Status, string Reason, long Downloads, DateTime? Created, DateTime? PublishedAt, string Files,
@@ -53,6 +67,7 @@ internal sealed class StoreDb
             .Int("publisher_id", required: true).Text("tags", def: "").Text("license", def: "").Text("homepage", def: "")
             .Text("status", def: ItemStatus.Draft).Text("latest_version", def: "").Text("latest_kind", def: "").Int("downloads", def: "0")
             .Timestamp("created").Timestamp("updated")
+            .Text("name_en", def: "").Text("summary_en", def: "").Text("description_en", def: "")
             .Index("status").Index("publisher_id"));
         d.Table("versions", t => t
             .Int("item_id", required: true).Text("version", required: true).Text("kind", def: "script").Text("api", def: "").Text("min_cms", def: "")
@@ -76,7 +91,7 @@ internal sealed class StoreDb
 
     private static Item I(DataRow r) => new(r.Id, r.Text("key"), r.Text("name"), r.Text("summary"), r.Text("description"), r.Int("publisher_id"),
         r.Text("tags"), r.Text("license"), r.Text("homepage"), r.Text("status"), r.Text("latest_version"), r.Text("latest_kind"), r.Int("downloads"),
-        r.Timestamp("created"), r.Timestamp("updated"));
+        r.Timestamp("created"), r.Timestamp("updated"), r.Text("name_en"), r.Text("summary_en"), r.Text("description_en"));
 
     private static PackageVersion V(DataRow r) => new(r.Id, r.Int("item_id"), r.Text("version"), r.Text("kind"), r.Text("api"), r.Text("min_cms"),
         r.Int("size"), r.Text("sha256"), r.Text("file"), r.Text("signature"), r.Text("key_id"), r.Text("notes"), r.Text("status"), r.Text("reason"),

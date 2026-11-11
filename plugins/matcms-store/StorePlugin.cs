@@ -20,9 +20,10 @@ public sealed class StorePlugin : IPlugin
         foreach (var spec in StoreMail.Specs) b.MailTemplate(spec);
 
         // ---- public pages --------------------------------------------------------------------------------------------
-        // One address per page (the store does not publish per language). Pages with a form carry the antiforgery token.
-        var read = new PublicRouteOptions { Methods = PluginMethod.Get, DefaultLanguageOnly = true };
-        var form = new PublicRouteOptions { Antiforgery = true, DefaultLanguageOnly = true, PostsPerMinute = 30 };
+        // The pages answer in every language of the site (/en/store): the store's own words are translated, an entry shows its English texts where
+        // the publisher wrote them, and links keep the prefix (StoreHtml.Localize). The API is one address. Pages with a form carry the antiforgery token.
+        var read = new PublicRouteOptions { Methods = PluginMethod.Get };
+        var form = new PublicRouteOptions { Antiforgery = true, PostsPerMinute = 30 };
         var member = form with { RequireMember = true };
         var api = new PublicRouteOptions { Methods = PluginMethod.Get, DefaultLanguageOnly = true, DuringMaintenance = true };
 

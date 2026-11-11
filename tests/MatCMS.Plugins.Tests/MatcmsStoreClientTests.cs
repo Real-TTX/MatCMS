@@ -133,6 +133,27 @@ public sealed class MatcmsStoreClientTests : IDisposable
     }
 
     [Fact]
+    public async Task An_english_admin_sees_the_stores_english_texts_where_there_are_some()
+    {
+        using var app = new AppFactory();
+        Publish("lingua", "1.0");
+        _server.Plugins["lingua"]!["translations"] = new JsonObject { ["en"] = new JsonObject { ["name"] = "Guestbook", ["summary"] = "", ["description"] = "" } };
+        using var scope = app.Services.CreateScope();
+        var client = scope.ServiceProvider.GetRequiredService<MatcmsStoreClient>();
+        var before = System.Globalization.CultureInfo.CurrentUICulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("de");
+            var de = (await client.ListAsync()).Entries.Single(e => e.Key == "lingua");
+            Assert.Equal(("Gästebuch lingua", "Ein Gästebuch"), (de.Name, de.Summary));
+            System.Globalization.CultureInfo.CurrentUICulture = new System.Globalization.CultureInfo("en");
+            var en = (await client.ListAsync()).Entries.Single(e => e.Key == "lingua");
+            Assert.Equal(("Guestbook", "Ein Gästebuch"), (en.Name, en.Summary));                     // an empty English field keeps the German text
+        }
+        finally { System.Globalization.CultureInfo.CurrentUICulture = before; }
+    }
+
+    [Fact]
     public void A_cloud_package_under_the_stores_name_must_carry_a_fitting_signature()
     {
         var bytes = Bundle("forum", "1.3");

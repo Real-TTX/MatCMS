@@ -16,6 +16,9 @@ internal static class StoreText
 
     public static string Cut(string s, int max) => s.Length <= max ? s : s[..max].TrimEnd();
 
+    /// <summary>Whether a language is English ("en", "en-GB") — the one second language an entry's texts can have.</summary>
+    public static bool IsEnglish(string? locale) => locale is { Length: >= 2 } l && l.StartsWith("en", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>A slug of letters, digits and dashes (umlauts spelled out).</summary>
     /// <summary>The label key of a package kind: script, native, template, component.</summary>
     public static string KindKey(string kind) => kind switch
@@ -154,6 +157,9 @@ internal static class StoreText
         ("store.profile", "Herausgeber-Profil", "Publisher profile"),
         ("store.profileName", "Name „{0}“ – öffentliche Seite {1}", "Name “{0}” – public page {1}"),
         ("store.texts", "Texte", "Texts"),
+        ("store.textsEn", "Auf Englisch (freiwillig)", "In English (optional)"),
+        ("store.textsEnHint", "Englischsprachige Besucher des Stores und Websites mit englischer Verwaltung sehen diese Texte; ein leeres Feld zeigt den deutschen Text.",
+            "Visitors of the store in English and sites whose back office is in English see these texts; an empty field shows the German text."),
         ("store.viewPublic", "Im Store ansehen", "View in the store"),
         ("store.save", "Speichern", "Save"),
         ("store.cancel", "Abbrechen", "Cancel"),
@@ -233,6 +239,9 @@ internal static class StoreText
         ("store.field.name", "Name", "Name"),
         ("store.field.summary", "Kurzbeschreibung", "Short description"),
         ("store.field.description", "Beschreibung", "Description"),
+        ("store.field.nameEn", "Name (Englisch)", "Name (English)"),
+        ("store.field.summaryEn", "Kurzbeschreibung (Englisch)", "Short description (English)"),
+        ("store.field.descriptionEn", "Beschreibung (Englisch)", "Description (English)"),
         ("store.field.descriptionHint", "Klartext; eine Leerzeile beginnt einen neuen Absatz.", "Plain text; a blank line starts a new paragraph."),
         ("store.field.tags", "Schlagwörter", "Keywords"),
         ("store.field.tagsHint", "Mit Komma getrennt, höchstens zehn.", "Comma-separated, at most ten."),

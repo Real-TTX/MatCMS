@@ -10,7 +10,9 @@ internal static class StorePages
         Page(ctx, ctx.T("store.notFound"), $"<h1>{E(ctx.T("store.notFound"))}</h1><p><a href=\"{StoreUrls.Home}\">{E(ctx.T("store.backHome"))}</a></p>", status: 404, noIndex: true);
 
     /// <summary>The published entries a visitor may see, with their publishers and covers, filtered by search, kind and keyword.</summary>
-    internal static async Task<List<(Item Item, Publisher? Pub, Picture? Cover)>> PublicItemsAsync(StoreDb db, string q, string kind, string tag, CancellationToken ct)
+    /// <remarks><paramref name="locale"/> null keeps the entries as stored (the catalogue API carries both languages); a language gives each entry's texts in it.</remarks>
+    internal static async Task<List<(Item Item, Publisher? Pub, Picture? Cover)>> PublicItemsAsync(StoreDb db, string q, string kind, string tag, CancellationToken ct,
+        string? locale = null)
     {
         var pubs = (await db.PublishersAsync(ct)).ToDictionary(p => p.Id);
         var list = new List<(Item, Publisher?, Picture?)>();
@@ -22,10 +24,10 @@ internal static class StorePages
             if (tag.Length > 0 && !StoreText.Tags(item.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)) continue;
             if (q.Length > 0)
             {
-                var hay = string.Join(' ', item.Key, item.Name, item.Summary, item.Description, item.Tags, pub?.Name ?? "");
+                var hay = string.Join(' ', item.Key, item.Name, item.Summary, item.Description, item.NameEn, item.SummaryEn, item.DescriptionEn, item.Tags, pub?.Name ?? "");
                 if (!q.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(w => hay.Contains(w, StringComparison.OrdinalIgnoreCase))) continue;
             }
-            list.Add((item, pub, (await db.PicturesOfAsync(item.Id, ct)).FirstOrDefault()));
+            list.Add((locale is null ? item : item.For(locale), pub, (await db.PicturesOfAsync(item.Id, ct)).FirstOrDefault()));
         }
         return list.OrderByDescending(x => x.Item1.Updated ?? DateTime.MinValue).ToList();
     }
@@ -36,7 +38,7 @@ internal static class StorePages
         var q = ctx.Request.Q("q").Trim();
         var kind = ctx.Request.Q("art") is "script" or "native" or StorePackage.KindTemplate or StorePackage.KindComponent ? ctx.Request.Q("art") : "";
         var tag = ctx.Request.Q("tag").Trim();
-        var items = await PublicItemsAsync(db, StoreText.Cut(q, 80), kind, StoreText.Cut(tag, 40), ct);
+        var items = await PublicItemsAsync(db, StoreText.Cut(q, 80), kind, StoreText.Cut(tag, 40), ct, ctx.Locale);
 
         string Tab(string value, string label) =>
             $"<a class=\"mst-tab{(kind == value ? " is-on" : "")}\" href=\"{E(StoreUrls.Home + Query(q, value, tag))}\">{E(label)}</a>";
@@ -76,7 +78,8 @@ internal static class StorePages
     {
         var db = new StoreDb(ctx.Data);
         var key = ctx.Request.R("key").ToLowerInvariant();
-        if (await db.ItemByKeyAsync(key, ct) is not { Status: ItemStatus.Published } item) return NotFound(ctx);
+        if (await db.ItemByKeyAsync(key, ct) is not { Status: ItemStatus.Published } stored) return NotFound(ctx);
+        var item = stored.For(ctx.Locale);
         var pub = await db.PublisherAsync(item.PublisherId, ct);
         if (pub?.Blocked == true) return NotFound(ctx);
         var versions = (await db.VersionsOfAsync(item.Id, ct)).Where(v => v.Status is VersionStatus.Published or VersionStatus.Withdrawn).ToList();
@@ -170,7 +173,7 @@ internal static class StorePages
             sb.Append("<div class=\"mst-by\"><a href=\"").Append(E(web)).Append("\" rel=\"noopener\" target=\"_blank\">").Append(E(web)).Append("</a></div>");
         sb.Append("</div></div>");
         if (pub.About.Length > 0) sb.Append("<p class=\"mst-intro\">").Append(E(pub.About)).Append("</p>");
-        var items = (await PublicItemsAsync(db, "", "", "", ct)).Where(x => x.Item.PublisherId == pub.Id).ToList();
+        var items = (await PublicItemsAsync(db, "", "", "", ct, ctx.Locale)).Where(x => x.Item.PublisherId == pub.Id).ToList();
         sb.Append("<div class=\"mst-bar\"></div>");
         if (items.Count == 0) sb.Append("<p class=\"mst-empty\">").Append(E(ctx.T("store.empty"))).Append("</p>");
         else

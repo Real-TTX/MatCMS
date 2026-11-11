@@ -9,6 +9,8 @@ namespace MatCMS.Plugin.Verein;
 /// <c>/verein/termine.ics</c> — everybody, the PUBLIC events only;
 /// <c>/verein/kalender/{token}.ics</c> — one member's own feed (a calendar app cannot sign in, so the secret link is the key): every event that is not
 /// a draft, plus the meetings the person is invited to. A member can replace the link, which ends the old one.
+/// Filters (1.18, the calendar view's types): <c>?art=</c> on the public feed (one kind of event), <c>?typ=termine|sitzungen</c> on a member's own.
+/// Birthdays, anniversaries and names of members are in NO feed — a feed address is a link that gets passed on.
 /// </summary>
 public static class VereinIcal
 {
@@ -26,8 +28,11 @@ public static class VereinIcal
 
     private static async Task<PluginResult> PublicAsync(IPluginContext ctx, CancellationToken ct)
     {
-        var events = (await new VereinStore(ctx.Data).EventsAsync(ct)).Where(e => !e.Draft && e.Public);
-        return Calendar(ctx, ctx.T("verein.ical.public", VereinSettings.Club(ctx)), events, Array.Empty<Meeting>());
+        // ?art=Umzug: only one kind of event (a feed "Umzüge" next to the whole plan); public events only, never a birthday or a name of a member
+        var kind = ctx.Request.Q("art").Trim();
+        var events = (await new VereinStore(ctx.Data).EventsAsync(ct)).Where(e => !e.Draft && e.Public && (kind.Length == 0 || string.Equals(e.Kind, kind, StringComparison.OrdinalIgnoreCase)));
+        var name = ctx.T("verein.ical.public", VereinSettings.Club(ctx)) + (kind.Length > 0 ? " · " + V.Clip(kind, 60) : "");
+        return Calendar(ctx, name, events, Array.Empty<Meeting>());
     }
 
     private static async Task<PluginResult> PersonalAsync(IPluginContext ctx, CancellationToken ct)
@@ -40,8 +45,10 @@ public static class VereinIcal
         if (p is null) return PluginResult.NotFound();
         var boardRoles = VereinSettings.BoardList(ctx);
         var board = p.Roles.Any(r => boardRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
-        var events = (await store.EventsAsync(ct)).Where(e => !e.Draft);
-        var meetings = (await store.MeetingsAsync(ct)).Where(m => board || VereinStore.InAudience(p, m.Audience, boardRoles));
+        // ?typ=termine / ?typ=sitzungen: one of the two only (the calendar view's filter); birthdays are never in a feed — a feed is a link that gets passed on
+        var type = ctx.Request.Q("typ");
+        var events = type == VereinCalendar.Meeting ? Enumerable.Empty<Event>() : (await store.EventsAsync(ct)).Where(e => !e.Draft);
+        var meetings = type == VereinCalendar.Event ? Enumerable.Empty<Meeting>() : (await store.MeetingsAsync(ct)).Where(m => board || VereinStore.InAudience(p, m.Audience, boardRoles));
         return Calendar(ctx, ctx.T("verein.ical.mine", VereinSettings.Club(ctx)), events, meetings);
     }
 

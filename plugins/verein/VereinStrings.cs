@@ -14,7 +14,7 @@ internal static partial class VereinStrings
         b.Strings("en", All.ToDictionary(r => r.Key, r => r.En));
     }
 
-    internal static (string Key, string De, string En)[] All => _all ??= Core.Concat(Admin).Concat(Public).Concat(Other).ToArray();
+    internal static (string Key, string De, string En)[] All => _all ??= Core.Concat(Admin).Concat(Public).Concat(Other).Concat(Calendar).ToArray();
     private static (string Key, string De, string En)[]? _all;
 
     private static readonly (string Key, string De, string En)[] Core =

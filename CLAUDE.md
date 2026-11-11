@@ -270,6 +270,13 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   (the blog collects it under every post; drawn for a guest — an event knows no visitor, writing happens on the forum's page) and `content.item`
   {source} → {title, url} (the owner says whether the content exists and is public; the forum asks before it opens a thread). A shop could add
   product discussions with the same two events.
+- **The club** (`plugins/verein`, native, key `verein`, see its README; 1.18): the member area `/mitglied` is two BLOCK PAGES like the shop's —
+  roles `area` (the frame of every signed-in page) and `signin` — whose starting layout is ONE `verein_slot` with `page_html`, the exact markup of
+  before, so an untouched site looks the same; `head_html`/`content_html`/`form_html` are the pieces to lay out, forms stay whole, and the calls sit in
+  `NoInlining` helpers (`VereinPages`) so the plugin still loads where plugin pages do not exist. The calendar view (`VereinCalendar`: Admin → Kalender
+  = MatUi's `.mat-schedule` from JSON, `/mitglied/kalender` = a server-side grid, the public site has no MatUi) filters by type (events, meetings,
+  birthdays, anniversaries of joining) and shows a member only what the member area shows them anyway; personal data (birthdays, names) never goes into
+  an iCal feed (`/verein/termine.ics?art=` = public events of one kind; the member's secret feed `?typ=termine|sitzungen`).
 - **Debug builds keep every temporary alive until the method ends**, which alone keeps a load context from being
   collected. Code and tests that check unloading hold nothing of the plugin in their own frame (`NoInlining` helpers).
 - **Tests: `dotnet test tests/MatCMS.Plugins.Tests`.** They run on in-memory SQLite and temporary folders and never touch

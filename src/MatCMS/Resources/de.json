@@ -2362,5 +2362,11 @@
   "member.reg.name": "Name",
   "member.reg.email": "E-Mail-Adresse",
   "member.reg.password": "Passwort (mindestens {0} Zeichen)",
-  "member.reg.haveAccount": "Schon ein Konto? Anmelden"
+  "member.reg.haveAccount": "Schon ein Konto? Anmelden",
+  "plugins.matcms.update": "Update {0} im MatCMS Store",
+  "plugins.matcms.updateBtn": "Aktualisieren",
+  "plugins.matcms.updateConfirm": "„{0}“ auf Version {1} aus dem MatCMS Store aktualisieren? Das Plugin wird dabei ausgeschaltet und muss danach wieder eingeschaltet werden.",
+  "dashboard.attn.pluginUpdates.title": "Plugin-Updates",
+  "dashboard.attn.pluginUpdates": "{0} Plugin(s) haben eine neuere Version im MatCMS Store.",
+  "store.dialogDownloads": "{0} Downloads"
 }

@@ -241,7 +241,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   from `InstanceConfig.MatcmsStore` (profile switch "Aus dem MatCMS Store laden" / instance override in the cloud; never written = not allowed). Both keys
   are in `SettingKeys.Protected`. A key the cloud's store also offers is installed from there (note instead of a button). A cloud package that came from
   the MatCMS Store (`CatalogPlugin.Origin = matcms` + signature) is checked by `CloudCatalogService` before import (`MatcmsStoreClient.CheckCloudPackage`).
-  Test seams `MatcmsStoreClient.BaseUrl/HandlerFactory/KeysOverride` (`MatcmsStoreClientTests`). Not yet: the profile ROLLOUT path does not check signatures.
+  The profile ROLLOUT checks it too: `ConfigPlugin` carries `Origin/Signature/SignatureKeyId` and `CloudSyncService` refuses a bundle that does not fit
+  (`MatcmsStoreClient.CheckSignedPackage`: the store's name without a signature, other bytes, another plugin's key — all refused).
+  **Update hints:** `MatcmsStoreUpdateService` asks the store every 6 h (first after 3 min) into the singleton `MatcmsStoreUpdates` (every catalogue read
+  refreshes it too; keys the cloud's store offers are left out); Admin → Plugins shows "Update x im MatCMS Store" + "Aktualisieren" and the dashboard's
+  attention list a line — both from memory, never a remote call while a page waits.
+  Test seams `MatcmsStoreClient.BaseUrl/HandlerFactory/KeysOverride` (`MatcmsStoreClientTests`).
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every

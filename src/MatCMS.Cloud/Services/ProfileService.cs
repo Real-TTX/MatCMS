@@ -546,7 +546,7 @@ public class ProfileService
             {
                 foreach (var p in await _db.ProfileStorePlugins.AsNoTracking().Where(x => x.ProfileId == layer.Id).Select(x => x.StorePlugin!).ToListAsync(ct))
                 {
-                    plugins[p.Key] = new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version };
+                    plugins[p.Key] = new ConfigPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Origin = p.Origin, Signature = p.Signature, SignatureKeyId = p.SignatureKeyId };
                     From("plugin", p.Key, layer);
                 }
                 foreach (var local in await _db.ProfilePlugins.AsNoTracking().Where(p => p.ProfileId == layer.Id)

@@ -702,6 +702,12 @@ public sealed class ConfigPlugin
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
     public string Version { get; set; } = "";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" plus the store's signature of exactly the bundle the instance will fetch, so the ROLLOUT
+    /// checks it like a store install does (same fields as <see cref="CatalogPlugin"/>). Additive: an older cloud sends none, an older site ignores them.</summary>
+    public string Origin { get; set; } = "";
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 /// <summary>

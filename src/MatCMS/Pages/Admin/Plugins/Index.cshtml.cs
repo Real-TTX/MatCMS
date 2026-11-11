@@ -39,6 +39,9 @@ public class IndexModel : PageModel
 
     public List<MatCMS.Models.Plugin> Items { get; private set; } = new();
 
+    /// <summary>Installed plugins with a newer version in the MatCMS Store (key → version), from what the site last heard — no remote call here.</summary>
+    public Dictionary<string, string> Updates { get; private set; } = new();
+
     /// <summary>The question asked before deleting each plugin, with what is lost when it owns data (key → text).</summary>
     public Dictionary<string, string> DeleteConfirm { get; } = new();
     /// <summary>The keys of the loaded plugins that declared settings (they get a settings button).</summary>
@@ -109,6 +112,7 @@ public class IndexModel : PageModel
                     PublisherUrl: p.PublisherUrl,
                     Badge: p.Kind == "native" ? t["plugins.kind.native"] : null,
                     Note: inCloud.Contains(p.Key) ? t["plugins.matcmsViaCloud"] : null,
+                    Downloads: p.Downloads,
                     Images: p.Images.Select(img => new Shared.StoreImage(
                         Url.Page("/Admin/Plugins/Index", "MatcmsImage", new { key = p.Key, imageId = img.Id })!, img.Caption)).ToList())).ToList(),
                 Error: CatalogError);
@@ -152,11 +156,12 @@ public class IndexModel : PageModel
         return File(img.Data, img.Type);
     }
 
-    public async Task<IActionResult> OnPostInstallFromMatcmsAsync(string key)
+    public async Task<IActionResult> OnPostInstallFromMatcmsAsync(string key, string? back = null)
     {
-        var (ok, message, _) = await _matcms.InstallAsync(key, HttpContext.RequestAborted);
+        var (ok, message, id) = await _matcms.InstallAsync(key, HttpContext.RequestAborted);
+        if (id is int pid) await _runner.ReloadAsync(pid);
         TempData[ok ? "Flash" : "FlashError"] = message;
-        return RedirectToPage(new { browse = "matcms" });
+        return back == "list" ? RedirectToPage() : RedirectToPage(new { browse = "matcms" });
     }
 
     /// <summary>The site's own switch for the MatCMS Store — only while no cloud is connected (then the cloud's operator decides).</summary>
@@ -185,6 +190,7 @@ public class IndexModel : PageModel
         NativeAllowed = await IsNativeAllowedAsync();
         CloudConnected = await _catalog.IsAvailableAsync();
         StoreAccess = await _matcms.AccessAsync(HttpContext.RequestAborted);
+        Updates = await _matcms.UpdatesAsync(HttpContext.RequestAborted);
         // Only fetched on demand: the plugins page must not wait on a remote call every time it opens.
         if (browse == "matcms" && StoreAccess.Allowed)
         {

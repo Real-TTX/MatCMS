@@ -77,6 +77,13 @@ public sealed class AttentionService
 
         if (_cloud.Connected && _cloud.UpdateAvailable)
             Add("info", "⬆️", "update", Settings("cloud"), D("updateViaCloud"), null, _cloud.LatestVersion ?? "", _version.Current);
+        // Plugins with a newer version in the MatCMS Store — from what the site last heard (MatcmsStoreUpdates), never a remote call here.
+        if (_services.GetService<MatcmsStoreClient>() is { } store && await store.UpdatesAsync(ct) is { Count: > 0 } updates)
+        {
+            var keys = updates.Keys.ToList();
+            var names = await _db.Plugins.AsNoTracking().Where(p => keys.Contains(p.Key)).Select(p => p.Name).ToListAsync(ct);
+            Add("info", "ti-download", "pluginUpdates", Page("/Admin/Plugins/Index"), string.Join(", ", names.OrderBy(n => n)), null, updates.Count);
+        }
         if (_cloud.Connected && !string.IsNullOrWhiteSpace(_cloud.SyncError))
             a.Add(new("err", "syncError", "ti-cloud", _t["dashboard.attn.syncError.title"], _cloud.SyncError!, Settings("cloud"),
                 D("sync", _cloud.LastSyncUtc is DateTime ls ? Local(ls) : "—", _cloud.AppliedRevision, _cloud.ConfigRevision)));

@@ -32,9 +32,12 @@ public sealed class MatcmsStoreClient
     private readonly IWebHostEnvironment _env;
     private readonly IMemoryCache _cache;
     private readonly ILogger<MatcmsStoreClient> _log;
+    private readonly MatcmsStoreUpdates _updates;
+    private readonly IServiceProvider _services;
 
-    public MatcmsStoreClient(AppDbContext db, CloudService cloud, IWebHostEnvironment env, IMemoryCache cache, ILogger<MatcmsStoreClient> log)
-    { _db = db; _cloud = cloud; _env = env; _cache = cache; _log = log; }
+    public MatcmsStoreClient(AppDbContext db, CloudService cloud, IWebHostEnvironment env, IMemoryCache cache, ILogger<MatcmsStoreClient> log,
+        MatcmsStoreUpdates updates, IServiceProvider services)
+    { _db = db; _cloud = cloud; _env = env; _cache = cache; _log = log; _updates = updates; _services = services; }
 
     /// <summary>Where this site stands: may it use the MatCMS Store, and who decides (its own switch, or its cloud).</summary>
     public sealed record Access(bool Allowed, bool CloudDecides, bool OwnSwitch);
@@ -52,7 +55,7 @@ public sealed class MatcmsStoreClient
 
     /// <summary>One plugin of the MatCMS Store, as the store dialog shows it. Picture addresses are the STORE's (relative); the site passes them through.</summary>
     public sealed record Entry(string Key, string Name, string Version, string Kind, string Summary, string Description, string Publisher, string PublisherUrl,
-        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images);
+        bool PublisherVerified, IReadOnlyList<(long Id, string Caption)> Images, long Downloads = 0);
 
     private static HttpClient Client(TimeSpan timeout)
     {
@@ -76,6 +79,7 @@ public sealed class MatcmsStoreClient
             var body = await http.GetStringAsync(BaseUrl + "/store/api/catalog", ct);
             var plugins = body.Length < 5_000_000 && JsonNode.Parse(body) is JsonObject o ? o["plugins"] as JsonArray : null;
             result = plugins is null ? (null, "Der MatCMS Store hat keinen gültigen Katalog geliefert.") : (plugins, null);
+            if (plugins is not null) _updates.SetStore(plugins.OfType<JsonObject>().Select(p => (S(p["key"]), S(p["version"]))));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -101,7 +105,8 @@ public sealed class MatcmsStoreClient
                 .Select(i => (Id: i["id"] is JsonValue iv && iv.TryGetValue<long>(out var id) ? id : 0, Caption: S(i["caption"])))
                 .Where(i => i.Id > 0).Take(8).ToList();
             list.Add(new Entry(key, S(p["name"]), S(p["version"]), S(p["kind"]), S(p["summary"]), S(p["description"]), S(p["publisher"]), S(p["publisherUrl"]),
-                p["publisherVerified"] is JsonValue pv && pv.TryGetValue<bool>(out var b) && b, images));
+                p["publisherVerified"] is JsonValue pv && pv.TryGetValue<bool>(out var b) && b, images,
+                p["downloads"] is JsonValue dv && dv.TryGetValue<long>(out var dl) ? dl : 0));
         }
         return (list.OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase).ToList(), null);
     }
@@ -182,6 +187,34 @@ public sealed class MatcmsStoreClient
             : $"Plugin „{plugin.Name}“ {plugin.Version} aus dem MatCMS Store installiert (Signatur geprüft). Es ist deaktiviert, bis du es freischaltest.", plugin.Id);
     }
 
+    /// <summary>
+    /// Asks the store (and, with a cloud, the cloud's store) what is current, for the update hints — run by <see cref="MatcmsStoreUpdateService"/>
+    /// in the background, never while a page waits. A site that may not use the store forgets what it knew.
+    /// </summary>
+    public async Task RefreshUpdatesAsync(CancellationToken ct = default)
+    {
+        if (!(await AccessAsync(ct)).Allowed) { _updates.Clear(); return; }
+        await CatalogAsync(true, ct);
+        // A key the cloud's store also offers is installed from there (see the store dialog) — so its updates come from there too.
+        if ((await _cloud.GetSettingsAsync()).Configured
+            && _services.GetService<CloudCatalogService>() is { } cloudCatalog
+            && (await cloudCatalog.GetCatalogAsync(ct)).catalog is { } c)
+            _updates.SetCloudKeys((c.Plugins ?? []).Select(p => p.Key));
+        else _updates.SetCloudKeys([]);
+    }
+
+    /// <summary>The installed plugins (not the built-in ones) for which the MatCMS Store has a newer version: key → that version. From memory only.</summary>
+    public async Task<Dictionary<string, string>> UpdatesAsync(CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (_updates.IsEmpty || !(await AccessAsync(ct)).Allowed) return result;
+        var installed = await _db.Plugins.AsNoTracking().Where(p => p.Kind != MatCMS.Models.PluginKind.BuiltIn)
+            .Select(p => new { p.Key, p.Version }).ToListAsync(ct);
+        foreach (var p in installed)
+            if (_updates.Newer(p.Key, p.Version) is { } v) result[p.Key] = v;
+        return result;
+    }
+
     /// <summary>A bundle's own key, version and kind (from <c>plugin.json</c>), or null when it has no readable manifest.</summary>
     public static (string Key, string Version, string Kind)? Manifest(byte[] bundle)
     {
@@ -203,15 +236,70 @@ public sealed class MatcmsStoreClient
     }
 
     /// <summary>
-    /// The check for a package from the CLOUD's store that came from the MatCMS Store (<c>CatalogPlugin.Origin = "matcms"</c> with a signature):
-    /// the signature must fit the bytes and the package's own key, kind and version. Null = fine (also: nothing to check); else the reason.
+    /// The check for a package that reaches the site through its CLOUD (store dialog or profile rollout) under the MatCMS Store's name
+    /// (<c>Origin = "matcms"</c>): it must carry a signature, the signature must fit the bytes and the package's own kind and version, and the
+    /// package must be the plugin it was asked for. A package without that origin is the cloud's own — nothing to check. Null = fine; else the reason.
     /// </summary>
-    public static string? CheckCloudPackage(byte[] bundle, CatalogPlugin entry, IReadOnlyDictionary<string, string>? keys = null)
+    public static string? CheckSignedPackage(byte[] bundle, string expectedKey, string? origin, string? signature, string? keyId,
+        IReadOnlyDictionary<string, string>? keys = null)
     {
-        if (entry.Signature.Length == 0) return null;
+        if (!string.Equals(origin, "matcms", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(signature)) return null;
+        if (string.IsNullOrEmpty(signature)) return $"„{expectedKey}“ kommt angeblich aus dem MatCMS Store, trägt aber keine Signatur – nichts installiert.";
         if (Manifest(bundle) is not { } m) return "Das Paket hat kein lesbares plugin.json.";
-        return StoreSignature.VerifyPackage(bundle, m.Kind, m.Key, m.Version, null, entry.Signature, entry.SignatureKeyId, keys ?? KeysOverride)
+        if (!string.Equals(m.Key, expectedKey, StringComparison.OrdinalIgnoreCase))
+            return $"Das Paket für „{expectedKey}“ ist das Plugin „{m.Key}“ – nichts installiert.";
+        return StoreSignature.VerifyPackage(bundle, m.Kind, m.Key, m.Version, null, signature, keyId ?? "", keys ?? KeysOverride)
             ? null
             : $"Das Paket „{m.Key}“ {m.Version} trägt eine MatCMS-Store-Signatur, die nicht zu diesem Paket passt – nichts installiert.";
+    }
+}
+
+/// <summary>
+/// What the MatCMS Store offers right now (key → version), kept in memory for the update hints on Admin → Plugins and the dashboard. Filled
+/// by every catalogue read and by <see cref="MatcmsStoreUpdateService"/>; keys the cloud's store offers are left out (they update from there).
+/// </summary>
+public sealed class MatcmsStoreUpdates
+{
+    private volatile IReadOnlyDictionary<string, string> _store = new Dictionary<string, string>();
+    private volatile IReadOnlySet<string> _cloud = new HashSet<string>();
+
+    public bool IsEmpty => _store.Count == 0;
+
+    public void SetStore(IEnumerable<(string Key, string Version)> entries) =>
+        _store = entries.Where(e => e.Key.Length > 0 && e.Version.Length > 0)
+            .GroupBy(e => e.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Version, StringComparer.OrdinalIgnoreCase);
+
+    public void SetCloudKeys(IEnumerable<string> keys) => _cloud = keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    public void Clear() { _store = new Dictionary<string, string>(); _cloud = new HashSet<string>(); }
+
+    /// <summary>The store's version when it is newer than <paramref name="installed"/> (and the key is not the cloud's), else null.</summary>
+    public string? Newer(string key, string? installed) =>
+        !_cloud.Contains(key) && _store.TryGetValue(key, out var v) && PluginContext.CompareVersions(v, installed) > 0 ? v : null;
+}
+
+/// <summary>Asks the MatCMS Store for current versions a few minutes after start and then every six hours — only while the site may use it.</summary>
+public sealed class MatcmsStoreUpdateService : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopes;
+    private readonly ILogger<MatcmsStoreUpdateService> _log;
+    public MatcmsStoreUpdateService(IServiceScopeFactory scopes, ILogger<MatcmsStoreUpdateService> log) { _scopes = scopes; _log = log; }
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        try { await Task.Delay(TimeSpan.FromMinutes(3), ct); } catch (OperationCanceledException) { return; }
+        using var timer = new PeriodicTimer(TimeSpan.FromHours(6));
+        do
+        {
+            try
+            {
+                using var scope = _scopes.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<MatcmsStoreClient>().RefreshUpdatesAsync(ct);
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex) { _log.LogInformation(ex, "MatCMS Store: update check failed"); }
+        }
+        while (await timer.WaitForNextTickAsync(ct));
     }
 }

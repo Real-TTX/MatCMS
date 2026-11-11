@@ -816,6 +816,14 @@ public class CloudSyncService
                 throw new InvalidOperationException($"Plugin-Paket '{key}' konnte nicht geladen werden.");
             }
 
+            // A plugin the cloud took over from the MatCMS Store carries the store's signature: the rollout checks it exactly like a store install,
+            // against the keys in THIS image — neither the cloud nor anything on the way can hand over other bytes under the store's name.
+            if (MatcmsStoreClient.CheckSignedPackage(bundle, key, p.Origin, p.Signature, p.SignatureKeyId) is { } refused)
+            {
+                Report("plugin", key, "failed", refused);
+                throw new InvalidOperationException($"Plugin '{key}': {refused}");
+            }
+
             using var ms = new MemoryStream(bundle);
             var (plugin, updated, error) = await PluginPackager.ImportAsync(ms, _env, _db);
             if (plugin is null)

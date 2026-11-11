@@ -194,6 +194,7 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         Assert.Equal("Acme Plugins", (string?)entry["publisher"]);
         var bundle = await guest.GetByteArrayAsync((string)entry["download"]!);
         Assert.Equal(package, bundle);
+        Assert.Equal(package, await guest.GetByteArrayAsync((string)entry["download"]!));          // the same address again the same day: counted once
         Assert.True(StoreSignature.VerifyPackage(bundle, "script", "acme-hello", "1.0", sha, sig, _s.KeyId, _s.Keys));   // what a site will check
         var pic = await guest.GetAsync((string)entry["images"]![0]!["url"]!);
         Assert.Equal("image/png", pic.Content.Headers.ContentType?.MediaType);

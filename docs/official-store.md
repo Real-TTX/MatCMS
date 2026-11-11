@@ -1,6 +1,6 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 11.11.2026 — **S0, S1, S2 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt), **S3 gebaut**, noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
+Stand: 11.11.2026 — **S0–S3 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt; Websites laden selbst, wo erlaubt), **S4 im Bau**. Zweite Fassung nach Matthias' Klarstellung.
 
 **Gebaut:**
 - **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug
@@ -35,7 +35,12 @@ Stand: 11.11.2026 — **S0, S1, S2 live** (matcms.de/store mit 7 signierten MATT
   auf dem Draht `InstanceConfig.MatcmsStore`, auf der Website `store.matcmsCloud`. Beide Schlüssel sind geschützt (kein Backup, keine Rollout-Zeile,
   kein Content-Op). Steht ein Key auch im Cloud-Store, kommt er von dort (Hinweis statt Knopf). Ein Paket aus dem **Cloud-Store**, das aus dem MatCMS Store
   übernommen wurde, wird beim Installieren ebenfalls gegen seine Signatur geprüft. Tests `MatcmsStoreClientTests`, `ProfileInheritanceTests`.
-  **Noch offen:** Pakete, die per Profil-Rollout kommen, werden noch nicht geprüft; Templates/Komponenten aus dem MatCMS Store (S4).
+- **S4a** — Sicherheit und Updates: Pakete aus dem MatCMS Store, die per **Profil-Rollout** kommen, werden geprüft wie eine eigene Installation
+  (`ConfigPlugin.Origin/Signature/SignatureKeyId`; fehlt die Signatur, passt sie nicht oder ist es ein anderes Plugin → der Rollout meldet „failed“).
+  **Update-Hinweise:** die Website fragt den Store alle 6 Stunden im Hintergrund; Admin → Plugins zeigt „Update x im MatCMS Store“ mit
+  „Aktualisieren“ (Rückfrage; das Plugin wird dabei ausgeschaltet), „Braucht Aufmerksamkeit“ eine Zeile. Einträge, die auch der Cloud-Store
+  anbietet, bekommen keinen Hinweis (sie kommen von dort). **Download-Zahlen** zählen je Adresse, Version und Tag einmal (Tabelle
+  `download_marks`, nur ein Hash, nach zwei Tagen gelöscht; `matcms-store` 0.2) und stehen jetzt auch im Store-Dialog der Websites.
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

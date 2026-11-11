@@ -100,14 +100,25 @@ public sealed class MatcmsStoreClientTests : IDisposable
             Assert.False(await db.Plugins.AnyAsync(p => p.Key == "boese"));                        // other bytes than the signed ones
         }
 
-        // Updated in place, still only signed.
+        // A newer version: the background check notices it, the list and the dashboard say so (from memory), "Aktualisieren" updates in place.
         Publish("gaestebuch", "1.1");
         using (var scope = app.Services.CreateScope())
         {
-            var r = await scope.ServiceProvider.GetRequiredService<MatcmsStoreClient>().InstallAsync("gaestebuch");
-            Assert.True(r.Ok, r.Message);
-            Assert.Equal("1.1", (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AsNoTracking().SingleAsync(p => p.Key == "gaestebuch")).Version);
+            var client = scope.ServiceProvider.GetRequiredService<MatcmsStoreClient>();
+            await client.RefreshUpdatesAsync();
+            Assert.Equal("1.1", (await client.UpdatesAsync())["gaestebuch"]);
         }
+        var list = await c.GetStringAsync("/admin/plugins");
+        Assert.Contains("Update 1.1 i", list);
+        Assert.Contains("pluginUpdates", await c.GetStringAsync("/admin/attention"));
+        res = await AppFactory.PostAsync(c, "/admin/plugins?handler=InstallFromMatcms&key=gaestebuch&back=list", new() { ["__RequestVerificationToken"] = token });
+        Assert.Equal("/admin/plugins", res.Headers.Location?.OriginalString.ToLowerInvariant());
+        using (var scope = app.Services.CreateScope())
+        {
+            Assert.Equal("1.1", (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AsNoTracking().SingleAsync(p => p.Key == "gaestebuch")).Version);
+            Assert.Empty(await scope.ServiceProvider.GetRequiredService<MatcmsStoreClient>().UpdatesAsync());
+        }
+        Assert.DoesNotContain("Update 1.1 i", await c.GetStringAsync("/admin/plugins"));
 
         // The site's own switch: off, the dialog does not open and nothing installs.
         res = await AppFactory.PostAsync(c, "/admin/plugins?handler=MatcmsStore", new() { ["__RequestVerificationToken"] = token });
@@ -125,11 +136,45 @@ public sealed class MatcmsStoreClientTests : IDisposable
     public void A_cloud_package_under_the_stores_name_must_carry_a_fitting_signature()
     {
         var bytes = Bundle("forum", "1.3");
-        var good = new CatalogPlugin { Key = "forum", Version = "1.3", Origin = "matcms", Signature = Sign(bytes, "forum", "1.3"), SignatureKeyId = _keyId };
-        Assert.Null(MatcmsStoreClient.CheckCloudPackage(bytes, good, _keys));
-        Assert.NotNull(MatcmsStoreClient.CheckCloudPackage(Bundle("forum", "1.4"), good, _keys));                  // other bytes
-        Assert.NotNull(MatcmsStoreClient.CheckCloudPackage(bytes, good, new Dictionary<string, string>()));       // not a key of this image
-        Assert.Null(MatcmsStoreClient.CheckCloudPackage(bytes, new CatalogPlugin { Key = "forum" }, _keys));       // the cloud's own entry: nothing to check
+        var sig = Sign(bytes, "forum", "1.3");
+        Assert.Null(MatcmsStoreClient.CheckSignedPackage(bytes, "forum", "matcms", sig, _keyId, _keys));
+        Assert.NotNull(MatcmsStoreClient.CheckSignedPackage(Bundle("forum", "1.4"), "forum", "matcms", sig, _keyId, _keys));         // other bytes
+        Assert.NotNull(MatcmsStoreClient.CheckSignedPackage(bytes, "forum", "matcms", sig, _keyId, new Dictionary<string, string>())); // not a key of this image
+        Assert.NotNull(MatcmsStoreClient.CheckSignedPackage(bytes, "forum", "matcms", "", "", _keys));                               // store's name, no signature
+        Assert.NotNull(MatcmsStoreClient.CheckSignedPackage(bytes, "shop", "matcms", sig, _keyId, _keys));                           // signed, but another plugin
+        Assert.Null(MatcmsStoreClient.CheckSignedPackage(bytes, "forum", "", "", "", _keys));                                        // the cloud's own entry: nothing to check
+    }
+
+    [Fact]
+    public async Task The_profile_rollout_checks_a_store_plugins_signature_too()
+    {
+        using var app = new AppFactory();
+        app.CreateClient();
+        var good = Bundle("gaestebuch", "1.0");
+        var sig = Sign(good, "gaestebuch", "1.0");
+        InstanceConfig Config(int rev) => new()
+        {
+            Revision = rev, PluginsMode = "keep",
+            Plugins = [new ConfigPlugin { Key = "gaestebuch", Name = "G", Version = "1.0", Origin = "matcms", Signature = sig, SignatureKeyId = _keyId }]
+        };
+
+        // Other bytes under the store's signature: refused, reported, nothing installed.
+        using (var scope = app.Services.CreateScope())
+        {
+            var r = await scope.ServiceProvider.GetRequiredService<CloudSyncService>()
+                .ApplyAsync(Config(1), (_, _) => Task.FromResult<byte[]?>(Bundle("gaestebuch", "1.0-evil")));
+            Assert.False(r.Ok);
+            Assert.Contains(r.Report, x => x.Id == "gaestebuch" && x.Outcome == "failed");
+            Assert.False(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AnyAsync(p => p.Key == "gaestebuch"));
+        }
+        // The signed bytes go through.
+        using (var scope = app.Services.CreateScope())
+        {
+            var r = await scope.ServiceProvider.GetRequiredService<CloudSyncService>()
+                .ApplyAsync(Config(2), (_, _) => Task.FromResult<byte[]?>(good));
+            Assert.True(r.Ok, r.Error);
+            Assert.True(await scope.ServiceProvider.GetRequiredService<AppDbContext>().Plugins.AnyAsync(p => p.Key == "gaestebuch"));
+        }
     }
 
     [Fact]

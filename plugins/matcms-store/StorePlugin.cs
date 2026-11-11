@@ -59,6 +59,7 @@ public sealed class StorePlugin : IPlugin
         b.Sitemap(SitemapAsync);
         b.LinkTargets("store.links.group", LinksAsync);
         b.On("site.search", SiteSearchAsync);
+        b.Job("download-marks", JobSchedule.Daily(new TimeOnly(3, 17)), ctx => new StoreDb(ctx.Data).PruneDownloadMarksAsync(CancellationToken.None));
     }
 
     private static async Task<IEnumerable<SitemapEntry>> SitemapAsync(IPluginContext ctx, CancellationToken ct)

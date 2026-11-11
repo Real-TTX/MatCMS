@@ -85,15 +85,14 @@ internal static class StoreApiRoutes
 
     private static PluginResult NotFound() => PluginResult.Json(new JsonObject { ["error"] = "not found" }, 404);
 
-    /// <summary>A package: only a PUBLISHED version of a public entry. Counted (anonymously) on every delivery.</summary>
+    /// <summary>A package: only a PUBLISHED version of a public entry. Counted anonymously, once per address, version and day.</summary>
     public static async Task<PluginResult> BundleAsync(IPluginContext ctx, CancellationToken ct)
     {
         var db = new StoreDb(ctx.Data);
         if (await db.ItemByKeyAsync(ctx.Request.R("key").ToLowerInvariant(), ct) is not { Status: ItemStatus.Published } item) return NotFound();
         var version = (await db.VersionsOfAsync(item.Id, ct)).FirstOrDefault(v => v.Version == ctx.Request.R("version") && v.Status == VersionStatus.Published);
         if (version is null || await ctx.Files.OpenAsync(version.File, ct) is not { } stream) return NotFound();
-        await db.Versions.IncrementAsync(version.Id, "downloads", 1, ct: ct);
-        await db.Items.IncrementAsync(item.Id, "downloads", 1, ct: ct);
+        await db.CountDownloadAsync(version, ctx.Request.ClientIp, ct);
         return PluginResult.FromStream(stream, "application/zip", item.Key + "-" + version.Version + ".zip")
             .WithHeader("X-Sha256", version.Sha256).WithHeader("Cache-Control", "public, max-age=86400").WithHeader("X-Content-Type-Options", "nosniff");
     }

@@ -39,6 +39,7 @@ internal sealed class StoreDb
     public IDataTable Items => _data.Table("items");
     public IDataTable Versions => _data.Table("versions");
     public IDataTable Pictures => _data.Table("pictures");
+    public IDataTable DownloadMarks => _data.Table("download_marks");
 
     public static void Declare(IDataBuilder d)
     {
@@ -58,6 +59,9 @@ internal sealed class StoreDb
             .Text("notes", def: "").Text("status", def: VersionStatus.Review).Text("reason", def: "").Int("downloads", def: "0")
             .Timestamp("created").Timestamp("published_at").Text("files", def: "")
             .UniqueIndex("item_id", "version").Index("status"));
+        // One row per (address, version, day) that was counted — a hash, never the address itself; deleted after two days. So a cloud
+        // or site that retries, or a script that pulls the same package again and again, counts once a day and the public number means something.
+        d.Table("download_marks", t => t.Text("mark", required: true, unique: true).Text("day", required: true).Index("day"));
         d.Table("pictures", t => t
             .Int("item_id", required: true).Text("file", required: true).Text("type", def: "image/png").Text("caption", def: "").Int("sort", def: "0")
             .Index("item_id"));
@@ -152,6 +156,28 @@ internal sealed class StoreDb
             ["latest_version"] = latest?.Version ?? "", ["latest_kind"] = latest?.Kind ?? "", ["status"] = status
         }, ct);
     }
+
+    /// <summary>
+    /// Counts one delivery of a package — once per address, version and day. True when it counted. The mark is a hash of the three with the
+    /// day in it, so it cannot be followed from one day to the next.
+    /// </summary>
+    public async Task<bool> CountDownloadAsync(PackageVersion version, string clientIp, CancellationToken ct)
+    {
+        var day = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var mark = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(day + "|" + version.Id.ToString(CultureInfo.InvariantCulture) + "|" + clientIp)));
+        if (await DownloadMarks.FindByAsync("mark", mark, ct) is not null) return false;
+        try { await DownloadMarks.InsertAsync(new Dictionary<string, object?> { ["mark"] = mark, ["day"] = day }, ct); }
+        catch (Exception) when (!ct.IsCancellationRequested) { return false; }   // the same address twice at once: the unique index answered
+        await Versions.IncrementAsync(version.Id, "downloads", 1, ct: ct);
+        await Items.IncrementAsync(version.ItemId, "downloads", 1, ct: ct);
+        return true;
+    }
+
+    /// <summary>Forgets the marks of days before yesterday (the daily job).</summary>
+    public Task<int> PruneDownloadMarksAsync(CancellationToken ct) =>
+        DownloadMarks.DeleteWhereAsync(DataQuery.Everything.Where("day", DataOp.Lt,
+            DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ct);
 
     // ---- pictures -----------------------------------------------------------------------------------------------------
 

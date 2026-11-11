@@ -496,7 +496,8 @@ Store tab "MatCMS Store", REST `GET /api/v1/store/matcms` + `POST …/{key}/take
 downloads the package (only paths ON the store server — addresses come from a catalogue), checks the signature against `StoreKeys.Known` of THIS image,
 then goes through `UpsertPluginAsync` like an upload, with publisher and pictures (replaced). The row keeps `Origin = "matcms"`, `Signature`,
 `SignatureKeyId` (passed on in `CatalogPlugin`, additive) and is NOT repacked on the Plugin page — that would change the signed bytes; an own upload
-clears the origin. An OWN entry with the same key is replaced only on an explicit request ("Ersetzen" with a confirmation, REST `?replaceOwn=true`, MCP `replaceOwn`) — the same key may be another plugin; the row stays, so profile selections survive. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
+clears the origin. The three fields also ride the rollout (`ConfigPlugin.Origin/Signature/SignatureKeyId`), so a site checks a store plugin that
+reaches it through a profile exactly as one it installs itself. An OWN entry with the same key is replaced only on an explicit request ("Ersetzen" with a confirmation, REST `?replaceOwn=true`, MCP `replaceOwn`) — the same key may be another plugin; the row stays, so profile selections survive. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
 Store address = CloudSetting `store.matcms.url` (empty = https://matcms.de). Test seams `HandlerFactory`/`KeysOverride` (`MatcmsStoreTakeOverTests`).
 
 **The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the

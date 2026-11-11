@@ -109,8 +109,8 @@ public class CloudCatalogService
             // A plugin the cloud took over from the MatCMS Store carries the store's signature in the catalogue: checked here against the
             // keys in THIS image, so neither the cloud nor anything on the way can hand over other bytes under the store's name.
             var (catalog, _) = await GetCatalogAsync(ct);
-            if (catalog?.Plugins?.FirstOrDefault(p => p.Key == key) is { Origin: "matcms" } signed
-                && MatcmsStoreClient.CheckCloudPackage(bytes, signed) is { } refused)
+            if (catalog?.Plugins?.FirstOrDefault(p => p.Key == key) is { } signed
+                && MatcmsStoreClient.CheckSignedPackage(bytes, key, signed.Origin, signed.Signature, signed.SignatureKeyId) is { } refused)
                 return (false, refused);
 
             using var stream = new MemoryStream(bytes, writable: false);

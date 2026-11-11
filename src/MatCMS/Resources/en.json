@@ -2362,5 +2362,11 @@
   "member.reg.name": "Name",
   "member.reg.email": "Email address",
   "member.reg.password": "Password (at least {0} characters)",
-  "member.reg.haveAccount": "Already have an account? Sign in"
+  "member.reg.haveAccount": "Already have an account? Sign in",
+  "plugins.matcms.update": "Update {0} in the MatCMS Store",
+  "plugins.matcms.updateBtn": "Update",
+  "plugins.matcms.updateConfirm": "Update “{0}” to version {1} from the MatCMS Store? The plugin is switched off for this and has to be switched on again afterwards.",
+  "dashboard.attn.pluginUpdates.title": "Plugin updates",
+  "dashboard.attn.pluginUpdates": "{0} plugin(s) have a newer version in the MatCMS Store.",
+  "store.dialogDownloads": "{0} downloads"
 }

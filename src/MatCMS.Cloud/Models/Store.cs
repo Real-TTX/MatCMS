@@ -39,6 +39,14 @@ public class StorePlugin
 
     /// <summary>The publisher's website (absolute http(s) or empty), linked from the name.</summary>
     public string PublisherUrl { get; set; } = "";
+
+    /// <summary>Where the entry came from: "" = this cloud's own (uploaded here), "matcms" = taken over from the MatCMS Store on matcms.de
+    /// (MatcmsStoreService). Such an entry is not edited here — repacking would break its signature — and an own upload turns it back into "".</summary>
+    public string Origin { get; set; } = "";
+
+    /// <summary>The MatCMS Store signature of exactly this bundle (base64) and its key id; empty for an own entry. Passed on to the sites in the catalogue.</summary>
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 /// <summary>
@@ -91,6 +99,11 @@ public class StoreTemplate
     public string ParamValuesJson { get; set; } = "{}";
     public int SchemaVersion { get; set; } = 1;
     public string PartsJson { get; set; } = "{}";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" and the store version it came as (the take-over list compares it). Cleared by every own
+    /// save — an edited copy is the operator's, and a later take-over must not overwrite it without being asked.</summary>
+    public string Origin { get; set; } = "";
+    public string OriginVersion { get; set; } = "";
 }
 
 /// <summary>A reusable block in the store. <see cref="Type"/> is the identity.</summary>
@@ -103,6 +116,11 @@ public class StoreComponent
     public string Icon { get; set; } = "";
     public string FieldsJson { get; set; } = "[]";
     public string TemplateHtml { get; set; } = "";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" and the store version it came as (the take-over list compares it). Cleared by every own
+    /// save — an edited copy is the operator's, and a later take-over must not overwrite it without being asked.</summary>
+    public string Origin { get; set; } = "";
+    public string OriginVersion { get; set; } = "";
 }
 
 

@@ -104,6 +104,7 @@ public static class ProfileInheritance
         e.ActivateTemplateName = Nearest(p => p.SyncTemplates && !string.IsNullOrWhiteSpace(p.ActivateTemplateName))?.ActivateTemplateName;
         e.RemoveDefaultAdmin = chain.Any(p => p.RemoveDefaultAdmin);
         e.NativePlugins = Nearest(p => NativePluginsPolicy.Normalize(p.NativePlugins).Length > 0)?.NativePlugins ?? "";
+        e.MatcmsStore = Nearest(p => NativePluginsPolicy.Normalize(p.MatcmsStore).Length > 0)?.MatcmsStore ?? "";
 
         e.SyncAi = chain.Any(p => p.SyncAi);
         e.AiInstruction = Nearest(p => p.SyncAi && !string.IsNullOrWhiteSpace(p.AiInstruction))?.AiInstruction;

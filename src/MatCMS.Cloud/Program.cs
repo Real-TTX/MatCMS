@@ -141,6 +141,7 @@ builder.Services.AddScoped<AttentionService>();
 builder.Services.AddScoped<SyncHistoryService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<StoreService>();
+builder.Services.AddScoped<MatcmsStoreService>();
 builder.Services.AddScoped<HostingActionsService>();
 builder.Services.AddScoped<CloudUpdaterService>();
 builder.Services.AddScoped<HostingOverviewService>();
@@ -363,8 +364,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
     await DbSeeder.SeedAsync(scope.ServiceProvider);
-    // The catalogue starter set. Separate because it is CONTENT: added when missing, never
-    // updated — an operator who changed an entry must not find it reset on the next start.
+    // The catalogue starter set. Separate because it is CONTENT: each entry offered once, never
+    // updated — an operator who changed an entry must not find it reset, one who deleted it not back.
     await StoreSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>());
 }
 

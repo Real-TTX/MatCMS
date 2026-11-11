@@ -52,6 +52,7 @@ public class StoreService
         row.ParametersJson = b.ParametersJson ?? row.ParametersJson;
         row.ParamValuesJson = b.ParamValuesJson ?? row.ParamValuesJson;
         row.PartsJson = b.PartsJson ?? row.PartsJson;
+        row.Origin = ""; row.OriginVersion = "";   // an own save makes it the operator's (MatcmsStoreService sets it again after a take-over)
         await _db.SaveChangesAsync(ct);
         await TouchAsync(_db.ProfileStoreTemplates.Where(x => x.StoreTemplateId == row.Id).Select(x => x.ProfileId), ct);
         return isNew;
@@ -82,6 +83,7 @@ public class StoreService
         row.Icon = b.Icon ?? row.Icon;
         row.FieldsJson = b.FieldsJson ?? row.FieldsJson;
         row.TemplateHtml = b.TemplateHtml ?? row.TemplateHtml;
+        row.Origin = ""; row.OriginVersion = "";   // an own save makes it the operator's (MatcmsStoreService sets it again after a take-over)
         await _db.SaveChangesAsync(ct);
         await TouchAsync(_db.ProfileStoreComponents.Where(x => x.StoreComponentId == row.Id).Select(x => x.ProfileId), ct);
         return isNew;
@@ -321,7 +323,7 @@ public class StoreService
                 .Select(x => new { x.StorePluginId, x.Id, x.Caption }).ToListAsync())
             .ToLookup(x => x.StorePluginId, x => new CatalogImage { Id = x.Id, Caption = x.Caption });
         var plugins = await _db.StorePlugins.AsNoTracking().OrderBy(p => p.Name)
-            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description, Publisher = p.Publisher, PublisherUrl = p.PublisherUrl } })
+            .Select(p => new { p.Id, Plugin = new CatalogPlugin { Key = p.Key, Name = p.Name, Version = p.Version, Description = p.Description, Publisher = p.Publisher, PublisherUrl = p.PublisherUrl, Origin = p.Origin, Signature = p.Signature, SignatureKeyId = p.SignatureKeyId } })
             .ToListAsync();
         foreach (var p in plugins) p.Plugin.Images = images[p.Id].ToList();
         return await CatalogRestAsync(plugins.Select(p => p.Plugin).ToList());
@@ -364,12 +366,25 @@ public class StoreService
                 ["publisher"] = p.Publisher, ["publisherUrl"] = p.PublisherUrl, ["images"] = images
             });
         }
+        // A template's LOOK (colours, fonts, button corners) — what a showcase needs to draw a small picture of a page in it. Public
+        // anyway: every site using the template shows exactly these values. Never its layout, CSS or script.
         var templates = new System.Text.Json.Nodes.JsonArray();
-        foreach (var t in await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name).Select(t => new { t.Name, t.Description, t.AccentColor }).ToListAsync(ct))
-            templates.Add(new System.Text.Json.Nodes.JsonObject { ["name"] = t.Name, ["description"] = t.Description, ["accent"] = t.AccentColor });
+        foreach (var t in await _db.StoreTemplates.AsNoTracking().OrderBy(t => t.Name)
+                     .Select(t => new
+                     {
+                         t.Name, t.Description, t.AccentColor, t.SecondaryColor, t.HeadingColor, t.TextColor, t.BackgroundColor, t.AltBackground,
+                         t.HeaderBackground, t.HeaderTextColor, t.HeadingFont, t.BodyFont, t.ButtonStyle, t.ButtonRadius
+                     }).ToListAsync(ct))
+            templates.Add(new System.Text.Json.Nodes.JsonObject
+            {
+                ["name"] = t.Name, ["description"] = t.Description, ["accent"] = t.AccentColor, ["secondary"] = t.SecondaryColor,
+                ["heading"] = t.HeadingColor, ["text"] = t.TextColor, ["background"] = t.BackgroundColor, ["alt"] = t.AltBackground,
+                ["headerBg"] = t.HeaderBackground, ["headerText"] = t.HeaderTextColor, ["headingFont"] = t.HeadingFont, ["bodyFont"] = t.BodyFont,
+                ["buttonStyle"] = t.ButtonStyle, ["buttonRadius"] = t.ButtonRadius
+            });
         var components = new System.Text.Json.Nodes.JsonArray();
-        foreach (var c in await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new { c.Type, c.Name, c.Description }).ToListAsync(ct))
-            components.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = c.Type, ["name"] = c.Name, ["description"] = c.Description });
+        foreach (var c in await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).Select(c => new { c.Type, c.Name, c.Description, c.Icon }).ToListAsync(ct))
+            components.Add(new System.Text.Json.Nodes.JsonObject { ["type"] = c.Type, ["name"] = c.Name, ["description"] = c.Description, ["icon"] = c.Icon });
         return new System.Text.Json.Nodes.JsonObject
         {
             ["format"] = 1, ["generated"] = DateTime.UtcNow.ToString("O"), ["plugins"] = plugins, ["templates"] = templates, ["components"] = components

@@ -82,10 +82,20 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
                     new JsonObject { ["id"] = 7, ["caption"] = "Karten <mit> Sternen", ["url"] = "/api/public/store/plugins/leserstimmen/image/7" },
                     new JsonObject { ["id"] = 8, ["caption"] = "Admin", ["url"] = "/api/public/store/plugins/leserstimmen/image/8" })
             },
-            new JsonObject { ["key"] = "demo-native", ["name"] = "Demo <b>Native</b>", ["version"] = "2.0", ["description"] = "Kompiliert.", ["kind"] = "native", ["updated"] = "2026-10-21",
+            new JsonObject { ["key"] = "demo-native", ["name"] = "Demo <b>Native</b>", ["version"] = "2.0", ["description"] = "Kompiliert.", ["kind"] = "native", ["api"] = "2", ["updated"] = "2026-10-21",
                 ["publisher"] = "Böse", ["publisherUrl"] = "javascript:alert(1)" }),
-        ["templates"] = new JsonArray(new JsonObject { ["name"] = "Klar", ["description"] = "Ruhig.", ["accent"] = "#2563eb" }),
-        ["components"] = new JsonArray()
+        // "Klar" as an older cloud sends it (accent only); "Küste" with its whole look — and two values that try to leave the style attribute.
+        ["templates"] = new JsonArray(
+            new JsonObject { ["name"] = "Klar", ["description"] = "Ruhig.", ["accent"] = "#2563eb" },
+            new JsonObject
+            {
+                ["name"] = "Küste", ["description"] = "Blau und Sand.", ["accent"] = "#2F6F8F", ["secondary"] = "#d9c3a0", ["alt"] = "#f2f6f8",
+                ["heading"] = "#14303d", ["text"] = "#1a1a1a", ["background"] = "#ffffff", ["headerBg"] = "red;}</style><b>", ["headerText"] = "#14303d",
+                ["headingFont"] = "Geologica", ["bodyFont"] = "Evil';}</style><script>", ["buttonRadius"] = "6"
+            }),
+        ["components"] = new JsonArray(
+            new JsonObject { ["type"] = "image-text", ["name"] = "Bild mit Text", ["description"] = "Bild links.", ["icon"] = "photo" },
+            new JsonObject { ["type"] = "quote", ["name"] = "Zitat", ["description"] = "Eine Stimme.", ["icon"] = "x\" onmouseover=\"alert(1)" })
     }.ToJsonString();
 
     private async Task<int> PageWithBlockAsync(string slug)
@@ -166,14 +176,31 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         var fromScript = Section(await visitor.GetStringAsync("/store-test"));
         Assert.Contains("Leserstimmen", fromScript);
         Assert.Contains("se-badge se-native", fromScript);
-        Assert.Contains("2 Plugins · 1 Templates · 0 Komponenten", WebUtility.HtmlDecode(fromScript));
+        // "everything": a heading per kind with its number, and the tabs (shown by the script) to filter by kind
+        Assert.Contains("<h3 class=\"se-sub\">Templates <span class=\"se-n\">2</span></h3>", fromScript);
+        Assert.Contains("data-se-tab=\"components\" aria-pressed=\"false\">Komponenten<span>2</span>", fromScript);
+        Assert.Contains("<div class=\"se-bar\" hidden>", fromScript);
         Assert.Contains("Demo &lt;b&gt;Native&lt;/b&gt;", fromScript);                    // what the catalogue says is text, never markup
-        Assert.Contains("background:#2563eb", fromScript);
+        Assert.Contains("background:#2563eb", fromScript);                                // an older cloud's template: its accent as a swatch
+        // a template is drawn in its own colours and heading font — validated values only; anything else falls back
+        Assert.Contains("--ta:#2f6f8f;--tb:#ffffff;--th:#14303d;--tx:#1a1a1a;--thb:#ffffff;--tht:#14303d;--tl:#f2f6f8;--tr:3px;--tf:&#39;Geologica&#39;,sans-serif", fromScript);
+        Assert.DoesNotContain("Evil", fromScript);
+        Assert.DoesNotContain("red;", fromScript);
+        // a component with its icon; an icon name that is not one becomes the puzzle piece
+        Assert.Contains("<i class=\"ti ti-photo\"></i>", fromScript);
+        Assert.Contains("<i class=\"ti ti-puzzle\"></i>", fromScript);
+        Assert.DoesNotContain("onmouseover", fromScript);
         // pictures through THIS site, one lightbox group per plugin; the publisher with a link only when the address is http(s)
         Assert.Contains("data-lightbox-group=\"se-leserstimmen\"", fromScript);
         Assert.Contains("href=\"/store-einblick/bild/leserstimmen/7\" data-lightbox data-caption=\"Karten &lt;mit&gt; Sternen\"", fromScript);
         Assert.Contains("href=\"/store-einblick/bild/leserstimmen/8\"", fromScript);
         Assert.Contains("2 Bilder", fromScript);
+        // the details view: every picture once more as a button (it clicks the card's link, so the lightbox has each picture ONCE)
+        Assert.Contains("<div class=\"se-detail\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Leserstimmen\" hidden>", fromScript);
+        Assert.Contains("data-se-pic=\"1\"", fromScript);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(fromScript, "href=\"/store-einblick/bild/leserstimmen/\\d+\" data-lightbox").Count);
+        Assert.Contains("<dt>Art</dt><dd>Native · Plugin-API 2</dd>", WebUtility.HtmlDecode(fromScript));
+        Assert.Contains("Native Plugins erlauben", WebUtility.HtmlDecode(fromScript));
         Assert.Contains("<a href=\"https://matthix.de/\" rel=\"noopener\" target=\"_blank\">MATTHIX</a>", fromScript);
         Assert.Contains("<strong>B&#246;se</strong>", fromScript);
         Assert.DoesNotContain("javascript:", fromScript);

@@ -111,7 +111,7 @@ public class DetailsModel : PageModel, IAsyncPageFilter
     /// <summary>Admin-only, even on one's own instance: enrollment decisions, profile assignment and
     /// token rotation are fleet/operator-config matters, not day-to-day instance management.</summary>
     private static readonly string[] AdminOnlyHandlers =
-        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostResyncAsync", "OnPostRotateAsync", "OnPostNativePluginsAsync" };
+        { "OnPostApproveAsync", "OnPostRejectAsync", "OnPostAssignProfileAsync", "OnPostResyncAsync", "OnPostRotateAsync", "OnPostNativePluginsAsync", "OnPostMatcmsStoreAsync" };
 
     /// <summary>Single security choke point for THIS page: every handler (GET and each POST) takes the
     /// instance <c>id</c>, so one filter can enforce both the per-instance access scope (an Operator
@@ -467,6 +467,17 @@ public class DetailsModel : PageModel, IAsyncPageFilter
         if (item is null) return RedirectToPage("Index");
         await ops.SetNativePluginsAsync(item, nativePlugins);
         TempData["Flash"] = (item.NativePlugins switch { "allow" => "Native Plugins erlaubt", "deny" => "Native Plugins verboten", _ => "Native Plugins wie im Profil" })
+            + (item.ProfileId is null ? " — die Instanz hat noch kein Profil und bekommt den Wert erst mit einem." : " — die Instanz übernimmt das beim nächsten Kontakt.");
+        return Redirect(Url.Page("Details", new { id }) + "?tab=config");
+    }
+
+    /// <summary>This site's own word about installing from the MatCMS Store (over its profile's); the work is ProfileOpsService's, shared with REST/MCP.</summary>
+    public async Task<IActionResult> OnPostMatcmsStoreAsync(int id, string? matcmsStore, [FromServices] Services.ProfileOpsService ops)
+    {
+        var item = await _db.Instances.FindAsync(id);
+        if (item is null) return RedirectToPage("Index");
+        await ops.SetMatcmsStoreAsync(item, matcmsStore);
+        TempData["Flash"] = (item.MatcmsStore switch { "allow" => "MatCMS Store erlaubt", "deny" => "MatCMS Store verboten", _ => "MatCMS Store wie im Profil" })
             + (item.ProfileId is null ? " — die Instanz hat noch kein Profil und bekommt den Wert erst mit einem." : " — die Instanz übernimmt das beim nächsten Kontakt.");
         return Redirect(Url.Page("Details", new { id }) + "?tab=config");
     }

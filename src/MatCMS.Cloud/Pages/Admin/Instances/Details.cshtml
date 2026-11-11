@@ -621,6 +621,27 @@
         </div>
     }
 
+    @* This site's own word about installing from the MatCMS Store (matcms.de) itself, over its profile's. Admin-only. *@
+    @if (Model.IsAdmin)
+    {
+        var profileStore = Model.Item.Profile?.MatcmsStore ?? "";
+        <div class="card">
+            <h2>@T["instances.matcmsStore"]</h2>
+            <p class="muted">@T["instances.matcmsStore.hint"]</p>
+            <form method="post" asp-page-handler="MatcmsStore" asp-route-id="@Model.Item.Id">
+                <div class="form-field">
+                    <label for="matcmsStore">@T["profiles.matcmsStore"]</label>
+                    <select id="matcmsStore" name="matcmsStore">
+                        <option value="" selected="@(Model.Item.MatcmsStore is null ? "selected" : null)">@T["instances.nativePlugins.profile", T[$"profiles.matcmsStore.{(profileStore.Length == 0 ? "keep" : profileStore)}"]]</option>
+                        <option value="allow" selected="@(Model.Item.MatcmsStore == "allow" ? "selected" : null)">@T["profiles.matcmsStore.allow"]</option>
+                        <option value="deny" selected="@(Model.Item.MatcmsStore == "deny" ? "selected" : null)">@T["profiles.matcmsStore.deny"]</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">@T["settings.save"]</button>
+            </form>
+        </div>
+    }
+
     @* The sender NAME of this one site's mails (a club's name on its forum and member mails), over its profile. The address is
        never the site's to choose. Admin-only, like the native-plugin switch. *@
     @if (Model.IsAdmin)

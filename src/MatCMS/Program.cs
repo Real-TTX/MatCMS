@@ -262,6 +262,9 @@ builder.Services.AddSingleton<CloudState>();
 builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
 builder.Services.AddScoped<CloudCatalogService>();
+builder.Services.AddScoped<MatcmsStoreClient>();
+builder.Services.AddSingleton<MatcmsStoreUpdates>();
+builder.Services.AddHostedService<MatcmsStoreUpdateService>();
 builder.Services.AddScoped<SiteApiKeyService>();
 // Applies cloud-offered content operations (AI changes via the MCP server) through the site's own
 // validated writers. Resolved on demand by CloudService while handling a heartbeat response.
@@ -660,7 +663,8 @@ app.Use(async (ctx, next) =>
     }
 
     var site = ctx.RequestServices.GetRequiredService<SiteContext>();
-    if (!site.MaintenanceEnabled)
+    // A plugin route that other servers fetch from (a store catalogue, a download) keeps answering — PublicRouteOptions.DuringMaintenance.
+    if (!site.MaintenanceEnabled || MatCMS.Services.Plugins.PluginRouteTransformer.AnswersDuringMaintenance(ctx))
     {
         await next();
         return;

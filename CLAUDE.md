@@ -117,6 +117,7 @@ src/MatCMS.Shared.Web/           # the shared admin shell (RCL): css, admin-list
 src/MatCMS.Plugin.Abstractions/  # the API plugins are written against (CMS image only; no ASP.NET, no EF)
 tests/MatCMS.Plugins.Tests/      # plugin system tests; tests/Fixtures/RefPlugin = the reference plugin (native)
 tests/MatCMS.Cloud.Tests/        # cloud tests (profile inheritance, effective config, mail relay) — in-memory SQLite
+tools/StoreSign/                 # signs MatCMS Store packages on the operator's machine (the private key never leaves it)
 src/MatCMS/                      # each app keeps its own Dockerfile, compose,
 src/MatCMS.Cloud/                #   run-*.ps1, VERSION and appdata/ volume
 plugins/                         # plugin SOURCES (plugin.csx + meta.json each) + pack.ps1 → store bundle
@@ -222,6 +223,45 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   (`updated` on guests/bookings, watermark `fed.pushed`), so a merge taken FROM the leader must not touch `updated` on the attached site. Only stay summaries
   travel, never `travellers`. Tests put two whole sites in one test (`FederationSites`) and route the attached one to the leader's TestServer through
   `BookingFederation.HandlerFactory`, set by reflection on every loaded copy of the DLL.
+- **The MatCMS Store** (`plugins/matcms-store`, native, key `matcms-store`; design and stages `docs/official-store.md`) is the store SERVER and runs on matcms.de
+  only: `/store` (a "Store" entry in the header menu), publishers are the site's member accounts with a publisher row (registration through `/store/registrieren`,
+  independent of `members.selfRegistration`), every uploaded version waits in Admin → MatCMS Store → Prüfen and is published ONLY with a valid signature pasted from
+  `tools/StoreSign` — the server never holds the private key. The signature scheme is `MatCMS.Shared/StoreSignature.cs` (`matcms-store-v1` + kind + key + version +
+  SHA-256, ECDSA P-256, keys in `StoreKeys.Known` — a new key is a new MatCMS version); the plugin keeps its own copy and `MatcmsStoreTests` has it accept what the
+  shared code signs. A key belongs to the publisher whose first version created it; reserved keys (built-ins, MATTHIX's) need a verified publisher; versions only go up.
+  `/store/api/…` (catalogue in the shape of a cloud's `/api/public/store` plus hash, signature, key id and download per version) keeps answering in maintenance mode.
+  Two route options came with it: `PublicRouteOptions.DuringMaintenance` (the maintenance middleware asks `PluginRouteTransformer.AnswersDuringMaintenance`) and
+  `MaxBodyMegabytes` (members' forms only — the builder refuses it without `RequireMember` + `Antiforgery`; `PluginPage` raises Kestrel's and the form reader's
+  limits after the member check, before the antiforgery check reads the body).
+  Since S4 the store also carries **templates and components** (one JSON file each, see below) and **reviews** (`StoreReviews.cs`: one per account and
+  entry, 1–5 stars + text, never the publisher's own entry; the publisher answers on the account page; anybody reports (`/store/{key}/melden`), the
+  operator hides/deletes under Bewertungen — reported ones count into the section's badge; `rating` {average, count} in the catalogue; setting
+  `reviews`; an erased account takes its reviews, an export lists them). Downloads count once per address, version and day (`download_marks`).
+  The entry page carries the review forms, so its route has antiforgery on; a redirect never carries a `#fragment` (SafeLocal), so the answer
+  to a review action is a notice at the TOP of the page (`StoreReviews.NoticeFor`).
+  An entry may have **English texts** (`name_en/summary_en/description_en`, each falling back to the German one on its own): the pages answer
+  under `/en/store…` too and keep the prefix in links and redirects (`StoreHtml.Localize`/`Go` — a new store link or redirect must go through
+  them), the catalogue stays German and carries `translations.en` beside it, and a site whose admin is English shows those in its store dialog.
+- **Sites install from the MatCMS Store themselves** (`Services/MatcmsStoreClient.cs`, docs/official-store.md S3): Admin → Plugins → "Weitere durchsuchen"
+  gets a "MatCMS Store" tab next to the cloud's store (the dialog's tabs are links, `?browse=matcms`, so only the store looked at is asked; pictures are fetched
+  and served by the SITE, `?handler=MatcmsImage`). Install = package only from the store server, `StoreSignature.VerifyPackage` against `StoreKeys.Known`
+  of THIS image, the bundle's own manifest must name the same key and version, then `PluginPackager.ImportAsync` (arrives OFF). Who may: no cloud → the
+  site's own switch `store.matcms` (on unless "0"); with a cloud → only `store.matcmsCloud` = "1", written by `CloudSyncService.ApplyMatcmsStoreAsync`
+  from `InstanceConfig.MatcmsStore` (profile switch "Aus dem MatCMS Store laden" / instance override in the cloud; never written = not allowed). Both keys
+  are in `SettingKeys.Protected`. A key the cloud's store also offers is installed from there (note instead of a button). A cloud package that came from
+  the MatCMS Store (`CatalogPlugin.Origin = matcms` + signature) is checked by `CloudCatalogService` before import (`MatcmsStoreClient.CheckCloudPackage`).
+  The profile ROLLOUT checks it too: `ConfigPlugin` carries `Origin/Signature/SignatureKeyId` and `CloudSyncService` refuses a bundle that does not fit
+  (`MatcmsStoreClient.CheckSignedPackage`: the store's name without a signature, other bytes, another plugin's key — all refused).
+  **Update hints:** `MatcmsStoreUpdateService` asks the store every 6 h (first after 3 min) into the singleton `MatcmsStoreUpdates` (every catalogue read
+  refreshes it too; keys the cloud's store offers are left out); Admin → Plugins shows "Update x im MatCMS Store" + "Aktualisieren" and the dashboard's
+  attention list a line — both from memory, never a remote call while a page waits.
+  **Templates and components** come from the store too (Templates/Komponenten → "Weitere durchsuchen", same tabs via `Shared.StoreTabs`): ONE JSON file each —
+  exactly what the editors' "Als JSON exportieren" writes — signed with kind `template`/`component`; the key follows from the content
+  (`MatCMS.Shared/StoreItemPackage.Key`: a template's NAME, a component's TYPE), and `InstallDesignAsync` refuses a file whose name/type does not give
+  the key the store named (it would overwrite another template here). Installed through `Services/DesignImport.cs` — the SAME importer as a pasted
+  JSON (a template is never activated; its tuned parameter values survive an update; a paste still takes them). The store plugin keeps its own copy of
+  the key rule; `MatcmsStoreTests` makes both agree.
+  Test seams `MatcmsStoreClient.BaseUrl/HandlerFactory/KeysOverride` (`MatcmsStoreClientTests`).
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every

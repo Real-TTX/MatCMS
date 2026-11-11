@@ -50,7 +50,7 @@
                 }
             </div>
         }
-        <partial name="_AddMenu" model='AddMenus.Payload(T, "components", Url.Page("Create")!, "components.new", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-component")' />
+        <partial name="_AddMenu" model='AddMenus.Payload(T, "components", Url.Page("Create")!, "components.new", Model.BrowseUrl, "import-component")' />
     </div>
 
     <div class="card" id="import-component" hidden>
@@ -114,7 +114,7 @@
 }
 
 @* The cloud catalogue opens as a store dialog, not as a card under the list — see _StoreDialog. *@
-@if (Model.Catalog is not null || Model.CatalogError is not null)
+@if (Model.Browsing is not null)
 {
     <partial name="_StoreDialog" model="Model.StoreDialog" />
 }

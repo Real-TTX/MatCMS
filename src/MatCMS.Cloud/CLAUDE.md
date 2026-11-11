@@ -272,7 +272,10 @@ show the result, not just the values.
   `Code` is only the note an older instance shows. Upload limit 90 MB (a native plugin may bring 60 MB of assemblies). `plugins.allowNative` is never rolled out as a SETTING (the sites refuse the key in free rows); the operator decides it with the
   dedicated "Native Plugins" switch — `Profile.NativePlugins` ("" = leave each site alone, "allow", "deny") and `Instance.NativePlugins`
   (null = the profile's, overrides it for one site; set through `ProfileOpsService.SetNativePluginsAsync`, which requests a resync) —
-  merged in the `/config` endpoint into `InstanceConfig.NativePlugins`.
+  merged in the `/config` endpoint into `InstanceConfig.NativePlugins`. The MatCMS Store switch is built the same way: `Profile.MatcmsStore` /
+  `Instance.MatcmsStore` (same values, inherited like it) → `InstanceConfig.MatcmsStore`; profile General tab "Aus dem MatCMS Store laden", instance
+  Details → Konfiguration, REST `PUT /api/v1/instances/{id}/matcms-store` + PATCH profile `matcmsStore`, MCP `set_instance_matcms_store` / `update_profile`.
+  "allow" lets the site install from matcms.de itself (signed packages only); no word = it installs only from this cloud's store.
 - Plugins are edited **in place**: the bundle is unpacked, `plugin.json` rewritten, every other entry
   copied byte for byte (`Repack` in `Pages/Admin/Profiles/Plugin.cshtml.cs`, second copy for the store
   in `Pages/Admin/Store/Plugin.cshtml.cs`). Repacking rather than
@@ -488,11 +491,31 @@ somebody else's plugin — the way in for later submissions). `CleanPublisher` k
 http(s) — it is rendered as a link on public websites. Not rolled out, no revision bump. The instances' catalogue carries it
 (`CatalogPlugin.Publisher/PublisherUrl`, additive), the site's store dialog shows it.
 
+**Plugins can be taken over from the MatCMS Store** (the store server on matcms.de, `docs/official-store.md` S2; `Services/MatcmsStoreService.cs`,
+Store tab "MatCMS Store", REST `GET /api/v1/store/matcms` + `POST …/{key}/take-over`, MCP `list_matcms_store`/`take_over_from_matcms_store`). A take-over
+downloads the package (only paths ON the store server — addresses come from a catalogue), checks the signature against `StoreKeys.Known` of THIS image,
+then goes through `UpsertPluginAsync` like an upload, with publisher and pictures (replaced). The row keeps `Origin = "matcms"`, `Signature`,
+`SignatureKeyId` (passed on in `CatalogPlugin`, additive) and is NOT repacked on the Plugin page — that would change the signed bytes; an own upload
+clears the origin. The three fields also ride the rollout (`ConfigPlugin.Origin/Signature/SignatureKeyId`), so a site checks a store plugin that
+reaches it through a profile exactly as one it installs itself. **Templates and components** are taken over too (same tab, `?kind=template|component` on REST,
+`kind` on MCP): the JSON file signed with kind template/component, its name/type must give the store key (`StoreItemPackage`), then `StoreService`'s own
+upsert; `StoreTemplate/StoreComponent.Origin` + `OriginVersion` (migration `StoreDesignOrigin`) drive the list's state. Unlike a plugin they stay
+editable here — every own save (page, REST, MCP, JSON import) clears the origin, so the next take-over asks ("Ersetzen") instead of overwriting the
+edit. Sites check no signature for these: they trust their cloud for templates like for its own; the check is where they enter the cloud. An OWN entry with the same key is replaced only on an explicit request ("Ersetzen" with a confirmation, REST `?replaceOwn=true`, MCP `replaceOwn`) — the same key may be another plugin; the row stays, so profile selections survive. No mirror, no polling: the tab reads the catalogue (cached 5 min) when opened.
+Store address = CloudSetting `store.matcms.url` (empty = https://matcms.de). Test seams `HandlerFactory`/`KeysOverride` (`MatcmsStoreTakeOverTests`).
+
 **The PUBLIC catalogue shows pictures too** (`GET /api/public/store`: per plugin `publisher`, `publisherUrl` and `images` = id, caption and the
 public address `/api/public/store/plugins/{key}/image/{id}`). That endpoint is anonymous like the catalogue but answers a picture only for the
-plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. The "Store-Einblick"
-plugin (1.1) never links it for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
+plugin it belongs to (`GetPublicPluginImageAsync` matches key AND id), with nosniff, a sandbox CSP and a day of public caching. A template carries its
+LOOK (accent, secondary, heading/text/background/alt colours, header colours, fonts, button style and radius — what every site using it shows anyway, never
+its layout, CSS or script) and a component its Tabler icon, so a showcase can draw a template as a small page in its own colours. The "Store-Einblick"
+plugin (1.2) validates every one of those values before it puts them into a style attribute, and never links the picture address for visitors: it passes each picture through the website (`/store-einblick/bild/{key}/{id}`, checked against the
 catalogue, bounded memory cache), so a visitor's browser talks to the website alone.
+
+**The store's starter set is offered ONCE per entry** (`Data/StoreSeeder.cs`, remembered in the CloudSetting `store.seeded`: `component:{type}`,
+`template:{name}`, `plugin:{key}`, one per line; not in the configuration backup). It used to be "add when missing", which put every deleted
+starter entry back on the next start — the test plugin "Wartungsfenster" returned with each cloud update. A new starter entry in a later version
+still reaches existing clouds once; what an operator changed or deleted stays that way (`StoreSeederTests`).
 
 There is **no separate "Global" tab** on a profile. The operator thinks in "templates this profile
 rolls out", not in where a row is stored, so each payload tab shows **one list** containing both the

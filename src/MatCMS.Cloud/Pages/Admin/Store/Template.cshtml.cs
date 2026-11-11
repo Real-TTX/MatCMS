@@ -149,6 +149,7 @@ public class TemplateModel : PageModel
         }
         catch (System.Text.Json.JsonException) { /* a broken stored blob is replaced by what was posted, as before */ }
         row.PartsJson = System.Text.Json.JsonSerializer.Serialize(kept);
+        row.Origin = ""; row.OriginVersion = "";   // edited here = the operator's own from now on
 
         await _db.SaveChangesAsync();
         await TouchUsersAsync(row.Id);

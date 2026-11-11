@@ -14,6 +14,15 @@
             <button type="button" class="modal-close" data-store-close aria-label="@T["action.close"]"><i class="ti ti-x" aria-hidden="true"></i></button>
         </div>
         <div class="modal-body">
+            @if (Model.Tabs is { Count: > 1 } tabs)
+            {
+                <div class="tabs store-tabs" role="tablist">
+                    @foreach (var tab in tabs)
+                    {
+                        <a class="tab@(tab.Active ? " active" : "")" href="@tab.Url" role="tab" aria-selected="@(tab.Active ? "true" : "false")">@tab.Label</a>
+                    }
+                </div>
+            }
             @if (Model.Error is not null)
             {
                 <div class="alert alert-error">@Model.Error</div>
@@ -53,6 +62,10 @@
                             }
                             <div class="store-card-head">
                                 <strong>@item.Title</strong>
+                                @if (!string.IsNullOrWhiteSpace(item.Badge))
+                                {
+                                    <span class="badge badge-new">@item.Badge</span>
+                                }
                                 @if (item.InstalledVersion is not null)
                                 {
                                     <span class="badge badge-off">@T["store.dialogInstalled"]</span>
@@ -81,12 +94,27 @@
                                 {
                                     <span class="muted mono">@item.Version</span>
                                 }
-                                <form method="post" asp-page-handler="InstallFromCloud"
-                                      asp-all-route-data="@(new Dictionary<string, string> { [Model.RouteName] = item.RouteValue })">
-                                    <button type="submit" class="btn btn-sm">
-                                        @(item.InstalledVersion is null ? T["store.dialogInstall"] : T["store.dialogUpdate"])
-                                    </button>
-                                </form>
+                                @if (item.Rating is { Length: > 0 } stars)
+                                {
+                                    <span class="muted">@stars</span>
+                                }
+                                @if (item.Downloads is long dl)
+                                {
+                                    <span class="muted">@T["store.dialogDownloads", dl.ToString("N0", System.Globalization.CultureInfo.InvariantCulture).Replace(",", ".")]</span>
+                                }
+                                @if (item.Note is not null)
+                                {
+                                    <span class="muted">@item.Note</span>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-page-handler="@Model.Handler"
+                                          asp-all-route-data="@(new Dictionary<string, string> { [Model.RouteName] = item.RouteValue })">
+                                        <button type="submit" class="btn btn-sm">
+                                            @(item.InstalledVersion is null ? T["store.dialogInstall"] : T["store.dialogUpdate"])
+                                        </button>
+                                    </form>
+                                }
                             </div>
                         </div>
                     }

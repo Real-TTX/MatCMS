@@ -234,4 +234,19 @@ public sealed class ProfileInheritanceTests : IDisposable
         Assert.Equal("0", c.Settings[ProfileService.SmtpFromSiteNameKey]);
         Assert.Equal("smtp.matthix.de", c.Settings["smtp.host"]);
     }
+
+    [Fact]
+    public async Task The_MatCMS_Store_permission_is_inherited_and_one_instance_can_override_it()
+    {
+        var standard = Add("Standard", set: p => p.MatcmsStore = "allow");
+        var club = Add("Vereine", standard.Id);
+        Assert.Equal("allow", (await ConfigAsync(club)).MatcmsStore);                // nearest profile with a word
+        Assert.Null((await ConfigAsync(Add("Leer"))).MatcmsStore);                  // no word = not on the wire (a site with a cloud then may not)
+
+        var inst = new Instance { Name = "verein", PublicId = "p2", TokenHash = "t", ProfileId = club.Id, MatcmsStore = "deny" };
+        _db.Instances.Add(inst);
+        _db.SaveChanges();
+        var loaded = _db.Instances.Include(i => i.Profile).AsNoTracking().Single(i => i.Id == inst.Id);
+        Assert.Equal("deny", (await _profiles.BuildConfigForAsync(loaded)).MatcmsStore);
+    }
 }

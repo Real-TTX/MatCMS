@@ -109,6 +109,9 @@ public class Instance
     /// profile says. So one site can run a compiled plugin without every site of its profile being allowed to.</summary>
     public string? NativePlugins { get; set; }
 
+    /// <summary>Overrides the profile's <see cref="Profile.MatcmsStore"/> for THIS site: "allow", "deny", or null = what the profile says.</summary>
+    public string? MatcmsStore { get; set; }
+
     /// <summary>Public URL of the site, for the "open" link. Reported by the instance, editable.</summary>
     public string? Url { get; set; }
 

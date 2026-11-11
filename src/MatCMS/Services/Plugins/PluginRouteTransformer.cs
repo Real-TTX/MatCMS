@@ -37,6 +37,16 @@ internal sealed class PluginRouteTransformer(PluginRegistry registry) : DynamicR
         return new ValueTask<RouteValueDictionary>(new RouteValueDictionary { ["page"] = "/PluginPage" });
     }
 
+    /// <summary>True when the request goes to a plugin route that keeps answering in maintenance mode (<see cref="PublicRouteOptions.DuringMaintenance"/>).
+    /// Asked by the maintenance middleware only while maintenance is on.</summary>
+    internal static bool AnswersDuringMaintenance(HttpContext http)
+    {
+        var registry = http.RequestServices.GetRequiredService<PluginRegistry>();
+        if (registry.Routes.Count == 0) return false;
+        var rest = StripCulture(http.Request.Path.Value ?? "/", out _);
+        return registry.MatchRoute(rest, http.Request.Method) is { } match && match.Route.Options.DuringMaintenance;
+    }
+
     // The null the framework reads as "this endpoint does not apply, keep looking".
     private static ValueTask<RouteValueDictionary> NotMine() => new((RouteValueDictionary)null!);
 

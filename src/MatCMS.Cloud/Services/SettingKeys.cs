@@ -128,6 +128,15 @@ public static class SettingKeys
     /// it. Empty = it is called "Dieser Host". Unique among the hosts, like a node's name.</summary>
     public const string HostingLocalName = "hosting.localName";
 
+    // --- Store ----------------------------------------------------------------
+    /// <summary>Which starter entries of the store the cloud has already offered (<c>StoreSeeder</c>), one per line
+    /// (<c>component:{type}</c>, <c>template:{name}</c>, <c>plugin:{key}</c>). Bookkeeping, not configuration: in no settings
+    /// section, not in the configuration backup — a restored cloud seeds its own starter set on its first start anyway.</summary>
+    public const string StoreSeeded = "store.seeded";
+
+    /// <summary>The address of the MatCMS Store (the store server on matcms.de) the cloud takes plugins from. Empty = https://matcms.de.</summary>
+    public const string MatcmsStoreUrl = "store.matcms.url";
+
     // --- Notifications ------------------------------------------------------
     /// <summary>The notification matrix (JSON, <c>NotificationService</c>): who gets which event. Once saved it
     /// replaces the three keys below, which stay only so the first load can translate them into it.</summary>

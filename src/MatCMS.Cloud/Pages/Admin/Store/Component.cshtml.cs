@@ -84,6 +84,7 @@ public class ComponentModel : PageModel
         row.Icon = icon?.Trim() ?? "";
         row.FieldsJson = fields;
         row.TemplateHtml = templateHtml ?? "";
+        row.Origin = ""; row.OriginVersion = "";   // edited here = the operator's own from now on
 
         await _db.SaveChangesAsync();
         await TouchUsersAsync(row.Id);

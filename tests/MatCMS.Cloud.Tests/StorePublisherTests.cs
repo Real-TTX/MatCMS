@@ -95,4 +95,28 @@ public sealed class StorePublisherTests : IDisposable
         var instanceCatalog = await _store.CatalogAsync();                          // the sites' store dialog gets the publisher too
         Assert.Equal("MATTHIX", instanceCatalog.Plugins.Single(p => p.Key == "forum").Publisher);
     }
+
+    [Fact]
+    public async Task The_public_catalogue_carries_a_templates_look_and_a_components_icon_but_never_their_code()
+    {
+        _db.StoreTemplates.Add(new MatCMS.Cloud.Models.StoreTemplate
+        {
+            Name = "Küste", Description = "Ruhig.", AccentColor = "#2f6f8f", SecondaryColor = "#d9c3a0", HeadingFont = "Geologica", BodyFont = "Inter",
+            BackgroundColor = "#ffffff", AltBackground = "#f2f6f8", HeaderBackground = "#0f1115", HeaderTextColor = "#ffffff", ButtonRadius = "3",
+            LayoutHtml = "<header>secret layout</header>", CustomCss = "body{}", CustomJs = "alert(1)"
+        });
+        _db.StoreComponents.Add(new MatCMS.Cloud.Models.StoreComponent { Type = "image-text", Name = "Bild mit Text", Description = "d", Icon = "photo", TemplateHtml = "<p>{{text}}</p>" });
+        await _db.SaveChangesAsync();
+
+        var catalog = await _store.PublicCatalogAsync();
+        var t = catalog["templates"]!.AsArray().OfType<JsonObject>().Single();
+        Assert.Equal(("#2f6f8f", "#d9c3a0", "#f2f6f8", "#0f1115", "#ffffff"),
+            ((string?)t["accent"], (string?)t["secondary"], (string?)t["alt"], (string?)t["headerBg"], (string?)t["headerText"]));
+        Assert.Equal(("Geologica", "Inter", "3"), ((string?)t["headingFont"], (string?)t["bodyFont"], (string?)t["buttonRadius"]));
+        var json = catalog.ToJsonString();
+        Assert.DoesNotContain("secret layout", json);                              // the look travels, the template's code does not
+        Assert.DoesNotContain("alert(1)", json);
+        Assert.DoesNotContain("{{text}}", json);
+        Assert.Equal("photo", (string?)catalog["components"]!.AsArray().OfType<JsonObject>().Single()["icon"]);
+    }
 }

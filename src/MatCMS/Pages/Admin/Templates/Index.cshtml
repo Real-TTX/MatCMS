@@ -40,7 +40,7 @@
     }
 </div>
 
-<partial name="_AddMenu" model='AddMenus.Payload(T, "templates", Url.Page("Create")!, "templates.create", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-template")' />
+<partial name="_AddMenu" model='AddMenus.Payload(T, "templates", Url.Page("Create")!, "templates.create", Model.BrowseUrl, "import-template")' />
 
 <div class="card" id="import-template" hidden>
     <h2>@T["templates.importJson"]</h2>
@@ -54,7 +54,7 @@
 </div>
 
 @* The cloud catalogue opens as a store dialog, not as a card under the list — see _StoreDialog. *@
-@if (Model.Catalog is not null || Model.CatalogError is not null)
+@if (Model.Browsing is not null)
 {
     <partial name="_StoreDialog" model="Model.StoreDialog" />
 }

@@ -85,7 +85,7 @@ public sealed class ProfileOpsService
         var mailTemplates = await _db.ProfileMailTemplates.AsNoTracking().Where(x => x.ProfileId == id)
             .Select(x => new { x.Key, x.Name, x.Subject, x.Enabled, x.IsHtml }).ToListAsync();
         var instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id)
-            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins, mailFromName = i.MailFromName }).ToListAsync();
+            .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins, matcmsStore = i.MatcmsStore, mailFromName = i.MailFromName }).ToListAsync();
         var parentName = p.ParentId is int ppid ? await _db.Profiles.AsNoTracking().Where(x => x.Id == ppid).Select(x => x.Name).FirstOrDefaultAsync() : null;
         var children = await _profiles.ChildNamesAsync(id);
         return Result.Done(new
@@ -96,6 +96,7 @@ public sealed class ProfileOpsService
             // what its instances actually get (with the inherited ones) is GET …/effective.
             parentId = p.ParentId, parentName, children,
             nativePlugins = p.NativePlugins,
+            matcmsStore = p.MatcmsStore,
             sync = new { p.SyncSettings, p.SyncSmtp, p.SyncTranslation, p.SyncBackup, p.SyncUsers, p.SyncPlugins, p.SyncComponents, p.SyncTemplates, p.SyncMailTemplates, p.SyncAi },
             modes = new
             {
@@ -126,7 +127,7 @@ public sealed class ProfileOpsService
         bool? NotifyOffline, bool? NotifyUpdate, string? NotifyRecipients, string? ActivateTemplateName,
         bool? SyncSettings, bool? SyncUsers, bool? SyncPlugins, bool? SyncComponents, bool? SyncTemplates, bool? SyncMailTemplates,
         bool? RemoveDefaultAdmin, string? SettingsMode, string? UsersMode, string? PluginsMode, string? ComponentsMode,
-        string? TemplatesMode, string? MailTemplatesMode, string? NativePlugins = null, int? ParentId = null);
+        string? TemplatesMode, string? MailTemplatesMode, string? NativePlugins = null, int? ParentId = null, string? MatcmsStore = null);
 
     /// <summary>Only the fields given change.</summary>
     public async Task<Result> PatchAsync(int id, Patch b)
@@ -150,6 +151,7 @@ public sealed class ProfileOpsService
         if (b.RemoveDefaultAdmin is { } rd) p.RemoveDefaultAdmin = rd;
         // "allow" | "deny" | "" (leave each site alone); anything unknown is "", never a guess.
         if (b.NativePlugins is not null) p.NativePlugins = NativePluginsPolicy.Normalize(b.NativePlugins);
+        if (b.MatcmsStore is not null) p.MatcmsStore = NativePluginsPolicy.Normalize(b.MatcmsStore);
         if (b.SettingsMode is not null) p.SettingsMode = ParseMode(b.SettingsMode, p.SettingsMode);
         // Users never "keep": add-only is unconditional on the instance, so the profile must not promise more.
         if (b.UsersMode is not null) p.UsersMode = ParseMode(b.UsersMode, p.UsersMode) is var um && um == SyncMode.Keep ? SyncMode.Add : um;
@@ -600,6 +602,26 @@ public sealed class ProfileOpsService
         });
     }
 
+    /// <summary>
+    /// One site's own word about installing from the MatCMS Store (matcms.de), over its profile's: "allow", "deny", or ""/null = follow the
+    /// profile. Like <see cref="SetNativePluginsAsync"/> the site is told to re-apply its configuration, which carries the decision.
+    /// </summary>
+    public async Task<Result> SetMatcmsStoreAsync(Instance inst, string? value)
+    {
+        var policy = NativePluginsPolicy.Normalize(value);
+        inst.MatcmsStore = policy.Length == 0 ? null : policy;
+        if (inst.ProfileId is not null) { inst.ResyncRequestedAt = DateTime.UtcNow; inst.LastSyncError = null; }
+        await _db.SaveChangesAsync();
+        var what = policy switch { NativePluginsPolicy.Allow => "erlaubt", NativePluginsPolicy.Deny => "verboten", _ => "wie im Profil" };
+        return Result.Done(new
+        {
+            ok = true, matcmsStore = inst.MatcmsStore ?? "",
+            message = inst.ProfileId is null
+                ? $"MatCMS Store: {what}. Die Instanz hat kein Profil und bekommt erst mit einem Profil eine Konfiguration."
+                : $"MatCMS Store: {what}. Die Instanz übernimmt das beim nächsten Kontakt."
+        });
+    }
+
     /// <summary>What the instances of a profile actually get, with everything it inherits — and from which profile each item comes.
     /// Secrets are masked. The same build as the instances' own /config, so it cannot disagree with what they receive.</summary>
     public async Task<Result> EffectiveAsync(int id)
@@ -614,7 +636,7 @@ public sealed class ProfileOpsService
         return Result.Done(new
         {
             chain = chain.Select(x => new { x.Id, x.Name }),
-            mailTransport = c.MailTransport, aiTransport = c.AiTransport, activateTemplate = c.ActivateTemplate, nativePlugins = c.NativePlugins,
+            mailTransport = c.MailTransport, aiTransport = c.AiTransport, activateTemplate = c.ActivateTemplate, nativePlugins = c.NativePlugins, matcmsStore = c.MatcmsStore,
             settings = c.Settings?.Select(kv => new { key = kv.Key, value = Secret(kv.Key) && !string.IsNullOrEmpty(kv.Value) ? "***" : kv.Value, from = Of("setting", kv.Key) }),
             users = c.Users?.Select(u => new { u.Username, u.Role, from = Of("user", u.Username) }),
             plugins = c.Plugins?.Select(x => new { x.Key, x.Version, from = Of("plugin", x.Key) }),

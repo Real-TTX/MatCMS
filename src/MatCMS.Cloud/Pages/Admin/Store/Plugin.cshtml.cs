@@ -99,6 +99,8 @@ public class PluginModel : PageModel
         row.Description = meta.Description;
         row.Bundle = bytes;
         row.UploadedAt = DateTime.UtcNow;
+        // An own upload is an own entry, whatever it was before: the store's signature was about other bytes.
+        row.Origin = ""; row.Signature = ""; row.SignatureKeyId = "";
 
         await _db.SaveChangesAsync();
         await TouchUsersAsync(row.Id);
@@ -117,6 +119,12 @@ public class PluginModel : PageModel
             return RedirectToPage(new { id });
         }
 
+        // Taken over from the MatCMS Store: repacking would change the bytes the signature is about (the sites check it).
+        if (row.Origin == Services.MatcmsStoreService.Origin)
+        {
+            TempData["FlashError"] = "Dieses Plugin kommt aus dem MatCMS Store und wird hier nicht bearbeitet – eine neue Version kommt über „Übernehmen“ im Reiter MatCMS Store.";
+            return RedirectToPage(new { id });
+        }
         var repacked = StoreBundle.Repack(row.Bundle, row.Key, name.Trim(), description?.Trim() ?? "", version?.Trim() ?? "", code ?? "");
         if (repacked is null)
         {

@@ -351,6 +351,14 @@ public sealed class InstanceConfig
     /// field ignores it (its switch stays as it is).
     /// </summary>
     public string? NativePlugins { get; set; }
+
+    /// <summary>
+    /// Whether this site may install plugins from the MatCMS Store (matcms.de) ITSELF: "allow", "deny", or null/empty = no word (a site with a
+    /// cloud then does not — its cloud's store is its store). Same values as <see cref="NativePluginsPolicy"/>. A field of its own like
+    /// <see cref="NativePlugins"/>: the site's setting behind it is protected against every generic writer. A site that predates the field
+    /// ignores it and installs only from its cloud, as before.
+    /// </summary>
+    public string? MatcmsStore { get; set; }
 }
 
 /// <summary>The wire values of <see cref="InstanceConfig.NativePlugins"/>.</summary>
@@ -694,6 +702,12 @@ public sealed class ConfigPlugin
     public string Key { get; set; } = "";
     public string Name { get; set; } = "";
     public string Version { get; set; } = "";
+
+    /// <summary>Taken over from the MatCMS Store: "matcms" plus the store's signature of exactly the bundle the instance will fetch, so the ROLLOUT
+    /// checks it like a store install does (same fields as <see cref="CatalogPlugin"/>). Additive: an older cloud sends none, an older site ignores them.</summary>
+    public string Origin { get; set; } = "";
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 /// <summary>
@@ -748,6 +762,12 @@ public sealed class CatalogPlugin
     /// site talks to its cloud by may be one the admin's browser cannot reach (an internal Docker name).
     /// </summary>
     public List<CatalogImage> Images { get; set; } = new();
+
+    /// <summary>Taken over from the MatCMS Store: "matcms", else "". With it the store's signature of exactly this bundle and its key id, so a site can
+    /// check the package against the keys in its own image (MatCMS.Shared/StoreSignature). Additive: an older cloud sends none, an older site ignores them.</summary>
+    public string Origin { get; set; } = "";
+    public string Signature { get; set; } = "";
+    public string SignatureKeyId { get; set; } = "";
 }
 
 public sealed class CatalogImage

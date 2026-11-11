@@ -406,7 +406,7 @@ public class EditModel : PageModel
         string? activateTemplateName,
         string? backupQuotaGb = null,
         string? backupKeepDaily = null, string? backupKeepWeekly = null,
-        string? backupKeepMonthly = null, string? backupMaxCount = null, string? nativePlugins = null, string? parentId = null)
+        string? backupKeepMonthly = null, string? backupMaxCount = null, string? nativePlugins = null, string? parentId = null, string? matcmsStore = null)
     {
         var profile = await _db.Profiles.FindAsync(id);
         if (profile is null) return RedirectToPage("Index");
@@ -435,6 +435,7 @@ public class EditModel : PageModel
         profile.RemoveDefaultAdmin = removeDefaultAdmin;
         // Only when the form carried the field: a post without it must not quietly reset the decision.
         if (nativePlugins is not null) profile.NativePlugins = MatCMS.Shared.NativePluginsPolicy.Normalize(nativePlugins);
+        if (matcmsStore is not null) profile.MatcmsStore = MatCMS.Shared.NativePluginsPolicy.Normalize(matcmsStore);
         profile.SyncPlugins = syncPlugins;
         profile.SyncComponents = syncComponents;
         profile.SyncTemplates = syncTemplates;

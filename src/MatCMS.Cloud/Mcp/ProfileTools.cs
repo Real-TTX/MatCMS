@@ -71,10 +71,11 @@ public class ProfileTools
         bool? removeDefaultAdmin = null,
         [Description("Compiled (native) plugins on the profile's sites: allow | deny | empty string = leave each site's own switch alone.")] string? nativePlugins = null,
         string? settingsMode = null, string? usersMode = null, string? pluginsMode = null, string? componentsMode = null, string? templatesMode = null, string? mailTemplatesMode = null,
+        [Description("Whether the profile's sites may install plugins from the MatCMS Store (matcms.de) themselves: allow | deny | empty string = no word (sites with a cloud then install only from this cloud's store).")] string? matcmsStore = null,
         [Description("The profile this one INHERITS from: everything the parent rolls out reaches this profile's sites too, this profile adds and overrides (never removes). 0 = inherit from nothing. A loop or more than 5 levels is refused.")] int? parentId = null) =>
         WriteAsync(me, () => ops.PatchAsync(profileId, new ProfileOpsService.Patch(name, description, autoApprove, autoUpdateLocal,
             notifyOffline, notifyUpdate, notifyRecipients, activateTemplateName, syncSettings, syncUsers, syncPlugins, syncComponents,
-            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode, nativePlugins, parentId)));
+            syncTemplates, syncMailTemplates, removeDefaultAdmin, settingsMode, usersMode, pluginsMode, componentsMode, templatesMode, mailTemplatesMode, nativePlugins, parentId, matcmsStore)));
 
     [McpServerTool(Name = "set_profile_ai"), Description("AI settings of a profile: whether its sites may use the cloud's AI, a monthly token budget per site (0 = unlimited), an instruction added to every request, and whether a site takes a backup before an AI change." + Rollout)]
     public static Task<object> SetProfileAi(McpContext me, ProfileOpsService ops, int profileId,
@@ -204,6 +205,13 @@ public class ProfileTools
     {
         RequireManage(me);
         return Unwrap(await ops.SetNativePluginsAsync(await InstanceAsync(instances, me, instanceId, ct), nativePlugins));
+    }
+
+    [McpServerTool(Name = "set_instance_matcms_store"), Description("Allow or forbid ONE site to install plugins from the MatCMS Store (matcms.de) itself, over its profile: allow | deny | empty string = follow the profile. Without allow a site with a cloud installs only from this cloud's store. Packages are always checked against the store signature; plugins arrive switched off. The site applies it on its next heartbeat.")]
+    public static async Task<object> SetInstanceMatcmsStore(McpContext me, InstanceService instances, ProfileOpsService ops, string instanceId, string matcmsStore, CancellationToken ct)
+    {
+        RequireManage(me);
+        return Unwrap(await ops.SetMatcmsStoreAsync(await InstanceAsync(instances, me, instanceId, ct), matcmsStore));
     }
 
     [McpServerTool(Name = "set_instance_mail_sender"), Description("The sender NAME of ONE site's mails (e.g. the club's name for its forum and member mails), over its profile; empty string = the profile's choice. Only the name — the address stays the profile's or the cloud's. Applies to the cloud relay and to SMTP the profile rolls out.")]

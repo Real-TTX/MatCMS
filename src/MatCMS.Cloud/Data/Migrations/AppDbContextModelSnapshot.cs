@@ -370,6 +370,9 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<string>("MailFromName")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MatcmsStore")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1075,6 +1078,10 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<int>("MailTemplatesMode")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("MatcmsStore")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1633,6 +1640,14 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginVersion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TemplateHtml")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1708,11 +1723,23 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Publisher")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PublisherUrl")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Signature")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SignatureKeyId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
@@ -1840,6 +1867,14 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OriginVersion")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

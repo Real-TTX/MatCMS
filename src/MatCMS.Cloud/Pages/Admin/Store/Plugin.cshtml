@@ -12,6 +12,10 @@
     </h1>
 </div>
 
+@if (Model.Item.Origin == MatCMS.Cloud.Services.MatcmsStoreService.Origin)
+{
+    <div class="alert alert-info">@T["store.matcms.fromStore", Model.Item.SignatureKeyId]</div>
+}
 @if (!Model.IsNew && Model.UsedBy.Count > 0)
 {
     @* An edit here reaches every profile that selected this entry — say so before it is saved, not

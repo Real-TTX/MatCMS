@@ -15,7 +15,13 @@ namespace MatCMS.Cloud.Pages.Admin.Store;
 public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
-    public IndexModel(AppDbContext db) => _db = db;
+    private readonly Services.MatcmsStoreService _matcms;
+    public IndexModel(AppDbContext db, Services.MatcmsStoreService matcms) { _db = db; _matcms = matcms; }
+
+    /// <summary>The MatCMS Store's catalogue with this cloud's state per entry (tab "MatCMS Store"); read from memory for five minutes.</summary>
+    public List<Services.MatcmsStoreService.Entry> Matcms { get; private set; } = new();
+    public string? MatcmsError { get; private set; }
+    public string MatcmsUrl { get; private set; } = "";
 
     public List<StorePlugin> Plugins { get; private set; } = new();
     public List<StoreTemplate> Templates { get; private set; } = new();
@@ -51,6 +57,8 @@ public class IndexModel : PageModel
 
         Components = await _db.StoreComponents.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
         MailTemplates = await _db.StoreMailTemplates.AsNoTracking().OrderBy(m => m.Key).ToListAsync();
+        MatcmsUrl = await _matcms.BaseUrlAsync();
+        (Matcms, MatcmsError) = await _matcms.ListAsync(fresh: Request.Query["refresh"] == "1");
 
         PluginUse = await CountAsync(_db.ProfileStorePlugins.Select(x => x.StorePluginId));
         TemplateUse = await CountAsync(_db.ProfileStoreTemplates.Select(x => x.StoreTemplateId));
@@ -63,6 +71,15 @@ public class IndexModel : PageModel
             .ToDictionaryAsync(x => x.Key, x => x.Count);
 
     public int Uses(Dictionary<int, int> map, int id) => map.TryGetValue(id, out var c) ? c : 0;
+
+    /// <summary>Takes one entry of the MatCMS Store over into this store (signature checked, pictures and publisher with it).</summary>
+    public async Task<IActionResult> OnPostTakeOverAsync(string? key, bool replace = false, string? group = null)
+    {
+        var r = await _matcms.ImportAsync((key ?? "").Trim(), replaceOwn: replace,
+            group: group is Services.MatcmsStoreService.GroupTemplate or Services.MatcmsStoreService.GroupComponent ? group : Services.MatcmsStoreService.GroupPlugin);
+        TempData[r.Ok ? "Flash" : "FlashError"] = r.Message;
+        return RedirectToPage(new { tab = "matcms" });
+    }
 
     // Tile views. Everything in the store IS global, so no origin badge here — the flag exists for
     // the profile lists, where own and taken entries sit in one table.

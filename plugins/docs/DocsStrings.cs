@@ -1,0 +1,226 @@
+namespace MatCMS.Plugin.Docs;
+
+/// <summary>Every text of the docs plugin as (key, German, English). A test checks that each key the code uses is here with both languages.</summary>
+internal static class DocsStrings
+{
+    public static void Register(IPluginBuilder b)
+    {
+        b.Strings("de", All.ToDictionary(r => r.Key, r => r.De));
+        b.Strings("en", All.ToDictionary(r => r.Key, r => r.En));
+    }
+
+    internal static (string Key, string De, string En)[] All => _all ??= Core.Concat(Placeholders()).ToArray();
+    private static (string Key, string De, string En)[]? _all;
+
+    /// <summary>The placeholders of the template parts, named in the template editor.</summary>
+    private static IEnumerable<(string, string, string)> Placeholders()
+    {
+        var names = DocsHtml.PagePlaceholders.Concat(DocsHtml.HomePlaceholders).Concat(DocsHtml.SearchPlaceholders).Concat(DocsHtml.SearchBoxPlaceholders).Distinct();
+        foreach (var n in names) yield return ("docs.ph." + n, PlaceholderDe(n), PlaceholderEn(n));
+    }
+
+    private static string PlaceholderDe(string p) => p switch
+    {
+        "title" => "Titel", "summary" => "Kurzbeschreibung der Seite", "updated" => "„Zuletzt geändert …“", "nav_label" => "Text des Navigationsknopfs (Handy)",
+        "crumbs_html" => "Brotkrumen", "notice_html" => "Hinweise (Entwurf, ältere Version)", "sidebar_html" => "Seitennavigation (Baum)", "search_html" => "Suchfeld",
+        "versions_html" => "Versionsauswahl", "content_html" => "Text der Seite", "children_html" => "Unterseiten als Liste", "toc_html" => "Inhaltsverzeichnis der Seite",
+        "prevnext_html" => "Zurück / Weiter", "edit_html" => "„Bearbeiten“ (nur für Admins)", "intro" => "Einleitung", "sections_html" => "Die Bereiche als Karten",
+        "count" => "Zahl der Treffer", "results_html" => "Die Treffer", "action" => "Adresse der Suche", "q" => "Der Suchbegriff", "placeholder" => "Platzhalter im Feld",
+        "label" => "Name des Felds (für Screenreader)", "button" => "Text des Knopfs", _ => p
+    };
+
+    private static string PlaceholderEn(string p) => p switch
+    {
+        "title" => "Title", "summary" => "The page's short description", "updated" => "\"Last changed …\"", "nav_label" => "Text of the navigation button (phone)",
+        "crumbs_html" => "Breadcrumbs", "notice_html" => "Notices (draft, older version)", "sidebar_html" => "Navigation (tree)", "search_html" => "Search box",
+        "versions_html" => "Version switcher", "content_html" => "The page's text", "children_html" => "Sub-pages as a list", "toc_html" => "The page's table of contents",
+        "prevnext_html" => "Previous / next", "edit_html" => "\"Edit\" (admins only)", "intro" => "Introduction", "sections_html" => "The sections as cards",
+        "count" => "Number of results", "results_html" => "The results", "action" => "Address of the search", "q" => "The search term", "placeholder" => "Placeholder in the box",
+        "label" => "Name of the box (for screen readers)", "button" => "Text of the button", _ => p
+    };
+
+    private static readonly (string Key, string De, string En)[] Core =
+    [
+        // ---- public ----
+        ("docs.defaultTitle", "Dokumentation", "Documentation"),
+        ("docs.defaultIntro", "Anleitungen, Erklärungen und Referenz – alles an einem Ort.", "Guides, explanations and reference – all in one place."),
+        ("docs.nav.label", "Dokumentation", "Documentation"),
+        ("docs.nav.open", "Navigation", "Navigation"),
+        ("docs.crumbs", "Brotkrumen", "Breadcrumbs"),
+        ("docs.toc", "Auf dieser Seite", "On this page"),
+        ("docs.pager", "Weitere Seiten", "More pages"),
+        ("docs.prev", "Zurück", "Previous"),
+        ("docs.next", "Weiter", "Next"),
+        ("docs.inSection", "In diesem Abschnitt", "In this section"),
+        ("docs.empty", "Hier entsteht gerade die Dokumentation.", "The documentation is being written."),
+        ("docs.updated", "Zuletzt geändert am {0}", "Last updated {0}"),
+        ("docs.editPage", "Seite bearbeiten", "Edit page"),
+        ("docs.draftNotice", "Entwurf – nur für Administratoren sichtbar.", "Draft – visible to administrators only."),
+        ("docs.oldVersion", "Sie lesen die Dokumentation für Version {0}.", "You are reading the documentation for version {0}."),
+        ("docs.toCurrent", "Zur aktuellen Version {0}", "Go to the current version {0}"),
+        ("docs.version", "Version", "Version"),
+        ("docs.versionCurrent", "aktuell", "current"),
+        ("docs.notFound", "Seite nicht gefunden", "Page not found"),
+        ("docs.notFoundText", "Diese Seite gibt es (noch) nicht. Vielleicht hilft die Suche oder die Navigation.", "This page does not exist (yet). The search or the navigation may help."),
+        ("docs.copy", "Kopieren", "Copy"),
+        ("docs.search", "Suche", "Search"),
+        ("docs.search.placeholder", "Dokumentation durchsuchen …", "Search the documentation …"),
+        ("docs.search.button", "Suchen", "Search"),
+        ("docs.search.short", "Bitte mindestens zwei Zeichen eingeben.", "Please type at least two characters."),
+        ("docs.search.none", "Keine Treffer für „{0}“.", "No results for \"{0}\"."),
+        ("docs.search.one", "{0} Treffer für „{1}“.", "{0} result for \"{1}\"."),
+        ("docs.search.many", "{0} Treffer für „{1}“.", "{0} results for \"{1}\"."),
+        ("docs.search.kind", "Dokumentation", "Documentation"),
+        ("docs.alert.note", "Hinweis", "Note"),
+        ("docs.alert.tip", "Tipp", "Tip"),
+        ("docs.alert.important", "Wichtig", "Important"),
+        ("docs.alert.warning", "Achtung", "Warning"),
+        ("docs.alert.caution", "Vorsicht", "Caution"),
+        ("docs.copied", "Kopiert", "Copied"),
+
+        // ---- blocks, menu elements, link picker, template parts ----
+        ("docs.block.sections", "Docs: Bereiche", "Docs: sections"),
+        ("docs.block.sectionsDesc", "Die Bereiche der Dokumentation als Karten oder Liste", "The documentation's sections as cards or a list"),
+        ("docs.block.search", "Docs: Suche", "Docs: search"),
+        ("docs.block.searchDesc", "Ein Suchfeld, das in der Dokumentation sucht", "A search box that searches the documentation"),
+        ("docs.block.heading", "Überschrift", "Heading"),
+        ("docs.block.layout", "Darstellung", "Layout"),
+        ("docs.block.limit", "Höchstens", "At most"),
+        ("docs.block.limitHelp", "Anzahl der Bereiche; leer = alle", "Number of sections; empty = all"),
+        ("docs.el.search", "Docs-Suche", "Docs search"),
+        ("docs.el.searchHelp", "Suchfeld der Dokumentation im Menü", "The documentation's search box in the menu"),
+        ("docs.el.docs", "Dokumentation (mit Bereichen)", "Documentation (with sections)"),
+        ("docs.el.docsHelp", "Link zur Dokumentation, die Bereiche als Aufklappmenü", "Link to the documentation, its sections as a dropdown"),
+        ("docs.lt.group", "Dokumentation", "Documentation"),
+        ("docs.part.page", "Docs: Seite", "Docs: page"),
+        ("docs.part.pageHelp", "Eine Seite der Dokumentation mit Navigation, Inhaltsverzeichnis und Zurück/Weiter", "A page of the documentation with navigation, table of contents and previous/next"),
+        ("docs.part.home", "Docs: Startseite", "Docs: start page"),
+        ("docs.part.homeHelp", "Die Startseite der Dokumentation (/docs) mit den Bereichen", "The documentation's start page (/docs) with its sections"),
+        ("docs.part.search", "Docs: Suche", "Docs: search"),
+        ("docs.part.searchHelp", "Die Trefferseite der Suche (auch „Seite nicht gefunden“)", "The search results page (also \"page not found\")"),
+        ("docs.part.searchbox", "Docs: Suchfeld", "Docs: search box"),
+        ("docs.part.searchboxHelp", "Das Suchfeld (Seitenleiste, Startseite, Block, Menü)", "The search box (sidebar, start page, block, menu)"),
+
+        // ---- settings ----
+        ("docs.set.groupLook", "Darstellung", "Appearance"),
+        ("docs.set.title", "Titel der Dokumentation", "Title of the documentation"),
+        ("docs.set.titleHelp", "Leer = „Dokumentation“ bzw. „Documentation“ in der Sprache der Seite", "Empty = \"Dokumentation\" or \"Documentation\" in the page's language"),
+        ("docs.set.intro", "Einleitung auf der Startseite", "Introduction on the start page"),
+        ("docs.set.introHelp", "Leer = ein Standardsatz in der Sprache der Seite", "Empty = a default sentence in the page's language"),
+        ("docs.set.homeLayout", "Bereiche auf der Startseite", "Sections on the start page"),
+        ("docs.set.homeCards", "Karten", "Cards"),
+        ("docs.set.homeList", "Liste", "List"),
+        ("docs.set.toc", "Inhaltsverzeichnis je Seite", "Table of contents per page"),
+        ("docs.set.tocHelp", "Aus den Überschriften (## und ###), ab zwei Überschriften", "From the headings (## and ###), from two headings on"),
+        ("docs.set.prevNext", "Zurück/Weiter unter jeder Seite", "Previous/next below every page"),
+        ("docs.set.lastUpdated", "„Zuletzt geändert“ anzeigen", "Show \"last updated\""),
+        ("docs.set.indexing", "Für Suchmaschinen freigeben", "Open to search engines"),
+        ("docs.set.indexingHelp", "Seiten in der Sitemap; aus = noindex", "Pages in the sitemap; off = noindex"),
+        ("docs.set.css", "Eigenes CSS", "Custom CSS"),
+        ("docs.set.cssHelp", "Wird nach dem CSS der Dokumentation geladen (z. B. --docs-accent, --docs-width, --docs-pre-bg)", "Loaded after the documentation's CSS (e.g. --docs-accent, --docs-width, --docs-pre-bg)"),
+
+        // ---- back office ----
+        ("docs.nav", "Dokumentation", "Documentation"),
+        ("docs.tile", "Doku-Seiten", "Doc pages"),
+        ("docs.tileDrafts", "{0} Entwürfe", "{0} drafts"),
+        ("docs.admin.pages", "Seiten", "Pages"),
+        ("docs.admin.versions", "Versionen", "Versions"),
+        ("docs.admin.settings", "Einstellungen", "Settings"),
+        ("docs.admin.language", "Sprache {0}", "Language {0}"),
+        ("docs.admin.languageLabel", "Sprache", "Language"),
+        ("docs.admin.versionTab", "Version {0}", "Version {0}"),
+        ("docs.admin.version", "Version", "Version"),
+        ("docs.admin.colTitle", "Titel", "Title"),
+        ("docs.admin.colUrl", "Adresse", "Address"),
+        ("docs.admin.colStatus", "Status", "Status"),
+        ("docs.admin.published", "Veröffentlicht", "Published"),
+        ("docs.admin.draft", "Entwurf", "Draft"),
+        ("docs.admin.search", "Seiten durchsuchen …", "Search pages …"),
+        ("docs.admin.none", "Noch keine Seiten. Lege den ersten Bereich an.", "No pages yet. Create the first section."),
+        ("docs.admin.newSection", "Neuer Bereich", "New section"),
+        ("docs.admin.newPage", "Neue Seite", "New page"),
+        ("docs.admin.newTranslation", "Neue Übersetzung", "New translation"),
+        ("docs.admin.editTitle", "Seite: {0}", "Page: {0}"),
+        ("docs.admin.treeHelp", "Bereiche sind die Seiten der obersten Ebene. Mit den Pfeilen änderst du die Reihenfolge, mit „+“ legst du eine Unterseite an.",
+            "Sections are the pages at the top level. The arrows change the order, \"+\" adds a sub-page."),
+        ("docs.admin.up", "Nach oben", "Move up"),
+        ("docs.admin.down", "Nach unten", "Move down"),
+        ("docs.admin.addChild", "Unterseite anlegen", "Add sub-page"),
+        ("docs.admin.edit", "Bearbeiten", "Edit"),
+        ("docs.admin.delete", "Löschen", "Delete"),
+        ("docs.admin.deleted", "„{0}“ wurde gelöscht.", "\"{0}\" was deleted."),
+        ("docs.admin.confirmDelete", "„{0}“ löschen?", "Delete \"{0}\"?"),
+        ("docs.admin.confirmDeleteParent", "„{0}“ löschen? Die Unterseiten rücken eine Ebene nach oben.", "Delete \"{0}\"? Its sub-pages move up one level."),
+        ("docs.admin.back", "Zur Übersicht", "Back to the list"),
+        ("docs.admin.title", "Titel", "Title"),
+        ("docs.admin.slug", "Adresse (Slug)", "Address (slug)"),
+        ("docs.admin.slugHelp", "Leer = aus dem Titel. Nur Kleinbuchstaben, Ziffern und Bindestriche.", "Empty = from the title. Lower case letters, digits and dashes only."),
+        ("docs.admin.summary", "Kurzbeschreibung", "Short description"),
+        ("docs.admin.summaryHelp", "Erscheint unter dem Titel, auf den Karten und in Suchmaschinen.", "Shown below the title, on the cards and in search engines."),
+        ("docs.admin.body", "Text", "Text"),
+        ("docs.admin.bodyPlaceholder", "## Einleitung\n\nText in Markdown …", "## Introduction\n\nText in Markdown …"),
+        ("docs.admin.markdownHelp", "Markdown: ## Überschrift, **fett**, `Code`, ```Codeblock```, Tabellen, > [!NOTE] Hinweis, [Link](doc:bereich/seite) zu einer anderen Seite.",
+            "Markdown: ## heading, **bold**, `code`, ```code block```, tables, > [!NOTE] note, [link](doc:section/page) to another page."),
+        ("docs.admin.cheatTitle", "Markdown in Kürze", "Markdown at a glance"),
+        ("docs.cheat.headings", "Überschriften (## erscheinen im Inhaltsverzeichnis)", "Headings (## appear in the table of contents)"),
+        ("docs.cheat.inline", "fett, kursiv, Code, durchgestrichen", "bold, italic, code, strikethrough"),
+        ("docs.cheat.links", "Link nach außen / zu einer Seite der Doku (Pfad)", "Link outside / to a page of the docs (path)"),
+        ("docs.cheat.images", "Bild aus der Mediathek", "Picture from the media library"),
+        ("docs.cheat.lists", "Liste, nummerierte Liste, Aufgabe", "List, numbered list, task"),
+        ("docs.cheat.code", "Codeblock mit Sprache und Kopierknopf", "Code block with language and copy button"),
+        ("docs.cheat.tables", "Tabelle", "Table"),
+        ("docs.cheat.alerts", "Hinweiskasten (Hinweis, Tipp, Achtung …)", "Alert box (note, tip, warning …)"),
+        ("docs.admin.publishedLabel", "Veröffentlicht", "Published"),
+        ("docs.admin.parent", "Liegt unter", "Sits below"),
+        ("docs.admin.noParent", "— oberste Ebene (Bereich) —", "— top level (section) —"),
+        ("docs.admin.sort", "Reihenfolge", "Order"),
+        ("docs.admin.sortHelp", "Kleinere Zahl = weiter oben; leer = ans Ende", "Smaller number = further up; empty = at the end"),
+        ("docs.admin.format", "Format", "Format"),
+        ("docs.admin.formatMd", "Markdown", "Markdown"),
+        ("docs.admin.formatHtml", "Formatierter Text (Editor)", "Formatted text (editor)"),
+        ("docs.admin.formatHelp", "Beim Umstellen wird der Text übernommen.", "The text is carried over when you switch."),
+        ("docs.admin.icon", "Symbol", "Icon"),
+        ("docs.admin.iconHelp", "Name eines Tabler-Icons für die Karte des Bereichs, z. B. rocket", "Name of a Tabler icon for the section's card, e.g. rocket"),
+        ("docs.admin.save", "Speichern", "Save"),
+        ("docs.admin.saved", "Gespeichert.", "Saved."),
+        ("docs.admin.titleRequired", "Bitte einen Titel eingeben.", "Please enter a title."),
+        ("docs.admin.badParent", "Diese Seite kann dort nicht liegen.", "The page cannot sit there."),
+        ("docs.admin.tooDeep", "Höchstens {0} Ebenen.", "At most {0} levels."),
+        ("docs.admin.view", "Ansehen", "View"),
+        ("docs.admin.lastChange", "Zuletzt geändert am {0} von {1}", "Last changed on {0} by {1}"),
+        ("docs.admin.translations", "Übersetzungen", "Translations"),
+        ("docs.admin.openTranslation", "Übersetzung {0} öffnen", "Open translation {0}"),
+        ("docs.admin.createTranslation", "Übersetzung anlegen ({0})", "Create translation ({0})"),
+        ("docs.admin.translating", "Übersetzung von „{0}“ ({1}) – der Text ist zum Übersetzen vorausgefüllt und wird als Entwurf gespeichert.",
+            "Translation of \"{0}\" ({1}) – the text is filled in to translate and saved as a draft."),
+        ("docs.admin.translationExists", "Es gibt schon eine Übersetzung in {0}.", "There is a translation in {0} already."),
+
+        // ---- versions ----
+        ("docs.ver.introNone", "Die Dokumentation hat noch keine Versionen. Die erste Version übernimmt alle bisherigen Seiten; jede weitere beginnt leer oder als Kopie einer anderen.",
+            "The documentation has no versions yet. The first version takes over all pages so far; every further one starts empty or as a copy of another."),
+        ("docs.ver.intro", "Die Standardversion liegt unter /docs, jede andere unter /docs/v/{Name}. Ältere Versionen tragen einen Hinweis und kein Suchmaschinen-Indexing.",
+            "The default version lives at /docs, every other at /docs/v/{name}. Older versions carry a notice and are not indexed by search engines."),
+        ("docs.ver.colName", "Name", "Name"),
+        ("docs.ver.colLabel", "Bezeichnung", "Label"),
+        ("docs.ver.colPages", "Seiten", "Pages"),
+        ("docs.ver.default", "Standard", "Default"),
+        ("docs.ver.makeDefault", "Zum Standard machen", "Make default"),
+        ("docs.ver.confirmDelete", "Version {0} mit ihren {1} Seiten löschen?", "Delete version {0} with its {1} pages?"),
+        ("docs.ver.new", "Neue Version", "New version"),
+        ("docs.ver.name", "Name", "Name"),
+        ("docs.ver.nameHelp", "Steht in der Adresse: Buchstaben, Ziffern, Punkt, Bindestrich (z. B. 2.0)", "Part of the address: letters, digits, dot, dash (e.g. 2.0)"),
+        ("docs.ver.label", "Bezeichnung", "Label"),
+        ("docs.ver.labelPlaceholder", "z. B. 2.0 (Beta)", "e.g. 2.0 (beta)"),
+        ("docs.ver.copy", "Inhalt", "Content"),
+        ("docs.ver.copyNone", "Leer beginnen", "Start empty"),
+        ("docs.ver.copyFrom", "Kopie von {0}", "Copy of {0}"),
+        ("docs.ver.makeDefaultNew", "Gleich zur Standardversion machen", "Make it the default version right away"),
+        ("docs.ver.add", "Version anlegen", "Add version"),
+        ("docs.ver.added", "Version {0} angelegt.", "Version {0} added."),
+        ("docs.ver.exists", "Version {0} gibt es schon.", "Version {0} exists already."),
+        ("docs.ver.nameRequired", "Bitte einen Namen eingeben.", "Please enter a name."),
+        ("docs.ver.defaultSet", "{0} ist jetzt die Standardversion.", "{0} is the default version now."),
+        ("docs.ver.deleted", "Version {0} gelöscht.", "Version {0} deleted."),
+        ("docs.ver.lastOne", "Die letzte Version kann nicht gelöscht werden.", "The last version cannot be deleted."),
+    ];
+}

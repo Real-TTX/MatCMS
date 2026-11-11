@@ -39,6 +39,9 @@
     <ProjectReference Include="..\..\plugins\bot\Bot.csproj" />
     <!-- The blog (plugins/blog), native since it left the image: imported as a test-signed package (BlogFixture) into harness and application. -->
     <ProjectReference Include="..\..\plugins\blog\Blog.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <!-- Docs / Wiki (plugins/docs), native: DocsTests run it inside the whole application. The test assembly also compiles against it (its Markdown
+         and search are pure functions, tested on their own), so the application loads its own copy next to this one. -->
+    <ProjectReference Include="..\..\plugins\docs\Docs.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -93,6 +96,10 @@
     <Copy SourceFiles="@(BotAssets)" DestinationFolder="$(OutDir)fixtures\bot\assets" />
     <Copy SourceFiles="@(BlogFiles)" DestinationFolder="$(OutDir)fixtures\blog" />
     <Copy SourceFiles="@(BlogAssets)" DestinationFolder="$(OutDir)fixtures\blog\assets" />
+    <ItemGroup>
+      <DocsFiles Include="$(MSBuildProjectDirectory)\..\..\plugins\docs\bin\$(Configuration)\net10.0\Docs.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DocsFiles)" DestinationFolder="$(OutDir)fixtures\docs" />
   </Target>
 
 </Project>

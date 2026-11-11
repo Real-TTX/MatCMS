@@ -1,0 +1,6 @@
+{
+  "Key": "docs",
+  "Name": "Docs / Wiki",
+  "Version": "1.0",
+  "Description": "Eine Dokumentation oder ein Wiki für die Website: Bereiche, Seiten und Unterseiten als Baum, Texte in Markdown (Überschriften, Codeblöcke, Tabellen, Hinweiskästen) oder als formatierter Text, automatisches Inhaltsverzeichnis, Zurück/Weiter, Seitennavigation, Brotkrumen und Volltextsuche; Deutsch und Englisch (/en/docs/…), optional mehrere Versionen; Blöcke, Menü-Suchfeld, Sitemap, Link-Ziele und eine API zum Befüllen. Natives Plugin."
+}

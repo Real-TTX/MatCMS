@@ -86,7 +86,7 @@ public sealed class VereinPlugin : IPlugin
         var kind = F("kind").Trim();
         var events = (await new VereinStore(ctx.Data).UpcomingAsync(V.Today, publicOnly: true, 500, ct))
             .Where(e => kind.Length == 0 || string.Equals(e.Kind, kind, StringComparison.OrdinalIgnoreCase)).Take(count).ToList();
-        var heading = F("heading").Trim() is { Length: > 0 } h ? h : ctx.Settings.Get(VereinSettings.EventsTitle) is { Length: > 0 } s ? s : ctx.T("verein.block.defaultHeading");
+        var heading = F("heading").Trim() is { Length: > 0 } h ? h : VereinSettings.Shown(ctx, VereinSettings.EventsTitle, VereinSettings.DefaultEventsTitle, "verein.block.defaultHeading") is { Length: > 0 } s ? s : ctx.T("verein.block.defaultHeading");
         var sb = new StringBuilder("<style>").Append(VereinCss.Css).Append("</style><section class=\"section verein-events").Append(F("layout") == "cards" ? " cards" : "").Append("\"><div class=\"container\">");
         sb.Append("<div class=\"section__intro\"><h2>").Append(V.H(heading)).Append("</h2>");
         if (F("intro").Trim().Length > 0) sb.Append("<p>").Append(V.H(F("intro").Trim())).Append("</p>");

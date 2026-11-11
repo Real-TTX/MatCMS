@@ -57,7 +57,7 @@ public static class VereinEvents
     {
         var all = await PublicAsync(ctx, ct);
         var upcoming = all.Where(e => string.CompareOrdinal(e.Ends.Length >= 10 ? e.Ends[..10] : e.Day, V.Today) >= 0).ToList();
-        var title = ctx.Settings.Get(VereinSettings.EventsTitle) is { Length: > 0 } t ? t : ctx.T("verein.events.title");
+        var title = VereinSettings.Shown(ctx, VereinSettings.EventsTitle, VereinSettings.DefaultEventsTitle, "verein.block.defaultHeading") is { Length: > 0 } t ? t : ctx.T("verein.events.title");
         var sb = new StringBuilder("<header class=\"vm-head\"><div><p class=\"vm-kicker\">").Append(V.H(VereinSettings.Club(ctx))).Append("</p><h1>").Append(V.H(title)).Append("</h1></div></header>");
         sb.Append("<section class=\"vm-card\">").Append(VereinPublic.EventList(ctx, upcoming, internalBadge: false, publicLinks: true)).Append("</section>");
         sb.Append("<p class=\"verein-more\"><a href=\"").Append(VereinIcal.PublicFeed).Append("\"><i class=\"ti ti-calendar-plus\" aria-hidden=\"true\"></i> ").Append(V.H(ctx.T("verein.events.subscribeAll"))).Append("</a></p>");

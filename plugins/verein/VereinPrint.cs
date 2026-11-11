@@ -153,9 +153,9 @@ public static class VereinPrint
     internal static byte[] Meeting(Letterhead lh, Meeting m, bool minutes)
     {
         var p = new PrintLayout(lh, lh.T(minutes ? "verein.print.minutesTitle" : "verein.print.invitationTitle", m.Title));
-        p.Kicker(minutes ? lh.T("verein.print.minutes") + (m.MinutesStatus == VereinStore.Final ? "" : lh.T("verein.print.draft")) : lh.T("verein.print.invitation") + (m.Kind.Length > 0 ? " · " + m.Kind : ""));
+        p.Kicker(minutes ? lh.T("verein.print.minutes") + (m.MinutesStatus == VereinStore.Final ? "" : lh.T("verein.print.draft")) : lh.T("verein.print.invitation") + (m.Kind.Length > 0 ? " · " + VereinAdmin.MeetingKindLabel(lh.Ctx, m.Kind) : ""));
         p.Title(m.Title);
-        p.Facts((lh.T("verein.print.col.when"), V.When(lh.Ctx, m.Starts)), (lh.T("verein.print.where"), m.Place), (lh.T("verein.print.kind"), minutes ? m.Kind : ""),
+        p.Facts((lh.T("verein.print.col.when"), V.When(lh.Ctx, m.Starts)), (lh.T("verein.print.where"), m.Place), (lh.T("verein.print.kind"), minutes ? VereinAdmin.MeetingKindLabel(lh.Ctx, m.Kind) : ""),
             (lh.T("verein.print.status"), m.Status == VereinStore.Cancelled ? lh.T("verein.print.cancelled") : ""));
         if (!minutes)
         {

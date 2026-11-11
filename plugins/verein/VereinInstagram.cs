@@ -11,14 +11,16 @@ namespace MatCMS.Plugin.Verein;
 public static class VereinInstagram
 {
     public const string Color = "instaColor", Logo = "instaLogo", Hashtags = "instaHashtags", SeasonKind = "instaSeason", SeasonTitle = "instaSeasonTitle";
+    /// <summary>The stored (German) default of <see cref="SeasonTitle"/>; shown as the text "verein.insta.planDefault" while untouched.</summary>
+    public const string DefaultSeasonTitle = "Terminplan";
 
     public static void Declare(ISettingsBuilder s) => s
         .Add(new SettingSpec(Color, "verein.insta.set.color", SettingKind.Color) { Group = "verein.insta.set.group", Default = "#8a1f33", Help = "verein.insta.set.colorHelp" })
         .Add(new SettingSpec(Logo, "verein.insta.set.logo", SettingKind.Image) { Help = "verein.insta.set.logoHelp" })
         .Choice(SeasonKind, "verein.insta.set.season", "monate", new[] { new FieldOption("monate", "verein.insta.set.seasonMonths"), new FieldOption("jahr", "verein.insta.set.seasonYear"), new FieldOption("fasnet", "verein.insta.set.seasonFasnet") },
             "verein.insta.set.seasonHelp")
-        // the default value is stored as typed — it stays German; an English club types its own word
-        .Text(SeasonTitle, "verein.insta.set.seasonTitle", "Terminplan", "verein.insta.set.seasonTitleHelp")
+        // the default value is stored as typed — it stays German; pages show it through VereinSettings.Shown, so untouched it follows the language
+        .Text(SeasonTitle, "verein.insta.set.seasonTitle", DefaultSeasonTitle,"verein.insta.set.seasonTitleHelp")
         .Text(Hashtags, "verein.insta.set.footer", "", "verein.insta.set.footerHelp");
 
     private static readonly (string Key, string Label, int W, int H)[] Formats = { ("square", "verein.insta.format.square", 1080, 1080), ("portrait", "verein.insta.format.portrait", 1080, 1350), ("story", "verein.insta.format.story", 1080, 1920) };
@@ -65,7 +67,7 @@ public static class VereinInstagram
         {
             if (template == "plakat") return "";
             if (legacySeason || (seasonKind is "fasnet" or "jahr" && from == defFrom && to == defTo))
-                return (ctx.Settings.Get(SeasonTitle) is { Length: > 0 } st ? st.Trim() : ctx.T("verein.insta.planDefault")) + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]);
+                return (VereinSettings.Shown(ctx, SeasonTitle, DefaultSeasonTitle, "verein.insta.planDefault") is { Length: > 0 } st ? st.Trim() : ctx.T("verein.insta.planDefault")) + " " + (from[..4] == to[..4] ? to[..4] : from[..4] + "/" + to[2..4]);
             string M(string d) => monthNames[int.Parse(d[5..7], CultureInfo.InvariantCulture) - 1];
             if (from[..7] == to[..7]) return ctx.T("verein.insta.head.month", M(from), from[..4]);
             // whole months of one year: "Termine Januar – Februar 2027"

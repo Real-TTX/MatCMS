@@ -48,6 +48,9 @@ internal static partial class VereinStrings
         ("verein.set.addressForAll", "Adresse für alle Mitglieder sichtbar", "Address visible to all members"),
         ("verein.set.addressForAllHelp", "Aus: nur der Vorstand (und die Person selbst) sieht sie.", "Off: only the board (and the person) sees it."),
         ("verein.set.loginIntro", "Text auf der Anmeldeseite", "Text on the sign-in page"),
+        // shown in place of the setting's stored default while it is untouched (VereinSettings.Shown) — the German MUST equal DefaultLoginIntro
+        ("verein.set.loginIntroDefault", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.",
+            "This is the way into our club's internal area. You get your sign-in details from the board."),
         ("verein.set.twoFactor", "Zwei-Faktor-Anmeldung", "Two-factor sign-in"),
         ("verein.set.twoFactorOptional", "freiwillig (jedes Mitglied kann sie im Profil einschalten)", "optional (every member can switch it on in the profile)"),
         ("verein.set.twoFactorBoard", "Pflicht für den Vorstand", "Required for the board"), ("verein.set.twoFactorAll", "Pflicht für alle Mitglieder", "Required for all members"),

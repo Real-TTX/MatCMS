@@ -60,8 +60,8 @@ public static class VereinExport
 
     private static string Heading(IPluginContext ctx, Period p)
     {
-        // the setting is the club's own word; only its empty default follows the language
-        var title = ctx.Settings.Get(VereinInstagram.SeasonTitle) is { Length: > 0 } st ? st.Trim() : ctx.T("verein.insta.planDefault");
+        // the setting is the club's own word; only its untouched default (and an empty value) follows the language
+        var title = VereinSettings.Shown(ctx, VereinInstagram.SeasonTitle, VereinInstagram.DefaultSeasonTitle, "verein.insta.planDefault") is { Length: > 0 } st ? st.Trim() : ctx.T("verein.insta.planDefault");
         return title + " " + (p.From[..4] == p.To[..4] ? p.From[..4] : p.From[..4] + "/" + p.To[2..4]);
     }
 

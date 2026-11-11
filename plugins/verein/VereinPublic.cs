@@ -171,7 +171,7 @@ public static partial class VereinPublic
     /// </summary>
     internal static Dictionary<string, string> SignInValues(IPluginContext ctx, bool failed)
     {
-        var intro = ctx.Settings.Get(VereinSettings.LoginIntro);
+        var intro = VereinSettings.Shown(ctx, VereinSettings.LoginIntro, VereinSettings.DefaultLoginIntro, "verein.set.loginIntroDefault");
         var card = "<div class=\"vm-card vm-login\"><p class=\"vm-kicker\">" + V.H(VereinSettings.Club(ctx)) + "</p><h1>" + V.H(ctx.T("verein.pub.area")) + "</h1>" +
             (string.IsNullOrWhiteSpace(intro) ? "" : V.Paragraphs(intro)) + (failed ? Err(ctx.T("verein.pub.loginFailed")) : "") +
             "<form method=\"post\" action=\"/anmelden\" class=\"vm-form\">" + ctx.Antiforgery + "<input type=\"hidden\" name=\"returnUrl\" value=\"" + Base + "\">" +
@@ -727,7 +727,7 @@ var side=f.parentNode;side.querySelectorAll('.vm-badge.warn').forEach(function(x
         sb.Append("<p><a href=\"").Append(Base).Append("/termine\">← ").Append(V.H(ctx.T("verein.pub.datesMeetings"))).Append("</a></p>");
         sb.Append("<section class=\"vm-card\"><dl class=\"vm-facts\"><dt>").Append(V.H(ctx.T("verein.pub.when"))).Append("</dt><dd>").Append(V.H(V.When(ctx, m.Starts))).Append("</dd>");
         if (m.Place.Length > 0) sb.Append("<dt>").Append(V.H(ctx.T("verein.pub.where"))).Append("</dt><dd>").Append(V.H(m.Place)).Append("</dd>");
-        if (m.Kind.Length > 0) sb.Append("<dt>").Append(V.H(ctx.T("verein.pub.kind"))).Append("</dt><dd>").Append(V.H(m.Kind)).Append("</dd>");
+        if (m.Kind.Length > 0) sb.Append("<dt>").Append(V.H(ctx.T("verein.pub.kind"))).Append("</dt><dd>").Append(V.H(VereinAdmin.MeetingKindLabel(ctx, m.Kind))).Append("</dd>");
         sb.Append("</dl>");
         if (m.Status == VereinStore.Cancelled) sb.Append("<div class=\"vm-err\">").Append(V.H(ctx.T("verein.pub.meetingCancelled"))).Append("</div>");
         if (m.Agenda.Length > 0) sb.Append("<h2>").Append(V.H(ctx.T("verein.pub.agenda"))).Append("</h2><div class=\"vm-text\">").Append(V.Paragraphs(m.Agenda)).Append("</div>");

@@ -691,7 +691,7 @@ public static class VereinAdmin
     private static readonly string[] MeetingKinds = { "Vorstandssitzung", "Mitgliederversammlung", "Jahreshauptversammlung", "Besprechung", "Sonstiges" };
 
     /// <summary>A meeting's kind is STORED as the German word; only its label follows the admin's language (an unknown kind shows as stored).</summary>
-    private static string MeetingKindLabel(IPluginContext ctx, string kind) => Array.IndexOf(MeetingKinds, kind) switch
+    internal static string MeetingKindLabel(IPluginContext ctx, string kind) => Array.IndexOf(MeetingKinds, kind) switch
     {
         0 => ctx.T("verein.admin.mkind.board"), 1 => ctx.T("verein.admin.mkind.members"), 2 => ctx.T("verein.admin.mkind.annual"),
         3 => ctx.T("verein.admin.mkind.talk"), 4 => ctx.T("verein.admin.mkind.other"), _ => kind

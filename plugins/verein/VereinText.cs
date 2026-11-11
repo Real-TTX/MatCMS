@@ -18,6 +18,13 @@ public static class VereinSettings
     private const string BoardMark = "vorstand";
 
     /// <summary>
+    /// The German defaults of the text settings. They are STORED values (a site that saved the page keeps them as typed), so they stay German;
+    /// <see cref="Shown"/> puts the table's text in their place while a setting still holds exactly this default.
+    /// </summary>
+    public const string DefaultEventsTitle = "Kommende Termine",
+        DefaultLoginIntro = "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.";
+
+    /// <summary>
     /// The settings in groups (each a page of its own under Einstellungen). Lists — roles, own fields, the letterhead's lines — are edited row by row
     /// (<see cref="SettingKind.List"/>) and stored one row per line, as the text areas were: an older value reads unchanged. The board used to be a
     /// second list of role names (<see cref="BoardRoles"/>, no longer offered); it is now a tick per role and the old list is read until roles are saved.
@@ -25,7 +32,7 @@ public static class VereinSettings
     public static void Declare(ISettingsBuilder s) => s
         .Add(new SettingSpec(ClubName, "verein.set.clubName") { Group = "verein.set.groupGeneral", Help = "verein.set.clubNameHelp" })
         .Text(ReplyTo, "verein.set.replyTo", "", "verein.set.replyToHelp")
-        .Text(EventsTitle, "verein.set.eventsTitle", "Kommende Termine", "verein.set.eventsTitleHelp")
+        .Text(EventsTitle, "verein.set.eventsTitle", DefaultEventsTitle,"verein.set.eventsTitleHelp")
         .Bool(AskDefault, "verein.set.askDefault", false, "verein.set.askDefaultHelp")
         .Add(new SettingSpec(Roles, "verein.set.roles", SettingKind.List)
         {
@@ -42,7 +49,7 @@ public static class VereinSettings
         .Add(new SettingSpec(DirectoryForAll, "verein.set.directoryForAll", SettingKind.Bool) { Group = "verein.set.groupArea", Default = "false", Help = "verein.set.directoryForAllHelp" })
         .Bool(BirthdayForAll, "verein.set.birthdayForAll", false, "verein.set.birthdayForAllHelp")
         .Bool(AddressForAll, "verein.set.addressForAll", false, "verein.set.addressForAllHelp")
-        .TextArea(LoginIntro, "verein.set.loginIntro", "Hier geht es zum internen Bereich unseres Vereins. Die Zugangsdaten bekommst du vom Vorstand.")
+        .TextArea(LoginIntro, "verein.set.loginIntro", DefaultLoginIntro)
         .Choice(TwoFactor, "verein.set.twoFactor", "", new[] { new FieldOption("", "verein.set.twoFactorOptional"), new FieldOption("vorstand", "verein.set.twoFactorBoard"), new FieldOption("alle", "verein.set.twoFactorAll") },
             "verein.set.twoFactorHelp")
         .Add(new SettingSpec(UploadApproval, "verein.set.uploadApproval", SettingKind.Bool) { Group = "verein.set.groupUploads", Default = "true", Help = "verein.set.uploadApprovalHelp" })
@@ -72,6 +79,18 @@ public static class VereinSettings
 
     public static IReadOnlyList<string> RoleList(IPluginContext ctx) => RoleRows(ctx).Select(r => r.Name).ToList();
     public static IReadOnlyList<string> BoardList(IPluginContext ctx) => RoleRows(ctx).Where(r => r.Board).Select(r => r.Name).ToList();
+
+    /// <summary>
+    /// A text setting as a page shows it: what the operator typed, as typed — but while it is still exactly the declared German default (never
+    /// edited, or saved unchanged) the text of <paramref name="textKey"/>, which is that very default in German and its translation in English.
+    /// A German site therefore shows the same words as before.
+    /// </summary>
+    public static string Shown(IPluginContext ctx, string settingKey, string germanDefault, string textKey)
+    {
+        var value = ctx.Settings.Get(settingKey);
+        return value == germanDefault ? ctx.T(textKey) : value;
+    }
+
     public static string Club(IPluginContext ctx) => ctx.Settings.Get(ClubName) is { Length: > 0 } n ? n.Trim() : ctx.Site.Name;
     /// <summary>Whether this person must sign in with a second factor before entering the member area.</summary>
     public static bool TwoFactorRequired(IPluginContext ctx, bool board) => ctx.Settings.Get(TwoFactor) switch { "alle" => true, "vorstand" => board, _ => false };

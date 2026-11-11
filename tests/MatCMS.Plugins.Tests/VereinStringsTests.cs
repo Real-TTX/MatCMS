@@ -51,6 +51,11 @@ public class VereinStringsTests
         var empty = rows.Where(r => r.De.Length == 0 || r.En.Length == 0).Select(r => r.Key).ToList();
         Assert.True(empty.Count == 0, "empty text: " + string.Join(", ", empty));
         Assert.Contains(rows, r => r.Key == "verein.lang" && r.De == "de" && r.En == "en");
+        // texts shown in place of an untouched stored default (VereinSettings.Shown) must be that default word for word in German,
+        // or a German site would change its words
+        var settings = File.ReadAllText(Path.Combine(Dir(), "VereinText.cs")) + File.ReadAllText(Path.Combine(Dir(), "VereinInstagram.cs"));
+        foreach (var key in new[] { "verein.set.loginIntroDefault", "verein.block.defaultHeading", "verein.insta.planDefault" })
+            Assert.Contains("\"" + rows.Single(r => r.Key == key).De + "\"", settings);
     }
 }
 
@@ -85,7 +90,14 @@ public class VereinLanguageTests : IClassFixture<VereinApp>
         Assert.Contains("Own fields", settings);
         Assert.DoesNotContain("verein.set.", settings.Replace("group=verein.set.", ""));
 
+        // a text setting that still holds its stored German default ("Terminplan") follows the language; the PDF's file name carries it
+        var pdfUrl = "/admin/p/verein/events/export/pdf?von=2027-01-01&bis=2027-12-31";
+        var enPdf = await c.GetAsync(pdfUrl);
+        Assert.Contains("Schedule-2027", enPdf.Content.Headers.ContentDisposition?.ToString() ?? string.Join(",", enPdf.Content.Headers.GetValues("Content-Disposition")));
+
         await c.PostAsync("/set-language?culture=de", new StringContent(""));
+        var dePdf = await c.GetAsync(pdfUrl);
+        Assert.Contains("Terminplan-2027", dePdf.Content.Headers.ContentDisposition?.ToString() ?? string.Join(",", dePdf.Content.Headers.GetValues("Content-Disposition")));
         var de = System.Net.WebUtility.HtmlDecode(await c.GetStringAsync("/admin/p/verein/dashboard"));
         Assert.Contains("Schnell anlegen", de);
         Assert.Contains("Eigene Felder", System.Net.WebUtility.HtmlDecode(await c.GetStringAsync("/admin/p/verein/_settings?group=verein.set.groupRoles")));

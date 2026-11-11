@@ -233,6 +233,15 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   Two route options came with it: `PublicRouteOptions.DuringMaintenance` (the maintenance middleware asks `PluginRouteTransformer.AnswersDuringMaintenance`) and
   `MaxBodyMegabytes` (members' forms only — the builder refuses it without `RequireMember` + `Antiforgery`; `PluginPage` raises Kestrel's and the form reader's
   limits after the member check, before the antiforgery check reads the body).
+- **Sites install from the MatCMS Store themselves** (`Services/MatcmsStoreClient.cs`, docs/official-store.md S3): Admin → Plugins → "Weitere durchsuchen"
+  gets a "MatCMS Store" tab next to the cloud's store (the dialog's tabs are links, `?browse=matcms`, so only the store looked at is asked; pictures are fetched
+  and served by the SITE, `?handler=MatcmsImage`). Install = package only from the store server, `StoreSignature.VerifyPackage` against `StoreKeys.Known`
+  of THIS image, the bundle's own manifest must name the same key and version, then `PluginPackager.ImportAsync` (arrives OFF). Who may: no cloud → the
+  site's own switch `store.matcms` (on unless "0"); with a cloud → only `store.matcmsCloud` = "1", written by `CloudSyncService.ApplyMatcmsStoreAsync`
+  from `InstanceConfig.MatcmsStore` (profile switch "Aus dem MatCMS Store laden" / instance override in the cloud; never written = not allowed). Both keys
+  are in `SettingKeys.Protected`. A key the cloud's store also offers is installed from there (note instead of a button). A cloud package that came from
+  the MatCMS Store (`CatalogPlugin.Origin = matcms` + signature) is checked by `CloudCatalogService` before import (`MatcmsStoreClient.CheckCloudPackage`).
+  Test seams `MatcmsStoreClient.BaseUrl/HandlerFactory/KeysOverride` (`MatcmsStoreClientTests`). Not yet: the profile ROLLOUT path does not check signatures.
 - **The forum** (`plugins/forum`, native, key `forum`, see its README) is the store's first larger native plugin: boards with rights, threads,
   BBCode (`ForumMarkup`: encode first, only its own tags out), members = the site's accounts, moderation by a member role. `ForumTests` load its
   built DLL into the whole application. **Article discussions** (like Golem.de): with the forum setting `discussionBoard` (a board's slug) every

@@ -262,6 +262,7 @@ builder.Services.AddSingleton<CloudState>();
 builder.Services.AddScoped<CloudService>();
 builder.Services.AddScoped<CloudSyncService>();
 builder.Services.AddScoped<CloudCatalogService>();
+builder.Services.AddScoped<MatcmsStoreClient>();
 builder.Services.AddScoped<SiteApiKeyService>();
 // Applies cloud-offered content operations (AI changes via the MCP server) through the site's own
 // validated writers. Resolved on demand by CloudService while handling a heartbeat response.

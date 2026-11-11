@@ -190,6 +190,12 @@ public class Profile
     /// </summary>
     public string NativePlugins { get; set; } = "";
 
+    /// <summary>
+    /// Whether the profile's sites may install from the MatCMS Store (matcms.de) themselves: "allow", "deny" or "" = no word (the default; a
+    /// site with a cloud then installs only from this cloud's store). <see cref="Instance.MatcmsStore"/> overrides it per site.
+    /// </summary>
+    public string MatcmsStore { get; set; } = "";
+
     public bool SyncPlugins { get; set; }
     public bool SyncComponents { get; set; }
     public bool SyncTemplates { get; set; }

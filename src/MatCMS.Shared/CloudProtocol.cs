@@ -351,6 +351,14 @@ public sealed class InstanceConfig
     /// field ignores it (its switch stays as it is).
     /// </summary>
     public string? NativePlugins { get; set; }
+
+    /// <summary>
+    /// Whether this site may install plugins from the MatCMS Store (matcms.de) ITSELF: "allow", "deny", or null/empty = no word (a site with a
+    /// cloud then does not — its cloud's store is its store). Same values as <see cref="NativePluginsPolicy"/>. A field of its own like
+    /// <see cref="NativePlugins"/>: the site's setting behind it is protected against every generic writer. A site that predates the field
+    /// ignores it and installs only from its cloud, as before.
+    /// </summary>
+    public string? MatcmsStore { get; set; }
 }
 
 /// <summary>The wire values of <see cref="InstanceConfig.NativePlugins"/>.</summary>

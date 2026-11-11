@@ -381,6 +381,17 @@ public static class ProfileApi
             return Send(await ops.SetNativePluginsAsync(inst, body.NativePlugins));
         }).RequireRateLimiting("operatorApi");
 
+        // { "matcmsStore": "allow" | "deny" | "" } — whether this site may install from the MatCMS Store itself, over its profile ("" = follow the profile).
+        app.MapPut("/api/v1/instances/{publicId}/matcms-store", async (HttpContext ctx, string publicId, MatcmsStoreBody body, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
+        {
+            var (key, error) = await CallerAsync(ctx, keys);
+            if (error is not null) return error;
+            if (RequireManage(key!) is { } g) return g;
+            var inst = await instances.FindForKeyAsync(publicId, key!);
+            if (inst is null) return Send(ProfileOpsService.InstanceNotFound);
+            return Send(await ops.SetMatcmsStoreAsync(inst, body.MatcmsStore));
+        }).RequireRateLimiting("operatorApi");
+
         // { "name": "Schalksteinnarren Besigheim" } — the sender NAME of this site's mails, over its profile ("" = the profile's).
         app.MapPut("/api/v1/instances/{publicId}/mail-sender", async (HttpContext ctx, string publicId, MailSenderBody body, ApiKeyService keys, InstanceService instances, ProfileOpsService ops) =>
         {
@@ -402,6 +413,7 @@ public static class ProfileApi
     }
 
     private sealed record NativePluginsBody(string? NativePlugins);
+    private sealed record MatcmsStoreBody(string? MatcmsStore);
     private sealed record MailSenderBody(string? Name);
 
     /// <summary>A service result as HTTP: the data on success, <c>{ error }</c> with its status otherwise.</summary>

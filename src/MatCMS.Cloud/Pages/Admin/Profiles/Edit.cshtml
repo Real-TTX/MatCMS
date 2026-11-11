@@ -224,6 +224,18 @@
                 </select>
                 <div class="help">@T["profiles.nativePlugins.hint"]</div>
             </div>
+
+            @* Installing from matcms.de directly: like native plugins a decision with a wire field of its own, never a free settings row. *@
+            <div class="form-field" style="margin-top:14px;">
+                <label for="matcmsStore">@T["profiles.matcmsStore"]</label>
+                <select id="matcmsStore" name="matcmsStore">
+                    @foreach (var option in new[] { "", "allow", "deny" })
+                    {
+                        <option value="@option" selected="@(Model.Item.MatcmsStore == option ? "selected" : null)">@T[$"profiles.matcmsStore.{(option.Length == 0 ? "keep" : option)}"]</option>
+                    }
+                </select>
+                <div class="help">@T["profiles.matcmsStore.hint"]</div>
+            </div>
         </div>
 
         <div class="list-actions">

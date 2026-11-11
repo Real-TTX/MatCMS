@@ -272,7 +272,10 @@ show the result, not just the values.
   `Code` is only the note an older instance shows. Upload limit 90 MB (a native plugin may bring 60 MB of assemblies). `plugins.allowNative` is never rolled out as a SETTING (the sites refuse the key in free rows); the operator decides it with the
   dedicated "Native Plugins" switch — `Profile.NativePlugins` ("" = leave each site alone, "allow", "deny") and `Instance.NativePlugins`
   (null = the profile's, overrides it for one site; set through `ProfileOpsService.SetNativePluginsAsync`, which requests a resync) —
-  merged in the `/config` endpoint into `InstanceConfig.NativePlugins`.
+  merged in the `/config` endpoint into `InstanceConfig.NativePlugins`. The MatCMS Store switch is built the same way: `Profile.MatcmsStore` /
+  `Instance.MatcmsStore` (same values, inherited like it) → `InstanceConfig.MatcmsStore`; profile General tab "Aus dem MatCMS Store laden", instance
+  Details → Konfiguration, REST `PUT /api/v1/instances/{id}/matcms-store` + PATCH profile `matcmsStore`, MCP `set_instance_matcms_store` / `update_profile`.
+  "allow" lets the site install from matcms.de itself (signed packages only); no word = it installs only from this cloud's store.
 - Plugins are edited **in place**: the bundle is unpacked, `plugin.json` rewritten, every other entry
   copied byte for byte (`Repack` in `Pages/Admin/Profiles/Plugin.cshtml.cs`, second copy for the store
   in `Pages/Admin/Store/Plugin.cshtml.cs`). Repacking rather than

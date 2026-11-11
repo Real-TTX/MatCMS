@@ -332,7 +332,8 @@ public class ProfileService
             // Independent of the user rollout: the instance's own guards (default password untouched +
             // another Admin present) decide whether it is safe to drop the default admin.
             RemoveDefaultAdmin = eff.RemoveDefaultAdmin,
-            NativePlugins = NativePluginsPolicy.Normalize(eff.NativePlugins) is { Length: > 0 } np ? np : null
+            NativePlugins = NativePluginsPolicy.Normalize(eff.NativePlugins) is { Length: > 0 } np ? np : null,
+            MatcmsStore = NativePluginsPolicy.Normalize(eff.MatcmsStore) is { Length: > 0 } ms ? ms : null
         };
 
         // Each payload is resolved the same way: what the profile SELECTED from the global store,
@@ -576,6 +577,8 @@ public class ProfileService
         var config = await BuildConfigAsync(instance.Profile, ct);
         // A site's own native-plugin decision wins over its profile's (Instance.NativePlugins).
         if (NativePluginsPolicy.Normalize(instance.NativePlugins) is { Length: > 0 } own) config.NativePlugins = own;
+        // …and so does its own word about the MatCMS Store (Instance.MatcmsStore).
+        if (NativePluginsPolicy.Normalize(instance.MatcmsStore) is { Length: > 0 } ownStore) config.MatcmsStore = ownStore;
         var name = (instance.MailFromName ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
         if (name.Length > 0 && config.Settings is { } settings && settings.ContainsKey(SmtpFromSiteNameKey))
         {

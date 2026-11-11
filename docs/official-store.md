@@ -1,6 +1,6 @@
 # MatCMS Store (global) — Entwurf
 
-Stand: 11.11.2026 — **S0 und S1 gebaut und live** (matcms.de/store, 7 MATTHIX-Plugins signiert), **S2 gebaut**, noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
+Stand: 11.11.2026 — **S0, S1, S2 live** (matcms.de/store mit 7 signierten MATTHIX-Plugins; cloud2 übernimmt), **S3 gebaut**, noch nicht live. Zweite Fassung nach Matthias' Klarstellung.
 
 **Gebaut:**
 - **S0** — `MatCMS.Shared/StoreSignature.cs` (Text, Prüfung, `StoreKeys.Known` mit dem Store-Schlüssel `0b25964caefce574`), Signier-Werkzeug
@@ -26,6 +26,16 @@ Stand: 11.11.2026 — **S0 und S1 gebaut und live** (matcms.de/store, 7 MATTHIX-
   **Anders als §8:** kein eigener Knopf im Profil — übernommen wird im Store, ins Profil kommt der Eintrag wie jeder andere über „Aus Global
   hinzufügen“; kein stündliches Abfragen und kein „automatisch übernehmen“ — die Liste fragt matcms.de beim Öffnen (5 Minuten zwischengespeichert)
   und zeigt neuere Versionen dort.
+
+- **S3** — Websites laden selbst (`MatCMS/Services/MatcmsStoreClient.cs`): im Store-Dialog von Admin → Plugins ein Reiter **„MatCMS Store“** neben dem
+  Cloud-Store (Bilder holt und liefert die Website selbst). Installieren = Paket vom Store-Server, **Signatur gegen die Schlüssel des Images**, Manifest
+  muss Key und Version des Katalogs nennen, dann der normale Import (kommt ausgeschaltet an). **Wer darf:** ohne Cloud der eigene Schalter auf der
+  Plugins-Seite (`store.matcms`, Standard an); mit Cloud nur, wenn die Cloud es erlaubt — Profil „Aus dem MatCMS Store laden“ (erlauben/verbieten/keine
+  Angabe = nein), je Instanz überschreibbar (Details → Konfiguration), REST `PUT /api/v1/instances/{id}/matcms-store`, MCP `set_instance_matcms_store`;
+  auf dem Draht `InstanceConfig.MatcmsStore`, auf der Website `store.matcmsCloud`. Beide Schlüssel sind geschützt (kein Backup, keine Rollout-Zeile,
+  kein Content-Op). Steht ein Key auch im Cloud-Store, kommt er von dort (Hinweis statt Knopf). Ein Paket aus dem **Cloud-Store**, das aus dem MatCMS Store
+  übernommen wurde, wird beim Installieren ebenfalls gegen seine Signatur geprüft. Tests `MatcmsStoreClientTests`, `ProfileInheritanceTests`.
+  **Noch offen:** Pakete, die per Profil-Rollout kommen, werden noch nicht geprüft; Templates/Komponenten aus dem MatCMS Store (S4).
 
 **Abweichungen vom Entwurf (bewusst, für später):** Die öffentlichen Seiten sind noch HTML-Seiten des Plugins (im Look von Store-Einblick 1.2, mit den
 Variablen der Website), noch keine Block-Seiten (`PageRole`). Statt einer Tabelle `reviews` steht der Grund einer Ablehnung/eines Rückzugs an der Version.

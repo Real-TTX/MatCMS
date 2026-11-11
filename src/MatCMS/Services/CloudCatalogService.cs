@@ -105,7 +105,15 @@ public class CloudCatalogService
             var res = await client.GetAsync($"{settings.Url}/api/store/{settings.InstanceId}/plugin/{Uri.EscapeDataString(key)}", ct);
             if (!res.IsSuccessStatusCode) return (false, $"Paket nicht erhalten (HTTP {(int)res.StatusCode}).");
 
-            using var stream = await res.Content.ReadAsStreamAsync(ct);
+            var bytes = await res.Content.ReadAsByteArrayAsync(ct);
+            // A plugin the cloud took over from the MatCMS Store carries the store's signature in the catalogue: checked here against the
+            // keys in THIS image, so neither the cloud nor anything on the way can hand over other bytes under the store's name.
+            var (catalog, _) = await GetCatalogAsync(ct);
+            if (catalog?.Plugins?.FirstOrDefault(p => p.Key == key) is { Origin: "matcms" } signed
+                && MatcmsStoreClient.CheckCloudPackage(bytes, signed) is { } refused)
+                return (false, refused);
+
+            using var stream = new MemoryStream(bytes, writable: false);
             // The instance's own importer, exactly as for a manual upload — which also means the
             // plugin arrives DISABLED and somebody has to switch it on.
             var (plugin, updated, error) = await PluginPackager.ImportAsync(stream, _env, _db);

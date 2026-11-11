@@ -14,6 +14,19 @@
         </label>
     </form>
     <div class="help" style="margin-bottom:12px;">@T["plugins.native.allowHelp"]</div>
+    @if (Model.StoreAccess.CloudDecides)
+    {
+        <div class="help" style="margin-bottom:12px;">@T[Model.StoreAccess.Allowed ? "plugins.matcms.cloudAllows" : "plugins.matcms.cloudDenies"]</div>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="MatcmsStore" class="check" style="margin:0 0 4px;">
+            <label class="check">
+                <input type="checkbox" name="allow" value="true" @(Model.StoreAccess.OwnSwitch ? "checked" : "") onchange="this.form.requestSubmit()" /> @T["plugins.matcms.allowTitle"]
+            </label>
+        </form>
+        <div class="help" style="margin-bottom:12px;">@T["plugins.matcms.allowHelp"]</div>
+    }
     @if (Model.Items.Count == 0)
     {
         <p class="muted">@T["plugins.empty"]</p>
@@ -92,7 +105,7 @@
         }
     </div>
     }
-    <partial name="_AddMenu" model='AddMenus.Payload(T, "plugins", Url.Page("Create")!, "plugins.new", Model.CloudConnected ? Url.Page("Index", new { browse = true }) : null, "import-plugin")' />
+    <partial name="_AddMenu" model='AddMenus.Payload(T, "plugins", Url.Page("Create")!, "plugins.new", Model.BrowseUrl, "import-plugin")' />
 </div>
 
 @if (Model.Jobs.Count > 0)
@@ -141,7 +154,7 @@
 </div>
 
 @* The cloud catalogue opens as a store dialog, not as a card under the list — see _StoreDialog. *@
-@if (Model.Catalog is not null || Model.CatalogError is not null)
+@if (Model.Browsing is not null)
 {
     <partial name="_StoreDialog" model="Model.StoreDialog" />
 }

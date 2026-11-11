@@ -370,6 +370,9 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<string>("MailFromName")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("MatcmsStore")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1074,6 +1077,10 @@ namespace MatCMS.Cloud.Data.Migrations
 
                     b.Property<int>("MailTemplatesMode")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("MatcmsStore")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()

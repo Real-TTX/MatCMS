@@ -325,6 +325,7 @@ public class CloudSyncService
 
             // After the plugins, so a native plugin that arrived in this same run starts with the permission it needs.
             if (await ApplyNativePluginsAsync(config.NativePlugins, ct) is true) applied.Add("Native Plugins");
+            if (await ApplyMatcmsStoreAsync(config.MatcmsStore, ct) is true) applied.Add("MatCMS Store");
 
             if (dryRun)
             {
@@ -489,6 +490,30 @@ public class CloudSyncService
         if (_services?.GetService<PluginRunner>() is { } runner)
             foreach (var id in await _db.Plugins.AsNoTracking().Where(p => p.Kind == PluginKind.Native).Select(p => p.Id).ToListAsync(ct))
                 await runner.ReloadAsync(id);
+        return true;
+    }
+
+    /// <summary>
+    /// The cloud operator's word about installing from the MatCMS Store (<see cref="InstanceConfig.MatcmsStore"/>): the ONE path that writes
+    /// <see cref="SettingKeys.MatcmsStoreCloud"/>. "allow" = "1", "deny" = "0", no word = untouched (and a value never written means "not
+    /// allowed" while a cloud is connected). Returns true when something changed (or would, in a preview).
+    /// </summary>
+    private async Task<bool> ApplyMatcmsStoreAsync(string? wanted, CancellationToken ct)
+    {
+        var policy = NativePluginsPolicy.Normalize(wanted);
+        if (policy.Length == 0) return false;
+        var value = policy == NativePluginsPolicy.Allow ? "1" : "0";
+        var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.MatcmsStoreCloud, ct);
+        if ((row?.Value ?? "0") == value && row is not null)
+        {
+            Report("setting", SettingKeys.MatcmsStoreCloud, "skipped-exists", "Wert ist bereits gesetzt");
+            return false;
+        }
+        Report("setting", SettingKeys.MatcmsStoreCloud, row is null ? "installed" : "updated", policy == NativePluginsPolicy.Allow ? "erlaubt" : "verboten");
+        if (_dryRun) return true;
+        if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.MatcmsStoreCloud, Value = value });
+        else row.Value = value;
+        await SaveAsync(ct);
         return true;
     }
 

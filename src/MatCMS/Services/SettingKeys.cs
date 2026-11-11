@@ -43,6 +43,12 @@ public static class SettingKeys
     // "1" = allowed. OFF by default; the operator of the site decides, and a cloud profile can roll it out.
     public const string AllowNativePlugins = "plugins.allowNative";
 
+    // The MatCMS Store (matcms.de), see MatcmsStoreClient. MatcmsStore = the site's OWN switch, used while no cloud is connected: anything
+    // but "0" = may install from it (on by default). MatcmsStoreCloud = the cloud operator's word for a connected site ("1" = allowed),
+    // written ONLY by CloudSyncService from InstanceConfig.MatcmsStore; never written = not allowed. Both protected (below).
+    public const string MatcmsStore = "store.matcms";
+    public const string MatcmsStoreCloud = "store.matcmsCloud";
+
     // SEO: "true" serves /sitemap.xml (+ a /robots.txt that references it); anything else = off.
     public const string SitemapEnabled = "sitemap.enabled";
 
@@ -311,5 +317,5 @@ public static class SettingKeys
     /// operator through the ONE dedicated profile/instance switch (<c>InstanceConfig.NativePlugins</c>, applied by
     /// <c>CloudSyncService.ApplyNativePluginsAsync</c>), never through a generic path.
     /// </summary>
-    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, .. AiOwn];
+    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, MatcmsStore, MatcmsStoreCloud, .. AiOwn];
 }

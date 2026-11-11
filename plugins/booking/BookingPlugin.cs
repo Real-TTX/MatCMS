@@ -73,10 +73,10 @@ public sealed class BookingPlugin : IPlugin
             foreach (var f in await BookingIcal.FeedsAsync(ctx.Data, ct))
             {
                 if (f.Conflicts.Length > 0)
-                    notes.Add(new AttentionNote(ctx.T("booking.attn.doubleBooking", f.Name), f.Conflicts.Replace("\n", " · "), BookingAdmin.Root + "channels") { Tone = UiTone.Error, Icon = "ti-calendar-x" });
+                    notes.Add(new AttentionNote(ctx.T("booking.attn.doubleBooking", f.Name), BookingIcal.ConflictsText(ctx.T, f.Conflicts), BookingAdmin.Root + "channels") { Tone = UiTone.Error, Icon = "ti-calendar-x" });
                 // an error that lasts: the portal's calendar has not been read for over two hours
                 else if (f.LastError.Length > 0 && f.Url.Length > 0 && (f.LastOk is null || f.LastOk < DateTime.UtcNow.AddHours(-2)))
-                    notes.Add(new AttentionNote(ctx.T("booking.attn.feedNotRead", f.Name), f.LastError, BookingAdmin.Root + "channels") { Tone = UiTone.Warning, Icon = "ti-calendar-off" });
+                    notes.Add(new AttentionNote(ctx.T("booking.attn.feedNotRead", f.Name), BookingStrings.Shown(ctx.T, f.LastError), BookingAdmin.Root + "channels") { Tone = UiTone.Warning, Icon = "ti-calendar-off" });
             }
             return notes;
         });
@@ -112,7 +112,7 @@ public sealed class BookingPlugin : IPlugin
         var cur = Currency(ctx);
         var lines = new JsonArray();
         foreach (var l in quote.Lines)
-            lines.Add(new JsonObject { ["kind"] = l.Kind, ["text"] = l.Text, ["quantity"] = l.Quantity, ["unit"] = l.Unit, ["amount"] = l.Amount, ["amountText"] = B.Money(l.Amount, cur), ["detail"] = l.Detail });
+            lines.Add(new JsonObject { ["kind"] = l.Kind, ["text"] = l.Text, ["quantity"] = l.Quantity, ["unit"] = l.Unit, ["amount"] = l.Amount, ["amountText"] = B.Money(ctx.T, l.Amount, cur), ["detail"] = l.Detail });
         var problems = new JsonArray();
         foreach (var p in quote.Problems) problems.Add(p);
         var days = new JsonArray();
@@ -120,7 +120,7 @@ public sealed class BookingPlugin : IPlugin
         return PluginResult.Json(new JsonObject
         {
             ["ok"] = quote.Ok && free, ["available"] = free, ["unit"] = unit.Slug, ["nights"] = stay.Nights, ["currency"] = cur,
-            ["total"] = quote.Total, ["totalText"] = B.Money(quote.Total, cur), ["minNights"] = quote.MinNights, ["arrivalDays"] = days,
+            ["total"] = quote.Total, ["totalText"] = B.Money(ctx.T, quote.Total, cur), ["minNights"] = quote.MinNights, ["arrivalDays"] = days,
             ["problems"] = problems, ["lines"] = lines
         }).WithHeader("Cache-Control", "no-store");
     }

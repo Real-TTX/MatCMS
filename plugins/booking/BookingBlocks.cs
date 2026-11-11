@@ -180,7 +180,7 @@ public static class BookingBlocks
           .Append(Field(ctx.T("booking.block.children"), "<input type=\"number\" name=\"kinder\" min=\"0\" max=\"50\" value=\"0\">")).Append("</div>");
         foreach (var f in fees)
             sb.Append("<label class=\"bk-check\" data-house=\"").Append(f.PropertyId).Append("\" data-unit=\"").Append(f.UnitId).Append("\"><input type=\"checkbox\" name=\"extra_").Append(f.Id)
-              .Append("\" value=\"1\" data-fee=\"").Append(f.Id).Append("\"> ").Append(B.H(f.Name)).Append(" (").Append(B.H(B.Money(f.Amount, BookingPlugin.Currency(ctx)))).Append(' ')
+              .Append("\" value=\"1\" data-fee=\"").Append(f.Id).Append("\"> ").Append(B.H(f.Name)).Append(" (").Append(B.H(B.Money(ctx.T, f.Amount, BookingPlugin.Currency(ctx)))).Append(' ')
               .Append(B.H(FeePer.Label(ctx.T, f.Per))).Append(")</label>");
         sb.Append("<div class=\"bk-price\" aria-live=\"polite\"></div>");
         sb.Append("<div class=\"bk-row\">")
@@ -319,7 +319,7 @@ var form=document.getElementById('anfrage');if(form)form.scrollIntoView({behavio
               .Append(u.GuestsMax == u.GuestsStd ? ctx.T("booking.block.persons", u.GuestsMax) : ctx.T("booking.block.personsRange", u.GuestsStd, u.GuestsMax))
               .Append(u.Bedrooms > 0 ? " · " + (u.Bedrooms == 1 ? ctx.T("booking.block.bedroom") : ctx.T("booking.block.bedrooms", u.Bedrooms)) : "").Append("</p>");
             if (u.Description.Length > 0) sb.Append("<p>").Append(B.H(u.Description.Length > 220 ? u.Description[..220].TrimEnd() + " …" : u.Description)).Append("</p>");
-            if (from > 0) sb.Append("<p class=\"bk-from\">").Append(ctx.T("booking.block.fromPerNight", B.H(B.Money(from, cur)))).Append("</p>");
+            if (from > 0) sb.Append("<p class=\"bk-from\">").Append(ctx.T("booking.block.fromPerNight", B.H(B.Money(ctx.T, from, cur)))).Append("</p>");
             sb.Append("<a class=\"btn bk-btn\" href=\"").Append(B.H(href)).Append("\">").Append(B.H(button)).Append("</a></div></article>");
         }
         sb.Append("</div></div></section>");

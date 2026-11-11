@@ -69,20 +69,20 @@ public static class BookingPrint
         p.Kicker(t("booking.print.kicker", b.Number));
         p.Title(unit?.Name ?? t("booking.print.accommodation"));
         p.Facts((t("booking.print.guest"), b.Name), (t("booking.print.accommodation"), (unit?.Name ?? "") + (house is null ? "" : ", " + house.Name)), (t("booking.print.address"), house?.Address.Replace("\n", ", ") ?? ""),
-            (t("booking.print.arrival"), B.Weekday(t, b.Arrival) + " " + B.Date(b.Arrival) + (house?.CheckIn is { Length: > 0 } ci ? ", " + t("booking.print.from", ci) : "")),
-            (t("booking.print.departure"), B.Weekday(t, b.Departure) + " " + B.Date(b.Departure) + (house?.CheckOut is { Length: > 0 } co ? ", " + t("booking.print.until", co) : "")),
+            (t("booking.print.arrival"), B.Weekday(t, b.Arrival) + " " + B.Date(t, b.Arrival) + (house?.CheckIn is { Length: > 0 } ci ? ", " + t("booking.print.from", ci) : "")),
+            (t("booking.print.departure"), B.Weekday(t, b.Departure) + " " + B.Date(t, b.Departure) + (house?.CheckOut is { Length: > 0 } co ? ", " + t("booking.print.until", co) : "")),
             (t("booking.print.nights"), B.Num(b.Nights)), (t("booking.print.guests"), BookingMail.Persons(t, b.Adults, b.Children)), (t("booking.print.status"), BookingStatus.Label(t, b.Status)));
         p.Heading(t("booking.print.price"));
         p.Table(new[] { t("booking.print.item"), t("booking.print.calc"), t("booking.print.amount") }, new[] { 0.36, 0.44, 0.2 },
-            b.Lines.Select(l => new[] { l.Text, l.Detail, B.Money(l.Amount, currency) }).Append(new[] { t("booking.print.total"), "", B.Money(b.Total, currency) }).ToList());
+            b.Lines.Select(l => new[] { l.Text, l.Detail, B.Money(t, l.Amount, currency) }).Append(new[] { t("booking.print.total"), "", B.Money(t, b.Total, currency) }).ToList());
         if (b.Status == BookingStatus.Confirmed)
         {
             p.Heading(t("booking.print.payment"));
             var rows = new List<string[]>();
-            if (plan.Deposit > 0 && plan.Deposit < b.Total) rows.Add(new[] { t("booking.print.deposit"), t("booking.print.due", B.Date(plan.DepositDue)), B.Money(plan.Deposit, currency) });
-            rows.Add(new[] { plan.Deposit > 0 && plan.Deposit < b.Total ? t("booking.print.rest") : t("booking.print.fullAmount"), t("booking.print.due", B.Date(plan.Deposit > 0 && plan.Deposit < b.Total ? plan.RestDue : plan.DepositDue)), B.Money(b.Total - (plan.Deposit < b.Total ? plan.Deposit : 0), currency) });
-            if (plan.Paid > 0) rows.Add(new[] { t("booking.print.paid"), "", B.Money(plan.Paid, currency) });
-            rows.Add(new[] { t("booking.print.open"), "", B.Money(Math.Max(0, b.Total - plan.Paid), currency) });
+            if (plan.Deposit > 0 && plan.Deposit < b.Total) rows.Add(new[] { t("booking.print.deposit"), t("booking.print.due", B.Date(t, plan.DepositDue)), B.Money(t, plan.Deposit, currency) });
+            rows.Add(new[] { plan.Deposit > 0 && plan.Deposit < b.Total ? t("booking.print.rest") : t("booking.print.fullAmount"), t("booking.print.due", B.Date(t, plan.Deposit > 0 && plan.Deposit < b.Total ? plan.RestDue : plan.DepositDue)), B.Money(t, b.Total - (plan.Deposit < b.Total ? plan.Deposit : 0), currency) });
+            if (plan.Paid > 0) rows.Add(new[] { t("booking.print.paid"), "", B.Money(t, plan.Paid, currency) });
+            rows.Add(new[] { t("booking.print.open"), "", B.Money(t, Math.Max(0, b.Total - plan.Paid), currency) });
             p.Table(new[] { "", "", t("booking.print.amount") }, new[] { 0.36, 0.44, 0.2 }, rows);
             if (paymentInfo.Trim().Length > 0) p.Body(paymentInfo.Trim() + "\n" + t("booking.print.reference", b.Number));
         }
@@ -281,7 +281,7 @@ internal sealed class PrintLayout
 
     public byte[] ToBytes()
     {
-        var stand = _lh.T("booking.print.asOf", B.Date(B.Today));
+        var stand = _lh.T("booking.print.asOf", B.Date(_lh.T, B.Today));
         for (var i = 0; i < _pdf.Pages.Count; i++)
         {
             var p = _pdf.Pages[i];

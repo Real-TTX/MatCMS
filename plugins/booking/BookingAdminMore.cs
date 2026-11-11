@@ -61,7 +61,7 @@ public static class BookingAdminMore
                     if (!byDay.TryGetValue(d, out var n))
                     {
                         sb.Append("<td class=\"free").Append(d < today ? " past" : "").Append(d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? " we" : "").Append("\">");
-                        if (d >= today) sb.Append("<a href=\"").Append(R).Append("bookings/new?unit=").Append(u.Id).Append("&amp;arrival=").Append(B.Iso(d)).Append("\" title=\"").Append(B.H(ctx.T("booking.admin.newBookingFrom", B.Date(d)))).Append("\"></a>");
+                        if (d >= today) sb.Append("<a href=\"").Append(R).Append("bookings/new?unit=").Append(u.Id).Append("&amp;arrival=").Append(B.Iso(d)).Append("\" title=\"").Append(B.H(ctx.T("booking.admin.newBookingFrom", B.Date(ctx.T, d)))).Append("\"></a>");
                         sb.Append("</td>");
                         d = d.AddDays(1);
                         continue;
@@ -73,13 +73,13 @@ public static class BookingAdminMore
                     {
                         var via = n.Origin != u.Id ? " " + ctx.T("booking.admin.via", units.FirstOrDefault(o => o.Id == n.Origin)?.Name ?? ctx.T("booking.admin.otherUnit")) : "";
                         sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar ").Append(B.H(b.Status)).Append("\"><a href=\"").Append(R).Append("bookings/").Append(b.Id)
-                          .Append("\" title=\"").Append(B.H(b.Number + " · " + b.Name + " · " + B.Date(b.Arrival) + "–" + B.Date(b.Departure) + " · " + BookingStatus.Label(ctx.T, b.Status) + via)).Append("\">")
+                          .Append("\" title=\"").Append(B.H(b.Number + " · " + b.Name + " · " + B.Date(ctx.T, b.Arrival) + "–" + B.Date(ctx.T, b.Departure) + " · " + BookingStatus.Label(ctx.T, b.Status) + via)).Append("\">")
                           .Append(B.H(b.Name.Length > 0 ? b.Name : b.Number)).Append("</a></td>");
                     }
                     else
                     {
                         var reason = blocks.TryGetValue(n.BlockId, out var bl) ? bl.Reason : "";
-                        var clash = bl?.Conflict ?? "";
+                        var clash = BookingStrings.Shown(ctx.T, bl?.Conflict);
                         sb.Append("<td colspan=\"").Append(span).Append("\" class=\"bar block").Append(bl?.Source.StartsWith("feed:", StringComparison.Ordinal) == true ? " feed" : "").Append(clash.Length > 0 ? " conflict" : "")
                           .Append("\" title=\"").Append(B.H((clash.Length > 0 ? clash : ctx.T("booking.admin.blockedTitle") + (reason.Length > 0 ? ": " + reason : "")))).Append("\"><span>")
                           .Append(B.H(reason.Length > 0 ? reason : ctx.T("booking.admin.blockedLower"))).Append("</span></td>");
@@ -151,7 +151,7 @@ public static class BookingAdminMore
                     return Ui.RowFor(g.Name + " " + g.Email + " " + g.Phone, Ui.Link(g.Name.Length > 0 ? g.Name : g.Email, R + "guests/" + g.Id),
                         Ui.Stack(Ui.Text(g.Email), g.Phone.Length > 0 ? Ui.Muted(g.Phone) : null),
                         B.Num(stays.Count) + (extra > 0 ? " " + (extra == 1 ? ctx.T("booking.admin.plusOneRequest") : ctx.T("booking.admin.plusRequests", extra)) : ""),
-                        mine.Count == 0 ? "–" : B.Date(mine.Max(b => b.Arrival)), B.Money(stays.Sum(b => b.Total), cur));
+                        mine.Count == 0 ? "–" : B.Date(ctx.T, mine.Max(b => b.Arrival)), B.Money(ctx.T, stays.Sum(b => b.Total), cur));
                 }),
                 searchPlaceholder: ctx.T("booking.admin.guestSearch"), emptyText: ctx.T("booking.admin.noGuests"))), ctx.T("booking.admin.navGuests"));
     }
@@ -201,7 +201,7 @@ public static class BookingAdminMore
             {
                 Ui.Card(ctx.T("booking.admin.stays"), Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.colNo")), Ui.Column(ctx.T("booking.admin.colStay")), Ui.Column(ctx.T("booking.admin.colPeriod")), Ui.Column(ctx.T("booking.admin.amount"), right: true), Ui.Column(ctx.T("booking.admin.colStatus")) },
                     bookings.Select(b => Ui.Row(Ui.Link(b.Number, R + "bookings/" + b.Id), units.TryGetValue(b.UnitId, out var u) ? u.Name : "–",
-                        B.Date(b.Arrival) + " – " + B.Date(b.Departure), B.Money(b.Total, cur), Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)))),
+                        B.Date(ctx.T, b.Arrival) + " – " + B.Date(ctx.T, b.Departure), B.Money(ctx.T, b.Total, cur), Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)))),
                     emptyText: ctx.T("booking.admin.noStays")))
             }, new UiNode?[] { Ui.Card(ctx.T("booking.admin.colGuest"), form), await BookingAdminFederation.GuestCardAsync(ctx, g.Email, ct) })), g.Name.Length > 0 ? g.Name : g.Email);
     }

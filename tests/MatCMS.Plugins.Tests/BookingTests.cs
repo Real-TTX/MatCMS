@@ -129,18 +129,42 @@ public sealed class BookingTests(BookingApp app) : IClassFixture<BookingApp>
     public async Task An_english_page_and_an_english_back_office_get_english_words()
     {
         await app.AdminAsync();
-        // the price answer under /en/: the bill's lines and the refusals in English, the money still written the German way
+        // the price answer under /en/: the bill's lines, the refusals and the money in English
         var res = await app.App.Browser().GetAsync($"/en/buchung/preis?einheit={app.Ids["a1"]}&anreise=2030-03-04&abreise=2030-03-07&erwachsene=5");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var q = JsonNode.Parse(await res.Content.ReadAsStringAsync())!;
         Assert.Contains("3 nights Nebensaison=30000", Lines(q));
         Assert.Contains("sleeps at most 4 people", Problems(q));
+        Assert.Equal("€300", q["lines"]![0]!["amountText"]!.GetValue<string>());
+        Assert.StartsWith("€", q["totalText"]!.GetValue<string>());
+        // the same answer in German is written the German way, as always
+        var de = JsonNode.Parse(await app.App.Browser().GetStringAsync($"/buchung/preis?einheit={app.Ids["a1"]}&anreise=2030-03-04&abreise=2030-03-07"))!;
+        Assert.Equal("300 €", de["lines"]![0]!["amountText"]!.GetValue<string>());
         // an admin who never chose German gets the English back office
         var en = app.App.Browser();
         await AppFactory.LoginAsync(en);
         var page = await en.GetStringAsync("/admin/p/booking/check");
         Assert.DoesNotContain("Preis prüfen", page);
         Assert.Contains("Check price", page);
+        // a refusal thrown deep in the calendar fetch is put into the reader's words where it is shown
+        await BookingApp.PostAsync(en, "/admin/p/booking/channels", new()
+        {
+            ["action"] = "add", ["unit"] = app.Ids["a1"].ToString(), ["portal"] = "Andere", ["name"] = "Test", ["url"] = "http://www.airbnb.com/calendar/ical/1.ics"
+        });
+        var channels = await en.GetStringAsync("/admin/p/booking/channels");
+        Assert.Contains("Only https addresses", channels);
+        Assert.DoesNotContain("booking.net.", channels);
+    }
+
+    [Fact]
+    public async Task Amounts_and_days_in_an_english_back_office_are_written_the_english_way()
+    {
+        await app.AdminAsync();
+        var en = app.App.Browser();
+        await AppFactory.LoginAsync(en);
+        var page = WebUtility.HtmlDecode(await en.GetStringAsync("/admin/p/booking/units"));
+        Assert.Contains("€80", page);                                                           // the unit's base price, "80 €" in German
+        Assert.DoesNotContain("80 €", page);
     }
 
     [Fact]

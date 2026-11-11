@@ -186,7 +186,7 @@ public static class BookingAdmin
             Ui.PageHead(null, ctx.T("booking.admin.units")),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.unit")), Ui.Column(ctx.T("booking.admin.property")), Ui.Column(ctx.T("booking.admin.colPersons")), Ui.Column(ctx.T("booking.admin.colBasePrice"), right: true), Ui.Column(ctx.T("booking.admin.colStatus")) },
                 units.Select(u => Ui.RowFor(u.Name + " " + House(u.PropertyId), Ui.Inline(Ui.Link(u.Name, Root + "units/" + u.Id), u.Contains.Count > 0 ? Ui.Badge(ctx.T("booking.admin.wholeHouse"), UiTone.Info) : null),
-                    House(u.PropertyId), u.GuestsStd == u.GuestsMax ? B.Num(u.GuestsMax) : u.GuestsStd + "–" + u.GuestsMax, B.Money(u.BasePrice, Cur(ctx)) + ctx.T("booking.admin.perNightSlash"),
+                    House(u.PropertyId), u.GuestsStd == u.GuestsMax ? B.Num(u.GuestsMax) : u.GuestsStd + "–" + u.GuestsMax, B.Money(ctx.T, u.BasePrice, Cur(ctx)) + ctx.T("booking.admin.perNightSlash"),
                     u.Active ? Ui.Badge(ctx.T("booking.admin.bookable"), UiTone.Success) : Ui.Badge(ctx.T("booking.admin.inactive")))),
                 emptyText: ctx.T("booking.admin.noUnit")) with { Below = new UiNode[] { Ui.Button(ctx.T("booking.admin.newUnit"), Root + "units/new", icon: "ti-plus") } }), ctx.T("booking.admin.units"));
     }
@@ -283,7 +283,7 @@ public static class BookingAdmin
             var list = await store.BlocksAsync(u.Id, ct);
             blocks = Ui.Card(ctx.T("booking.admin.blocks"), Ui.Stack(
                 Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.from")), Ui.Column(ctx.T("booking.admin.toFree")), Ui.Column(ctx.T("booking.admin.colNights"), right: true), Ui.Column(ctx.T("booking.admin.reason")), Ui.Column("", actions: true) },
-                    list.Select(x => Ui.Row(B.Weekday(ctx.T, x.From) + " " + B.Date(x.From), B.Weekday(ctx.T, x.To) + " " + B.Date(x.To), B.Num(x.Nights), x.Reason,
+                    list.Select(x => Ui.Row(B.Weekday(ctx.T, x.From) + " " + B.Date(ctx.T, x.From), B.Weekday(ctx.T, x.To) + " " + B.Date(ctx.T, x.To), B.Num(x.Nights), x.Reason,
                         Ui.Action(ctx.T("booking.admin.remove"), "unblock", B.Num(x.Id), confirm: ctx.T("booking.admin.confirmRemoveBlock"), icon: "ti-trash"))),
                     emptyText: ctx.T("booking.admin.noBlocks")),
                 Ui.Form(Ui.Grid(160, Ui.Input("from", ctx.T("booking.admin.from"), "", UiInputType.Date), Ui.Input("to", ctx.T("booking.admin.toFree"), "", UiInputType.Date), Ui.Input("reason", ctx.T("booking.admin.reason"))),
@@ -314,13 +314,13 @@ public static class BookingAdmin
         var rates = await store.RatesAsync(units.Select(u => u.Id), ct);
         var cur = Cur(ctx);
         string Range(Season s) => units.Count == 0 ? "–" : rates.Where(r => r.SeasonId == s.Id).Select(r => r.Price).DefaultIfEmpty().ToList() is var ps && ps.All(x => x == 0)
-            ? ctx.T("booking.admin.noPrices") : B.Money(ps.Where(x => x > 0).Min(), cur) + (ps.Max() != ps.Where(x => x > 0).Min() ? " – " + B.Money(ps.Max(), cur) : "");
+            ? ctx.T("booking.admin.noPrices") : B.Money(ctx.T, ps.Where(x => x > 0).Min(), cur) + (ps.Max() != ps.Where(x => x > 0).Min() ? " – " + B.Money(ctx.T, ps.Max(), cur) : "");
         var years = seasons.Select(s => s.From.Year).Distinct().OrderBy(y => y).ToList();
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(null, ctx.T("booking.admin.seasons")),
             HouseTabs(houses, house, "seasons"),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.season")), Ui.Column(ctx.T("booking.admin.colPeriod")), Ui.Column(ctx.T("booking.admin.rank"), right: true), Ui.Column(ctx.T("booking.admin.colPricePerNight"), right: true) },
-                seasons.Select(s => Ui.RowFor(s.Name, Ui.Link(s.Name, Root + "seasons/" + s.Id), B.Date(s.From) + " – " + B.Date(s.To), B.Num(s.Rank), Range(s))),
+                seasons.Select(s => Ui.RowFor(s.Name, Ui.Link(s.Name, Root + "seasons/" + s.Id), B.Date(ctx.T, s.From) + " – " + B.Date(ctx.T, s.To), B.Num(s.Rank), Range(s))),
                 emptyText: ctx.T("booking.admin.noSeason"))
                 with { Below = new UiNode[] { Ui.Button(ctx.T("booking.admin.newSeason"), Root + "seasons/new?objekt=" + house.Id, icon: "ti-plus") } },
             years.Count == 0 ? null : Ui.Card(ctx.T("booking.admin.copySeasons"), Ui.Form(
@@ -376,7 +376,7 @@ public static class BookingAdmin
             var days = r is null ? "" : string.Join(",", r.ArrivalDays);
             // one row of fields per unit under its name (no card per unit), labels short enough to stay on one line so the fields line up
             return Ui.Stack(Ui.Heading(u.Name, 4), Ui.Grid(130,
-                Ui.Input("price_" + u.Id, ctx.T("booking.admin.rateNight", cur), r is null ? "" : B.MoneyField(r.Price)) with { Help = r is null ? ctx.T("booking.admin.rateNightHelp", B.Money(u.BasePrice, Cur(ctx))) : null },
+                Ui.Input("price_" + u.Id, ctx.T("booking.admin.rateNight", cur), r is null ? "" : B.MoneyField(r.Price)) with { Help = r is null ? ctx.T("booking.admin.rateNightHelp", B.Money(ctx.T, u.BasePrice, Cur(ctx))) : null },
                 Ui.Input("min_" + u.Id, ctx.T("booking.admin.minNights"), B.Num(r?.MinNights ?? u.BaseMinNights), UiInputType.Number),
                 Ui.Select("days_" + u.Id, ctx.T("booking.admin.arrival"), ArrivalChoices.Any(c => c.Value == days) ? days : "",
                     ArrivalChoices.Select(c => Ui.Option(c.Value, ctx.T(c.Label))).ToArray()),
@@ -413,7 +413,7 @@ public static class BookingAdmin
             Ui.PageHead(null, ctx.T("booking.admin.fees")),
             HouseTabs(houses, house, "fees"),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.fee")), Ui.Column(ctx.T("booking.admin.amount"), right: true), Ui.Column(ctx.T("booking.admin.appliesTo")), Ui.Column(ctx.T("booking.admin.colKind")) },
-                fees.Select(f => Ui.RowFor(f.Name, Ui.Link(f.Name, Root + "fees/" + f.Id), B.Money(f.Amount, Cur(ctx)) + " " + FeePer.Label(ctx.T, f.Per),
+                fees.Select(f => Ui.RowFor(f.Name, Ui.Link(f.Name, Root + "fees/" + f.Id), B.Money(ctx.T, f.Amount, Cur(ctx)) + " " + FeePer.Label(ctx.T, f.Per),
                     f.UnitId == 0 ? ctx.T("booking.admin.allUnitsLower") : units.FirstOrDefault(u => u.Id == f.UnitId)?.Name ?? "–",
                     Ui.Inline(f.TouristTax ? Ui.Badge(ctx.T("booking.admin.touristTax"), UiTone.Info) : null, f.Optional ? Ui.Badge(ctx.T("booking.admin.optional")) : Ui.Badge(ctx.T("booking.admin.mandatory"))))),
                 emptyText: ctx.T("booking.admin.noFees")) with { Below = new UiNode[] { Ui.Button(ctx.T("booking.admin.newFee"), Root + "fees/new?objekt=" + house.Id, icon: "ti-plus") } }), ctx.T("booking.admin.fees"));
@@ -495,7 +495,7 @@ public static class BookingAdmin
                 Ui.Input("arrival", ctx.T("booking.admin.arrival"), B.Iso(arrival), UiInputType.Date), Ui.Input("departure", ctx.T("booking.admin.departure"), B.Iso(departure), UiInputType.Date),
                 Ui.Input("adults", ctx.T("booking.admin.adults"), B.Num(adults), UiInputType.Number), Ui.Input("children", ctx.T("booking.admin.children"), B.Num(children), UiInputType.Number)),
             fees.Any(f => f.Optional && (f.UnitId == 0 || f.UnitId == unit.Id))
-                ? Ui.Grid(220, fees.Where(f => f.Optional && (f.UnitId == 0 || f.UnitId == unit.Id)).Select(f => (UiNode?)Ui.Checkbox("fee_" + f.Id, f.Name + " (" + B.Money(f.Amount, cur) + " " + FeePer.Label(ctx.T, f.Per) + ")", optional.Contains(f.Id))).ToArray())
+                ? Ui.Grid(220, fees.Where(f => f.Optional && (f.UnitId == 0 || f.UnitId == unit.Id)).Select(f => (UiNode?)Ui.Checkbox("fee_" + f.Id, f.Name + " (" + B.Money(ctx.T, f.Amount, cur) + " " + FeePer.Label(ctx.T, f.Per) + ")", optional.Contains(f.Id))).ToArray())
                 : null,
             Ui.FormActions(Ui.Submit(ctx.T("booking.admin.calculate"), icon: "ti-calculator")));
         UiNode result = quote is null ? Ui.Empty(ctx.T("booking.admin.unitNotBookable")) : Ui.Stack(
@@ -506,8 +506,8 @@ public static class BookingAdmin
             quote.Problems.Count == 0 ? null : Ui.Alert(string.Join(" ", quote.Problems), UiTone.Warning),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.colItem")), Ui.Column(ctx.T("booking.admin.calculation")), Ui.Column(ctx.T("booking.admin.amount"), right: true) },
                 // a week line's unit is the week price (the line's text is "1 Woche …" / "1 week …" in the language it was priced in)
-                quote.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : l.Kind == "nights" && l.Quantity > 0 ? Ui.Muted(B.Money(l.Unit, cur) + " " + (l.Text.Contains("Woche") || l.Text.Contains("week") ? ctx.T("booking.admin.perWeek") : ctx.T("booking.per.night"))) : null, B.Money(l.Amount, cur)))
-                    .Append(Ui.Row(Ui.Text(ctx.T("booking.admin.total")), null, Ui.Text(B.Money(quote.Total, cur))))));
+                quote.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : l.Kind == "nights" && l.Quantity > 0 ? Ui.Muted(B.Money(ctx.T, l.Unit, cur) + " " + (l.Text.Contains("Woche") || l.Text.Contains("week") ? ctx.T("booking.admin.perWeek") : ctx.T("booking.per.night"))) : null, B.Money(ctx.T, l.Amount, cur)))
+                    .Append(Ui.Row(Ui.Text(ctx.T("booking.admin.total")), null, Ui.Text(B.Money(ctx.T, quote.Total, cur))))));
         return PluginResult.Page(Ui.Stack(
             Ui.PageHead(null, ctx.T("booking.admin.navCheck")),
             Ui.Card(ctx.T("booking.admin.stay"), form), Ui.Card(unit.Name, result)), ctx.T("booking.admin.navCheck"));

@@ -40,18 +40,36 @@ public static class B
     public static string Money(long cents, string currency = "EUR") =>
         Grouped(cents) + " " + Symbol(currency);
 
+    /// <summary>
+    /// Cents for reading in the language of <paramref name="t"/>: German "1.200,50 €" (exactly <see cref="Money(long, string)"/>), English "€1,200.50"
+    /// (a one-character symbol in front; a code with a space: "CHF 1,200.50"). The language comes from the string table itself (<c>booking.fmt.lang</c>),
+    /// so the amount is always written the way the words around it are.
+    /// </summary>
+    public static string Money(Tr t, long cents, string currency = "EUR")
+    {
+        if (!English(t)) return Money(cents, currency);
+        var symbol = Symbol(currency);
+        var amount = Grouped(Math.Abs(cents), ',', '.');
+        return (cents < 0 ? "−" : "") + (symbol.Length == 1 ? symbol + amount : symbol + " " + amount);
+    }
+
+    /// <summary>Whether <paramref name="t"/> speaks English — anything else is written the German way, as it always was.</summary>
+    public static bool English(Tr t) => t("booking.fmt.lang") == "en";
+
     /// <summary>"1.200" or "1.200,50" — German grouping and decimal comma, without culture data.</summary>
-    private static string Grouped(long cents)
+    private static string Grouped(long cents) => Grouped(cents, '.', ',');
+
+    private static string Grouped(long cents, char thousands, char decimals)
     {
         var whole = Math.Abs(cents) / 100;
         var digits = whole.ToString(CultureInfo.InvariantCulture);
         var sb = new System.Text.StringBuilder();
         for (var i = 0; i < digits.Length; i++)
         {
-            if (i > 0 && (digits.Length - i) % 3 == 0) sb.Append('.');
+            if (i > 0 && (digits.Length - i) % 3 == 0) sb.Append(thousands);
             sb.Append(digits[i]);
         }
-        if (cents % 100 != 0) sb.Append(',').Append(Math.Abs(cents % 100).ToString("00", CultureInfo.InvariantCulture));
+        if (cents % 100 != 0) sb.Append(decimals).Append(Math.Abs(cents % 100).ToString("00", CultureInfo.InvariantCulture));
         return (cents < 0 ? "−" : "") + sb;
     }
 
@@ -73,11 +91,14 @@ public static class B
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static string Date(DateOnly d) => d.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
     public static string Date(string s) => Day(s) is { } d ? Date(d) : s;
+    /// <summary>A day for reading in the language of <paramref name="t"/>: German "12.01.2027", English "12/01/2027" (day first, as in Britain).</summary>
+    public static string Date(Tr t, DateOnly d) => English(t) ? d.ToString("dd'/'MM'/'yyyy", CultureInfo.InvariantCulture) : Date(d);
+    public static string Date(Tr t, string s) => Day(s) is { } d ? Date(t, d) : s;
     public static string Weekday(DateOnly d) => DayNames[IsoDay(d.DayOfWeek) - 1];
     public static readonly string[] MonthNames = { "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember" };
     public static string Month(DateOnly d) => MonthNames[d.Month - 1] + " " + d.Year.ToString(CultureInfo.InvariantCulture);
 
-    // the same in the language of a request (dates themselves stay dd.MM.yyyy)
+    // the same in the language of a request
     public static string Weekday(Tr t, DateOnly d) => DayName(t, IsoDay(d.DayOfWeek));
     public static string DayName(Tr t, int iso) => t("booking.day." + iso.ToString(CultureInfo.InvariantCulture));
     public static string MonthName(Tr t, int month) => t("booking.month." + month.ToString(CultureInfo.InvariantCulture));

@@ -139,9 +139,9 @@ public static class BookingCleaning
                 with { Action = BookingAdmin.Root + "cleaning" },
             Ui.Table(new[] { Ui.Column(ctx.T("booking.clean.col.day")), Ui.Column(ctx.T("booking.clean.col.unit")), Ui.Column(ctx.T("booking.clean.col.departure")), Ui.Column(ctx.T("booking.clean.col.next")), Ui.Column(ctx.T("booking.clean.assignee")), Ui.Column("", actions: true) },
                 tasks.Select(t => Ui.Row(
-                    Ui.Stack(Ui.Text(B.Weekday(ctx.T, t.Day) + " " + B.Date(t.Day)), t.Turnover ? Ui.Badge(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.clean.turnoverUntil", ci) : ctx.T("booking.clean.turnover"), UiTone.Warning) : null),
+                    Ui.Stack(Ui.Text(B.Weekday(ctx.T, t.Day) + " " + B.Date(ctx.T, t.Day)), t.Turnover ? Ui.Badge(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.clean.turnoverUntil", ci) : ctx.T("booking.clean.turnover"), UiTone.Warning) : null),
                     t.Unit.Name, t.Leaving,
-                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Weekday(ctx.T, n) + " " + B.Date(n)) + (t.NextPersons > 0 ? " · " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? " · " + t.NextExtras : "") : "–",
+                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Weekday(ctx.T, n) + " " + B.Date(ctx.T, n)) + (t.NextPersons > 0 ? " · " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? " · " + t.NextExtras : "") : "–",
                     Assign(t), Done(t))),
                 emptyText: ctx.T("booking.clean.empty")),
             Ui.Card(ctx.T("booking.clean.calendar"), Ui.Stack(
@@ -203,16 +203,16 @@ public static class BookingCleaning
     {
         var (from, to) = Range(ctx);
         var tasks = await TasksAsync(ctx.Data, from, to, ct, ctx.T);
-        var p = new PrintLayout(await BookingPrint.LetterheadAsync(ctx, ct), ctx.T("booking.clean.pdfTitle", B.Date(from), B.Date(to)));
-        p.Kicker(ctx.T("booking.clean.pdfKicker", B.Date(from), B.Date(to)));
+        var p = new PrintLayout(await BookingPrint.LetterheadAsync(ctx, ct), ctx.T("booking.clean.pdfTitle", B.Date(ctx.T, from), B.Date(ctx.T, to)));
+        p.Kicker(ctx.T("booking.clean.pdfKicker", B.Date(ctx.T, from), B.Date(ctx.T, to)));
         p.Title(ctx.T("booking.clean.title"));
         if (tasks.Count == 0) p.Body(ctx.T("booking.clean.empty"));
         else
             p.Table(new[] { ctx.T("booking.clean.col.day"), ctx.T("booking.clean.col.unit"), ctx.T("booking.clean.col.next"), ctx.T("booking.clean.assignee"), ctx.T("booking.clean.done") }, new[] { 0.2, 0.26, 0.28, 0.16, 0.1 },
                 tasks.Select(t => new[]
                 {
-                    B.Weekday(ctx.T, t.Day) + " " + B.Date(t.Day) + (t.Turnover ? " " + ctx.T("booking.clean.turnoverParen") : ""), t.Unit.Name,
-                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Date(n)) + (t.NextPersons > 0 ? ", " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? ", " + t.NextExtras : "") : "–",
+                    B.Weekday(ctx.T, t.Day) + " " + B.Date(ctx.T, t.Day) + (t.Turnover ? " " + ctx.T("booking.clean.turnoverParen") : ""), t.Unit.Name,
+                    t.NextArrival is { } n ? (n == t.Day ? ctx.T("booking.clean.today") : B.Date(ctx.T, n)) + (t.NextPersons > 0 ? ", " + ctx.T("booking.clean.persons", t.NextPersons) : "") + (t.NextExtras.Length > 0 ? ", " + t.NextExtras : "") : "–",
                     t.Assignee, t.Done is null ? "[   ]" : ctx.T("booking.clean.yes")
                 }).ToList());
         foreach (var u in tasks.Select(t => t.Unit).DistinctBy(u => u.Id).Where(u => u.Checklist.Length > 0))

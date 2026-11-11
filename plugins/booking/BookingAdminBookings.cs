@@ -69,7 +69,7 @@ public static class BookingAdminBookings
             Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colNumber")), Ui.Column(ctx.T("booking.bookings.colGuest")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPeriod")),
                     Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column(ctx.T("booking.bookings.colStatus")), Ui.Column(ctx.T("booking.bookings.colPayment")) },
                 list.Select(b => Ui.RowFor(b.Number + " " + b.Name + " " + b.Email, Ui.Link(b.Number, R + "bookings/" + b.Id), b.Name,
-                    units.TryGetValue(b.UnitId, out var u) ? u.Name : "–", B.Date(b.Arrival) + " – " + B.Date(b.Departure) + " (" + b.Nights + ")", B.Money(b.Total, cur),
+                    units.TryGetValue(b.UnitId, out var u) ? u.Name : "–", B.Date(ctx.T, b.Arrival) + " – " + B.Date(ctx.T, b.Departure) + " (" + b.Nights + ")", B.Money(ctx.T, b.Total, cur),
                     Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)), PaidBadge(b))),
                 searchPlaceholder: ctx.T("booking.bookings.search"),
                 emptyText: tab == "offen" ? ctx.T("booking.bookings.noOpen") : ctx.T("booking.bookings.none"))
@@ -229,18 +229,18 @@ public static class BookingAdminBookings
         var headActions = new List<UiNode?> { Ui.Button(ctx.T("booking.bookings.all"), R + "bookings", UiButtonKind.Ghost, "ti-arrow-left", small: true) };
         if (hasPayments) headActions.Add(Ui.Button(ctx.T("booking.bookings.pdf"), self + "/pdf", UiButtonKind.Ghost, "ti-file-type-pdf", small: true));
         headActions.AddRange(steps);
-        var head = Ui.PageHead((unit?.Name ?? "–") + " · " + B.Date(b.Arrival) + " – " + B.Date(b.Departure), ctx.T("booking.bookings.title", b.Number), headActions.ToArray());
+        var head = Ui.PageHead((unit?.Name ?? "–") + " · " + B.Date(ctx.T, b.Arrival) + " – " + B.Date(ctx.T, b.Departure), ctx.T("booking.bookings.title", b.Number), headActions.ToArray());
 
         var facts = Ui.Card(ctx.T("booking.bookings.stay"), Ui.Stack(
             Ui.Inline(Ui.Badge(BookingStatus.Label(ctx.T, b.Status), BookingStatus.Tone(b.Status)), b.Source == "admin" ? Ui.Badge(ctx.T("booking.bookings.byAdmin")) : Ui.Badge(ctx.T("booking.bookings.website"))),
             Ui.KeyValue(new[] { (ctx.T("booking.bookings.colUnit"), (unit?.Name ?? "–") + (house is null ? "" : ", " + house.Name)),
-                (ctx.T("booking.bookings.arrival"), B.Weekday(ctx.T, b.Arrival) + " " + B.Date(b.Arrival)), (ctx.T("booking.bookings.departure"), B.Weekday(ctx.T, b.Departure) + " " + B.Date(b.Departure)),
+                (ctx.T("booking.bookings.arrival"), B.Weekday(ctx.T, b.Arrival) + " " + B.Date(ctx.T, b.Arrival)), (ctx.T("booking.bookings.departure"), B.Weekday(ctx.T, b.Departure) + " " + B.Date(ctx.T, b.Departure)),
                 (ctx.T("booking.bookings.nights"), B.Num(b.Nights)), (ctx.T("booking.bookings.guests"), BookingMail.Persons(b.Adults, b.Children)),
                 (ctx.T("booking.bookings.heldUntil"), b.Status == BookingStatus.Request ? BookingMail.Local(b.HoldUntil) : ""),
                 (ctx.T("booking.bookings.offerUntil"), b.Status == BookingStatus.Offer ? BookingMail.Local(b.OfferUntil) : "") }.Where(x => x.Item2.Length > 0).ToArray()),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colItem")), Ui.Column(ctx.T("booking.bookings.colCalc")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true) },
-                b.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : null, B.Money(l.Amount, cur)))
-                    .Append(Ui.Row(Ui.Text(ctx.T("booking.bookings.total")), null, Ui.Text(B.Money(b.Total, cur)))))));
+                b.Lines.Select(l => Ui.Row(l.Text, l.Detail.Length > 0 ? Ui.Muted(l.Detail) : null, B.Money(ctx.T, l.Amount, cur)))
+                    .Append(Ui.Row(Ui.Text(ctx.T("booking.bookings.total")), null, Ui.Text(B.Money(ctx.T, b.Total, cur)))))));
         var guest = Ui.Card(ctx.T("booking.bookings.colGuest"), Ui.Stack(
             Ui.KeyValue(new[] { (ctx.T("booking.bookings.name"), b.Name), (ctx.T("booking.bookings.email"), b.Email), (ctx.T("booking.bookings.phone"), b.Phone) }.Where(x => x.Item2.Length > 0).ToArray()),
             b.GuestId > 0 ? Ui.Link(ctx.T("booking.bookings.guestCard"), R + "guests/" + b.GuestId) : null,
@@ -254,14 +254,14 @@ public static class BookingAdminBookings
             var list = await BookingPayments.ListAsync(ctx.Data, b.Id, ct);
             var two = plan.Deposit > 0 && plan.Deposit < plan.Total;
             payments = Ui.Card(ctx.T("booking.bookings.payments"), Ui.Stack(
-                Ui.Inline(Ui.Badge(plan.StateLabel(ctx.T), plan.Tone), Ui.Text(ctx.T("booking.bookings.paidOf", B.Money(plan.Paid, cur), B.Money(plan.Total, cur)))),
+                Ui.Inline(Ui.Badge(plan.StateLabel(ctx.T), plan.Tone), Ui.Text(ctx.T("booking.bookings.paidOf", B.Money(ctx.T, plan.Paid, cur), B.Money(ctx.T, plan.Total, cur)))),
                 Ui.KeyValue(new[]
                 {
-                    (two ? ctx.T("booking.bookings.deposit") : ctx.T("booking.bookings.totalAmount"), ctx.T("booking.bookings.dueBy", B.Money(two ? plan.Deposit : plan.Total, cur), B.Date(plan.DepositDue))),
-                    (two ? ctx.T("booking.bookings.rest") : "", two ? ctx.T("booking.bookings.dueBy", B.Money(plan.Rest, cur), B.Date(plan.RestDue)) : "")
+                    (two ? ctx.T("booking.bookings.deposit") : ctx.T("booking.bookings.totalAmount"), ctx.T("booking.bookings.dueBy", B.Money(ctx.T, two ? plan.Deposit : plan.Total, cur), B.Date(ctx.T, plan.DepositDue))),
+                    (two ? ctx.T("booking.bookings.rest") : "", two ? ctx.T("booking.bookings.dueBy", B.Money(ctx.T, plan.Rest, cur), B.Date(ctx.T, plan.RestDue)) : "")
                 }.Where(x => x.Item1.Length > 0).ToArray()),
                 list.Count == 0 ? null : Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colDay")), Ui.Column(ctx.T("booking.bookings.colMethod")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column("", actions: true) },
-                    list.Select(x => Ui.Row(B.Date(x.Day), BookingPayments.MethodLabel(ctx.T, x.Method) + (x.Note.Length > 0 ? " · " + x.Note : ""), B.Money(x.Amount, cur),
+                    list.Select(x => Ui.Row(B.Date(ctx.T, x.Day), BookingPayments.MethodLabel(ctx.T, x.Method) + (x.Note.Length > 0 ? " · " + x.Note : ""), B.Money(ctx.T, x.Amount, cur),
                         Ui.Action(ctx.T("booking.bookings.remove"), "unpay", B.Num(x.Id), confirm: ctx.T("booking.bookings.confirmRemovePayment"), icon: "ti-trash")))),
                 Ui.Form(Ui.Grid(140,
                         Ui.Input("amount", ctx.T("booking.bookings.amount"), plan.Open > 0 ? B.MoneyField(plan.Paid < plan.Deposit && two ? plan.Deposit - plan.Paid : plan.Open) : ""),

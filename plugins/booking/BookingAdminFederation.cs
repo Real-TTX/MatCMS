@@ -40,7 +40,7 @@ public static class BookingAdminFederation
     }
 
     private static UiNode Open(Entry e) => e.Href.Length == 0 ? Ui.Text(e.Number) : Ui.Link(e.Number, e.Href, newTab: e.External);
-    private static string Period(Entry e) => e.Arrival is { } a && e.Departure is { } d ? B.Date(a) + " – " + B.Date(d) + " (" + (d.DayNumber - a.DayNumber) + ")" : "–";
+    private static string Period(IPluginContext ctx, Entry e) => e.Arrival is { } a && e.Departure is { } d ? B.Date(ctx.T, a) + " – " + B.Date(ctx.T, d) + " (" + (d.DayNumber - a.DayNumber) + ")" : "–";
     private static UiNode StatusBadge(IPluginContext ctx, string s) => Ui.Badge(BookingStatus.Label(ctx.T, s), BookingStatus.Tone(s));
     private static UiColumn[] Columns(IPluginContext ctx) => new[]
     {
@@ -63,19 +63,19 @@ public static class BookingAdminFederation
             {
                 if (ctx.Request.Action == "probe")
                     return await BookingFederation.ProbeAsync(ctx, ct) is { } why
-                        ? PluginResult.Redirect(self, ctx.T("booking.fed.noConnection", why), true)
+                        ? PluginResult.Redirect(self, ctx.T("booking.fed.noConnection", BookingStrings.Shown(ctx.T, why)), true)
                         : PluginResult.Redirect(self, ctx.T("booking.fed.connected"));
                 var r = await BookingFederation.SyncAsync(ctx, ct);
                 return r.Ok
                     ? PluginResult.Redirect(self, ctx.T("booking.fed.synced", r.Pushed, r.Stays, r.Pulled))
-                    : PluginResult.Redirect(self, ctx.T("booking.fed.syncFailed", r.Error), true);
+                    : PluginResult.Redirect(self, ctx.T("booking.fed.syncFailed", BookingStrings.Shown(ctx.T, r.Error)), true);
             }
             var (g, s) = await BookingFederation.PendingAsync(ctx.Data, ct);
             var error = await BookingFederation.MetaAsync(ctx.Data, "fed.last_error", ct);
             var ok = await BookingFederation.MetaTimeAsync(ctx.Data, "fed.last_ok", ct);
             return PluginResult.Page(Ui.Stack(
                 Ui.PageHead(null, ctx.T("booking.fed.title"), settings),
-                error.Length > 0 ? Ui.Alert(ctx.T("booking.fed.lastFailed", error), UiTone.Warning) : null,
+                error.Length > 0 ? Ui.Alert(ctx.T("booking.fed.lastFailed", BookingStrings.Shown(ctx.T, error)), UiTone.Warning) : null,
                 Ui.Card(ctx.T("booking.fed.memberCard"), Ui.Stack(
                     Ui.Stats(
                         Ui.Stat(ctx.T("booking.fed.central"), ctx.Settings.Get(BookingFederation.UrlKey) is { Length: > 0 } u ? u : ctx.T("booking.fed.notSet")),
@@ -101,7 +101,7 @@ public static class BookingAdminFederation
         var houses = all.Select(e => e.House).Distinct().Count();
 
         var inbox = Ui.Table(Columns(ctx),
-            open.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(ctx, e.Status))),
+            open.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(ctx, e), B.Money(ctx.T, e.Total, e.Currency), StatusBadge(ctx, e.Status))),
             emptyText: ctx.T("booking.bookings.noOpen"));
         UiNode Today(string title, List<Entry> list) => Ui.Card(title, Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colHouse")), Ui.Column(ctx.T("booking.bookings.colGuest")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPersons"), right: true) },
             list.Select(e => Ui.Row(e.House, e.Guest, e.Unit, B.Num(e.Persons))), emptyText: ctx.T("booking.fed.nobody")));
@@ -142,7 +142,7 @@ public static class BookingAdminFederation
             Tabs(ctx, "all"),
             Ui.Tabs(Ui.Tab(ctx.T("booking.bookings.tabOpen"), self, tab == "offen"), Ui.Tab(ctx.T("booking.bookings.tabComing"), self + "?tab=kommend", tab == "kommend"), Ui.Tab(ctx.T("booking.bookings.tabAll"), self + "?tab=alle", tab == "alle")),
             Ui.Table(Columns(ctx),
-                list.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(e), B.Money(e.Total, e.Currency), StatusBadge(ctx, e.Status))),
+                list.Select(e => Ui.RowFor(e.Number + " " + e.House + " " + e.Guest + " " + e.Email, Open(e), e.House, e.Guest, e.Unit, Period(ctx, e), B.Money(ctx.T, e.Total, e.Currency), StatusBadge(ctx, e.Status))),
                 searchPlaceholder: ctx.T("booking.fed.search"),
                 emptyText: tab == "offen" ? ctx.T("booking.bookings.noOpen") : ctx.T("booking.bookings.none"))), ctx.T("booking.fed.title"));
     }
@@ -159,13 +159,13 @@ public static class BookingAdminFederation
         {
             var (g, error) = await BookingFederation.LookupAsync(ctx, email, ct);
             stays = (g?["stays"] as System.Text.Json.Nodes.JsonArray ?? new()).OfType<System.Text.Json.Nodes.JsonObject>().Select(BookingFederation.RemoteStay.From).ToList();
-            note = error is not null ? ctx.T("booking.fed.unreachable", error) : g is null ? ctx.T("booking.fed.unknownThere") : null;
+            note = error is not null ? ctx.T("booking.fed.unreachable", BookingStrings.Shown(ctx.T, error)) : g is null ? ctx.T("booking.fed.unknownThere") : null;
         }
         return Ui.Card(ctx.T("booking.fed.otherHouses"), Ui.Stack(
             note is null ? null : Ui.Muted(note),
             Ui.Table(new[] { Ui.Column(ctx.T("booking.bookings.colHouse")), Ui.Column(ctx.T("booking.bookings.colUnit")), Ui.Column(ctx.T("booking.bookings.colPeriod")), Ui.Column(ctx.T("booking.bookings.colAmount"), right: true), Ui.Column(ctx.T("booking.bookings.colStatus")) },
                 stays.Select(x => Ui.Row(x.Site, (x.Property.Length > 0 ? x.Property + " · " : "") + x.Unit,
-                    x.Arrival is { } a && x.Departure is { } d ? B.Date(a) + " – " + B.Date(d) : "–", B.Money(x.Total, x.Currency.Length == 3 ? x.Currency : "EUR"),
+                    x.Arrival is { } a && x.Departure is { } d ? B.Date(ctx.T, a) + " – " + B.Date(ctx.T, d) : "–", B.Money(ctx.T, x.Total, x.Currency.Length == 3 ? x.Currency : "EUR"),
                     Ui.Badge(BookingStatus.Label(ctx.T, x.Status), BookingStatus.Tone(x.Status)))),
                 emptyText: ctx.T("booking.fed.noOtherStays"))));
     }

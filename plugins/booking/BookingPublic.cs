@@ -53,7 +53,7 @@ public static partial class BookingPublic
         if (problem is not null) prefill = Enumerable.Range(0, count).Select(i => new Traveller(i,
             BookingCheckin.FieldsOf(profile, i).ToDictionary(k => k, k => ctx.Request.F("t" + i + "_" + k)))).ToList();
         var body = "<p class=\"bk-kicker\">" + B.H(house?.Name ?? ctx.Site.Name) + " · " + ctx.T("booking.public.number", B.H(b.Number)) + "</p><h1>" + ctx.T("booking.public.checkinTitle") + "</h1>"
-            + "<p>" + B.H(unit?.Name ?? "") + ", " + B.Date(b.Arrival) + " – " + B.Date(b.Departure) + ". " + ctx.T("booking.public.checkinIntro") + "</p>"
+            + "<p>" + B.H(unit?.Name ?? "") + ", " + B.Date(ctx.T, b.Arrival) + " – " + B.Date(ctx.T, b.Departure) + ". " + ctx.T("booking.public.checkinIntro") + "</p>"
             + BookingCheckin.Form(profile, count, prefill, row?.Text("arrival_time") ?? "", row?.Text("travel") ?? "", ctx.Antiforgery, problem, ctx.T)
             + "<p><a href=\"" + B.H(back) + "\">" + ctx.T("booking.public.backToBooking") + "</a></p>";
         return Shell(ctx.T("booking.public.checkinTitle"), body);
@@ -161,8 +161,8 @@ public static partial class BookingPublic
         sb.Append("<h1>").Append(B.H(title)).Append("</h1>");
         sb.Append("<p class=\"bk-status bk-status-").Append(B.H(b.Status)).Append("\">").Append(B.H(lead)).Append("</p>");
         sb.Append("<div class=\"bk-card\"><h2>").Append(B.H(unit?.Name ?? "")).Append("</h2><dl class=\"bk-facts\">")
-          .Append("<dt>").Append(T("booking.public.arrival")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Arrival)).Append(' ').Append(B.Date(b.Arrival)).Append(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.public.fromTime", B.H(ci)) : "").Append("</dd>")
-          .Append("<dt>").Append(T("booking.public.departure")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Departure)).Append(' ').Append(B.Date(b.Departure)).Append(house?.CheckOut is { Length: > 0 } co ? ctx.T("booking.public.untilTime", B.H(co)) : "").Append("</dd>")
+          .Append("<dt>").Append(T("booking.public.arrival")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Arrival)).Append(' ').Append(B.Date(ctx.T, b.Arrival)).Append(house?.CheckIn is { Length: > 0 } ci ? ctx.T("booking.public.fromTime", B.H(ci)) : "").Append("</dd>")
+          .Append("<dt>").Append(T("booking.public.departure")).Append("</dt><dd>").Append(B.Weekday(ctx.T, b.Departure)).Append(' ').Append(B.Date(ctx.T, b.Departure)).Append(house?.CheckOut is { Length: > 0 } co ? ctx.T("booking.public.untilTime", B.H(co)) : "").Append("</dd>")
           .Append("<dt>").Append(T("booking.public.nights")).Append("</dt><dd>").Append(b.Nights).Append("</dd><dt>").Append(T("booking.public.guests")).Append("</dt><dd>").Append(B.H(Persons(ctx.T, b.Adults, b.Children))).Append("</dd></dl>");
         sb.Append(Bill(b.Lines, b.Total, cur, ctx.T)).Append("</div>");
 
@@ -173,12 +173,12 @@ public static partial class BookingPublic
         {
             var plan = await BookingPayments.PlanAsync(ctx, b, ct);
             var two = plan.Deposit > 0 && plan.Deposit < plan.Total;
-            string Due(long amount, DateOnly day) => ctx.T("booking.public.dueBy", B.H(B.Money(amount, cur)), B.Date(day));
+            string Due(long amount, DateOnly day) => ctx.T("booking.public.dueBy", B.H(B.Money(ctx.T, amount, cur)), B.Date(ctx.T, day));
             sb.Append("<div class=\"bk-card\"><h2>").Append(T("booking.public.payment")).Append("</h2><dl class=\"bk-facts\">");
             if (two) sb.Append("<dt>").Append(T("booking.public.deposit")).Append("</dt><dd>").Append(Due(plan.Deposit, plan.DepositDue)).Append("</dd>")
                        .Append("<dt>").Append(T("booking.public.rest")).Append("</dt><dd>").Append(Due(plan.Rest, plan.RestDue)).Append("</dd>");
             else sb.Append("<dt>").Append(T("booking.public.totalAmount")).Append("</dt><dd>").Append(Due(plan.Total, plan.DepositDue)).Append("</dd>");
-            sb.Append("<dt>").Append(T("booking.public.paid")).Append("</dt><dd>").Append(B.H(B.Money(plan.Paid, cur))).Append("</dd><dt>").Append(T("booking.public.open")).Append("</dt><dd><strong>").Append(B.H(B.Money(plan.Open, cur))).Append("</strong></dd></dl>");
+            sb.Append("<dt>").Append(T("booking.public.paid")).Append("</dt><dd>").Append(B.H(B.Money(ctx.T, plan.Paid, cur))).Append("</dd><dt>").Append(T("booking.public.open")).Append("</dt><dd><strong>").Append(B.H(B.Money(ctx.T, plan.Open, cur))).Append("</strong></dd></dl>");
             if (ctx.Settings.Get(BookingPlugin.PaymentInfoKey) is { Length: > 0 } pay)
                 sb.Append("<p class=\"bk-pre\">").Append(B.H(pay)).Append("</p><p class=\"bk-muted\">").Append(ctx.T("booking.public.reference", B.H(b.Number))).Append("</p>");
             sb.Append("<p><a class=\"btn btn-outline bk-btn bk-btn-ghost\" href=\"").Append(B.H(self + "/pdf")).Append("\">").Append(T("booking.public.pdf")).Append("</a></p></div>");
@@ -228,8 +228,8 @@ public static partial class BookingPublic
     {
         var sb = new StringBuilder("<table class=\"bk-bill\"><tbody>");
         foreach (var l in lines)
-            sb.Append("<tr><td>").Append(B.H(l.Text)).Append(l.Detail.Length > 0 ? "<small>" + B.H(l.Detail) + "</small>" : "").Append("</td><td>").Append(B.H(B.Money(l.Amount, cur))).Append("</td></tr>");
-        sb.Append("</tbody><tfoot><tr><td>").Append((tr ?? BookingStrings.German)("booking.public.total")).Append("</td><td>").Append(B.H(B.Money(total, cur))).Append("</td></tr></tfoot></table>");
+            sb.Append("<tr><td>").Append(B.H(l.Text)).Append(l.Detail.Length > 0 ? "<small>" + B.H(l.Detail) + "</small>" : "").Append("</td><td>").Append(B.H(B.Money(tr ?? BookingStrings.German, l.Amount, cur))).Append("</td></tr>");
+        sb.Append("</tbody><tfoot><tr><td>").Append((tr ?? BookingStrings.German)("booking.public.total")).Append("</td><td>").Append(B.H(B.Money(tr ?? BookingStrings.German, total, cur))).Append("</td></tr></tfoot></table>");
         return sb.ToString();
     }
 

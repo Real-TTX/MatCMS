@@ -346,18 +346,18 @@ public static class BookingFederation
     private static Uri Base(IPluginContext ctx)
     {
         var url = (ctx.Settings.Get(UrlKey) ?? "").Trim();
-        if (url.Length == 0) throw new HttpRequestException("Die Adresse der Zentrale fehlt (Einstellungen → Verbund).");
+        if (url.Length == 0) throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.noUrl"));
         if (!url.Contains("://", StringComparison.Ordinal)) url = "https://" + url;
         Uri u;
         try { u = BookingIcal.Check(url); }
-        catch (HttpRequestException e) when (e.Message.StartsWith("Nur https", StringComparison.Ordinal)) { throw new HttpRequestException("Die Zentrale muss über https erreichbar sein."); }
+        catch (HttpRequestException e) when (e.Message == BookingStrings.Pack("booking.net.httpsOnly")) { throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.httpsOnly")); }
         return new Uri(u.GetLeftPart(UriPartial.Authority) + ApiPath);
     }
 
     private static HttpClient Client(IPluginContext ctx)
     {
         var key = (ctx.Settings.Get(KeyKey) ?? "").Trim();
-        if (key.Length == 0) throw new HttpRequestException("Der API-Schlüssel der Zentrale fehlt (Einstellungen → Verbund).");
+        if (key.Length == 0) throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.noKey"));
         var handler = HandlerFactory?.Invoke() ?? new SocketsHttpHandler
         {
             AllowAutoRedirect = false, AutomaticDecompression = DecompressionMethods.All, PooledConnectionLifetime = TimeSpan.FromMinutes(1),
@@ -366,7 +366,7 @@ public static class BookingFederation
             {
                 var addresses = IPAddress.TryParse(context.DnsEndPoint.Host, out var literal) ? new[] { literal } : await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, token);
                 var allowed = addresses.Where(BookingIcal.IsPublic).ToList();
-                if (allowed.Count == 0) throw new HttpRequestException("Die Adresse führt nicht ins öffentliche Internet.");
+                if (allowed.Count == 0) throw new HttpRequestException(BookingStrings.Pack("booking.net.notPublic"));
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 try { await socket.ConnectAsync(allowed[0], context.DnsEndPoint.Port, token); return new NetworkStream(socket, ownsSocket: true); }
                 catch { socket.Dispose(); throw; }
@@ -384,19 +384,19 @@ public static class BookingFederation
         if (body is not null) req.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var res = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         if (notFoundIsNull && res.StatusCode == HttpStatusCode.NotFound) return null;
-        if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException("Die Antwort der Zentrale ist zu groß.");
+        if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.tooBig"));
         var bytes = await res.Content.ReadAsByteArrayAsync(ct);
-        if (bytes.Length > MaxBytes) throw new HttpRequestException("Die Antwort der Zentrale ist zu groß.");
+        if (bytes.Length > MaxBytes) throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.tooBig"));
         JsonObject? json = null;
         try { json = JsonNode.Parse(bytes) as JsonObject; } catch { /* not JSON — said below */ }
-        if (res.IsSuccessStatusCode) return json ?? throw new HttpRequestException("Die Zentrale antwortet nicht wie eine MatCMS-Seite mit dem Buchungs-Plugin.");
+        if (res.IsSuccessStatusCode) return json ?? throw new HttpRequestException(BookingStrings.Pack("booking.fed.err.notMatcms"));
         var why = json?["error"] is JsonValue v && v.TryGetValue<string>(out var e) ? e : res.ReasonPhrase ?? "";
         throw new HttpRequestException((int)res.StatusCode switch
         {
-            401 => "Der API-Schlüssel wird von der Zentrale nicht angenommen.",
-            403 => "Dem API-Schlüssel fehlt das Recht „Buchungen: Personendaten“.",
-            404 => "Unter der Adresse gibt es kein Buchungs-Plugin (oder es ist abgeschaltet).",
-            _ => "Antwort " + (int)res.StatusCode + (why.Length > 0 ? ": " + why : "")
+            401 => BookingStrings.Pack("booking.fed.err.keyRefused"),
+            403 => BookingStrings.Pack("booking.fed.err.noRight"),
+            404 => BookingStrings.Pack("booking.fed.err.noPlugin"),
+            _ => BookingStrings.Pack("booking.net.status", (int)res.StatusCode + (why.Length > 0 ? ": " + why : ""))
         });
     }
 
@@ -409,7 +409,7 @@ public static class BookingFederation
             await SendAsync(c, HttpMethod.Get, new Uri(Base(ctx), "guests?email=probe%40matcms.invalid"), null, ct, notFoundIsNull: true);
             return null;
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return e is TaskCanceledException ? "Die Zentrale antwortet nicht (Zeitüberschreitung)." : e.Message; }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return e is TaskCanceledException ? BookingStrings.Pack("booking.fed.err.timeout") : e.Message; }
     }
 
     /// <summary>A guest as the leading site has him, with his stays on the other sites — for the guest card. Null when unknown there or not reachable.</summary>
@@ -420,7 +420,7 @@ public static class BookingFederation
             using var c = Client(ctx);
             return (await SendAsync(c, HttpMethod.Get, new Uri(Base(ctx), "guests?email=" + Uri.EscapeDataString(email)), null, ct, notFoundIsNull: true), null);
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return (null, e is TaskCanceledException ? "Die Zentrale antwortet nicht." : e.Message); }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException) { return (null, e is TaskCanceledException ? BookingStrings.Pack("booking.fed.err.noAnswer") : e.Message); }
     }
 
     /// <summary>
@@ -464,7 +464,7 @@ public static class BookingFederation
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
         {
-            var why = e is TaskCanceledException ? "Die Zentrale antwortet nicht (Zeitüberschreitung)." : e.Message;
+            var why = e is TaskCanceledException ? BookingStrings.Pack("booking.fed.err.timeout") : e.Message;
             await SetMetaAsync(ctx.Data, "fed.last_error", why, ct);
             return new SyncResult(false, pushed, staysSent, pulled, why);
         }

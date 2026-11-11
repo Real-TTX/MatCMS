@@ -44,6 +44,9 @@ public static class BookingStatus
 public sealed class BookingException(string key, params object[] args) : Exception(BookingStrings.German(key, args))
 {
     public string Text(IPluginContext ctx) => BookingStrings.Has(key) ? ctx.T(key, args) : Message;
+
+    /// <summary>The key with its arguments for <see cref="BookingStrings.Shown"/> (the finished text when it carries none) — for a message stored and read later.</summary>
+    public string Packed => BookingStrings.Has(key) ? BookingStrings.Pack(key, args) : Message;
 }
 
 /// <summary>

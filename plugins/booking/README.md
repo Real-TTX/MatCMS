@@ -3,7 +3,15 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.13 — Deutsch und Englisch
+## Stand: 0.14 — Englisch auch bei Beträgen, Daten und Fehlern
+
+- **0.14**: Beträge und Daten folgen der Sprache (`B.Money(t, …)`/`B.Date(t, …)`: englisch „€1,200.50“ und „12/01/2027“, deutsch unverändert
+  „1.200,50 €“ und „12.01.2027“; die Sprache liest `B.English` aus der Texttabelle, Schlüssel `booking.fmt.lang`). Fehler beim Abruf von Kalendern
+  und der Zentrale sowie Doppelbuchungs-Hinweise werden als Schlüssel + Argumente gespeichert (`BookingStrings.Pack`) und erst beim Anzeigen
+  übersetzt (`Shown`) — alte, schon gespeicherte deutsche Texte erscheinen unverändert, die Konflikt-Mail bleibt deutsch und kommt nicht doppelt.
+  Deutsch bleiben weiter: Mailvorlagen samt Werten, Verlauf, Meldeliste (CSV), Reinigungskalender (Abo ohne Sprache), API-Antworten an andere Programme.
+
+## Stand davor: 0.13 — Deutsch und Englisch
 
 - **0.13**: zweisprachig (Deutsch/Englisch) wie das Forum: alle Texte als `(Key, De, En)` in `BookingStrings*.cs`, gelesen mit `ctx.T("booking.…")`
   (Admin in der Sprache des Admins, öffentliche Seiten unter `/en/` englisch). Deutsch unverändert. Deutsch bleiben: Mailvorlagen und ihre Werte,

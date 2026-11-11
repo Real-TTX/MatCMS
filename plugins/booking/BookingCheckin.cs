@@ -237,11 +237,11 @@ public static class BookingCheckin
         p.Kicker(t("booking.checkin.formKicker", b.Number));
         p.Title(unit?.Name ?? t("booking.checkin.unit"));
         p.Facts((t("booking.checkin.property"), house is null ? "" : house.Name + (house.Address.Length > 0 ? ", " + house.Address.Replace("\n", ", ") : "")),
-            (t("booking.public.arrival"), B.Date(b.Arrival)), (t("booking.public.departure"), B.Date(b.Departure)), (t("booking.checkin.persons"), B.Num(people.Count)));
+            (t("booking.public.arrival"), B.Date(t, b.Arrival)), (t("booking.public.departure"), B.Date(t, b.Departure)), (t("booking.checkin.persons"), B.Num(people.Count)));
         var cols = Profiles[profile].All.Where(k => k is not ("first" or "last")).ToList();
         var share = 0.7 / Math.Max(1, cols.Count);
         p.Table(new[] { t("booking.checkin.name") }.Concat(cols.Select(k => Label(t, k))).ToArray(), new[] { 0.3 }.Concat(cols.Select(_ => share)).ToArray(),
-            people.Select(t => new[] { t.Name }.Concat(cols.Select(k => k == "born" ? B.Date(t.Get(k)) : t.Get(k))).ToArray()).ToList());
+            people.Select(t => new[] { t.Name }.Concat(cols.Select(k => k == "born" ? B.Date(tr ?? BookingStrings.German, t.Get(k)) : t.Get(k))).ToArray()).ToList());
         var main = people.FirstOrDefault();
         if (main is not null && Profiles[profile].MainOnly.Length > 0)
         {

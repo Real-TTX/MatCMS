@@ -37,7 +37,7 @@ public static class BookingAdminChannels
                     if (url.Length == 0 && text.Trim().Length == 0) return PluginResult.Redirect(self, ctx.T("booking.admin.feedUrlNeeded"), true);
                     if (url.Length > 0)
                         try { BookingIcal.Check(url); }
-                        catch (HttpRequestException ex) { return PluginResult.Redirect(self, ex.Message, true); }
+                        catch (HttpRequestException ex) { return PluginResult.Redirect(self, BookingStrings.Shown(ctx.T, ex.Message), true); }
                     var feedId = await ctx.Data.Table(BookingStore.TFeeds).InsertAsync(new Dictionary<string, object?>
                     {
                         ["unit_id"] = unit.Id, ["name"] = name, ["url"] = B.Clip(url, 1000), ["export_token"] = BookingIcal.NewToken(), ["created"] = DateTime.UtcNow
@@ -46,7 +46,7 @@ public static class BookingAdminChannels
                     await BookingIcal.RunAsync(ctx, feed, ct, url.Length == 0 ? text : null);
                     var after = (await BookingIcal.FeedAsync(ctx.Data, feedId, ct))!;
                     return after.LastError.Length > 0
-                        ? PluginResult.Redirect(self, ctx.T("booking.admin.feedAddedNotRead", name, after.LastError), true)
+                        ? PluginResult.Redirect(self, ctx.T("booking.admin.feedAddedNotRead", name, BookingStrings.Shown(ctx.T, after.LastError)), true)
                         : PluginResult.Redirect(self, ctx.T(after.Conflicts.Length > 0 ? "booking.admin.feedReadConflicts" : "booking.admin.feedRead", name, after.Events));
                 }
                 case "run" when await BookingIcal.FeedAsync(ctx.Data, id, ct) is { } feed:
@@ -55,7 +55,7 @@ public static class BookingAdminChannels
                     if (feed.Url.Length == 0 && text.Trim().Length == 0) return PluginResult.Redirect(self, ctx.T("booking.admin.feedNoUrl"), true);
                     await BookingIcal.RunAsync(ctx, feed, ct, feed.Url.Length == 0 ? text : null);
                     var after = (await BookingIcal.FeedAsync(ctx.Data, id, ct))!;
-                    return after.LastError.Length > 0 ? PluginResult.Redirect(self, feed.Name + ": " + after.LastError, true) : PluginResult.Redirect(self, ctx.T("booking.admin.feedRead", feed.Name, after.Events));
+                    return after.LastError.Length > 0 ? PluginResult.Redirect(self, feed.Name + ": " + BookingStrings.Shown(ctx.T, after.LastError), true) : PluginResult.Redirect(self, ctx.T("booking.admin.feedRead", feed.Name, after.Events));
                 }
                 case "remove":
                     await BookingIcal.RemoveFeedAsync(ctx.Data, id, ct);
@@ -79,8 +79,8 @@ public static class BookingAdminChannels
                     new[] { Ui.Column(ctx.T("booking.admin.portal")), Ui.Column(ctx.T("booking.admin.colState")), Ui.Column(ctx.T("booking.admin.colOccupations"), right: true), Ui.Column(ctx.T("booking.admin.colPortalUrl")), Ui.Column("", actions: true) },
                     mine.Select(x => Ui.Row(
                         Ui.Stack(Ui.Text(x.Name), x.Url.Length > 0 ? Ui.Muted(x.Url.Length > 60 ? x.Url[..60] + "…" : x.Url) : Ui.Muted(ctx.T("booking.admin.pasted")),
-                            x.Conflicts.Length > 0 ? Ui.Alert(x.Conflicts.Replace("\n", " · "), UiTone.Error) : null),
-                        x.LastError.Length > 0 ? Ui.Badge(ctx.T("booking.admin.error", x.LastError), UiTone.Error)
+                            x.Conflicts.Length > 0 ? Ui.Alert(BookingIcal.ConflictsText(ctx.T, x.Conflicts), UiTone.Error) : null),
+                        x.LastError.Length > 0 ? Ui.Badge(ctx.T("booking.admin.error", BookingStrings.Shown(ctx.T, x.LastError)), UiTone.Error)
                             : x.LastOk is null ? Ui.Badge(ctx.T("booking.admin.notReadYet"), UiTone.Warning) : Ui.Badge(ctx.T("booking.admin.readAt", BookingMail.Local(x.LastOk)), UiTone.Success),
                         B.Num(x.Events),
                         Ui.Muted(Url(ctx, x.ExportToken)),

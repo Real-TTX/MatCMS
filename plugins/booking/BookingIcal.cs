@@ -238,7 +238,7 @@ public static class BookingIcal
             {
                 var addresses = IPAddress.TryParse(context.DnsEndPoint.Host, out var literal) ? new[] { literal } : await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, token);
                 var allowed = addresses.Where(IsPublic).ToList();
-                if (allowed.Count == 0) throw new HttpRequestException("Die Adresse führt nicht ins öffentliche Internet.");
+                if (allowed.Count == 0) throw new HttpRequestException(BookingStrings.Pack("booking.net.notPublic"));
                 var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
                 try { await socket.ConnectAsync(allowed[0], context.DnsEndPoint.Port, token); return new NetworkStream(socket, ownsSocket: true); }
                 catch { socket.Dispose(); throw; }
@@ -255,33 +255,33 @@ public static class BookingIcal
                 uri = Check(new Uri(uri, loc).ToString());
                 continue;
             }
-            if (!res.IsSuccessStatusCode) throw new HttpRequestException("Antwort " + (int)res.StatusCode + " " + res.ReasonPhrase);
-            if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException("Der Kalender ist größer als 2 MB.");
+            if (!res.IsSuccessStatusCode) throw new HttpRequestException(BookingStrings.Pack("booking.net.status", (int)res.StatusCode + " " + res.ReasonPhrase));
+            if (res.Content.Headers.ContentLength > MaxBytes) throw new HttpRequestException(BookingStrings.Pack("booking.ical.tooBig"));
             await using var stream = await res.Content.ReadAsStreamAsync(ct);
             using var ms = new MemoryStream();
             var buf = new byte[16384];
             int n;
             while ((n = await stream.ReadAsync(buf, ct)) > 0)
             {
-                if (ms.Length + n > MaxBytes) throw new HttpRequestException("Der Kalender ist größer als 2 MB.");
+                if (ms.Length + n > MaxBytes) throw new HttpRequestException(BookingStrings.Pack("booking.ical.tooBig"));
                 ms.Write(buf, 0, n);
             }
             var text = Encoding.UTF8.GetString(ms.ToArray());
-            if (!text.Contains("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase)) throw new HttpRequestException("Unter der Adresse liegt kein Kalender (kein BEGIN:VCALENDAR).");
+            if (!text.Contains("BEGIN:VCALENDAR", StringComparison.OrdinalIgnoreCase)) throw new HttpRequestException(BookingStrings.Pack("booking.ical.noCalendar"));
             return text;
         }
-        throw new HttpRequestException("Zu viele Weiterleitungen.");
+        throw new HttpRequestException(BookingStrings.Pack("booking.net.redirects"));
     }
 
     /// <summary>The address as given: absolute, https, no user/password in it. Throws with a reason a host understands.</summary>
     public static Uri Check(string url)
     {
-        if (!Uri.TryCreate((url ?? "").Trim(), UriKind.Absolute, out var u)) throw new HttpRequestException("Das ist keine vollständige Adresse.");
-        if (u.Scheme != Uri.UriSchemeHttps) throw new HttpRequestException("Nur https-Adressen (die Portale liefern alle https).");
-        if (u.UserInfo.Length > 0) throw new HttpRequestException("Die Adresse darf keinen Benutzernamen enthalten.");
-        if (IPAddress.TryParse(u.Host.Trim('[', ']'), out var ip) && !IsPublic(ip)) throw new HttpRequestException("Die Adresse führt nicht ins öffentliche Internet.");
+        if (!Uri.TryCreate((url ?? "").Trim(), UriKind.Absolute, out var u)) throw new HttpRequestException(BookingStrings.Pack("booking.net.incomplete"));
+        if (u.Scheme != Uri.UriSchemeHttps) throw new HttpRequestException(BookingStrings.Pack("booking.net.httpsOnly"));
+        if (u.UserInfo.Length > 0) throw new HttpRequestException(BookingStrings.Pack("booking.net.userInfo"));
+        if (IPAddress.TryParse(u.Host.Trim('[', ']'), out var ip) && !IsPublic(ip)) throw new HttpRequestException(BookingStrings.Pack("booking.net.notPublic"));
         if (u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || u.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) || u.Host.EndsWith(".internal", StringComparison.OrdinalIgnoreCase))
-            throw new HttpRequestException("Die Adresse führt nicht ins öffentliche Internet.");
+            throw new HttpRequestException(BookingStrings.Pack("booking.net.notPublic"));
         return u;
     }
 
@@ -331,8 +331,12 @@ public static class BookingIcal
                 var from = e.From < today ? today : e.From;
                 var all = await BookingStore.NightsIn(tx, units, from, e.To, ct);
                 var taken = all.Where(n => !mine.Contains(n.BlockId)).ToList();
-                var clash = taken.Select(n => n.BookingId > 0 ? "Buchung " + (bookings.TryGetValue(n.BookingId, out var no) ? no : "#" + n.BookingId) : "Sperre").Distinct().ToList();
-                var note = clash.Count == 0 ? "" : feed.Name + " " + B.Date(e.From) + "–" + B.Date(e.To) + " überschneidet sich mit " + string.Join(", ", clash);
+                var clash = taken.Select(n => n.BookingId > 0
+                    ? BookingStrings.Item("booking.ical.clashBooking", bookings.TryGetValue(n.BookingId, out var no) ? no : "#" + n.BookingId)
+                    : BookingStrings.Item("booking.ical.clashBlock")).Distinct().ToList();
+                // stored as key + arguments and put into words where it is shown (BookingStrings.Shown): German in the mail, the reader's language in the admin
+                var note = clash.Count == 0 ? "" : BookingStrings.Pack("booking.ical.clash", feed.Name,
+                    BookingStrings.Item("date", B.Iso(e.From)), BookingStrings.Item("date", B.Iso(e.To)), BookingStrings.List(clash));
                 if (note.Length > 0) conflicts.Add(note);
                 var blockId = await tx.Table(BookingStore.TBlocks).InsertAsync(new Dictionary<string, object?>
                 {
@@ -368,7 +372,9 @@ public static class BookingIcal
             var events = Parse(text ?? await FetchAsync(feed.Url, ct));
             var conflicts = await ApplyAsync(ctx.Data, feed, events, ct);
             values["last_ok"] = DateTime.UtcNow; values["last_error"] = ""; values["events"] = events.Count; values["conflicts"] = string.Join("\n", conflicts);
-            var fresh = conflicts.Except(feed.Conflicts.Split('\n', StringSplitOptions.RemoveEmptyEntries)).ToList();
+            // compared in German words: a conflict stored by an older version (as finished German text) is the same conflict, not a new one
+            var known = feed.Conflicts.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(c => BookingStrings.Shown(BookingStrings.German, c)).ToHashSet();
+            var fresh = conflicts.Select(c => BookingStrings.Shown(BookingStrings.German, c)).Where(c => !known.Contains(c)).Distinct().ToList();
             if (fresh.Count > 0 && BookingPlugin.NotifyAddress(ctx) is { Length: > 0 } host)
             {
                 var unit = await new BookingStore(ctx.Data).UnitAsync(feed.UnitId, ct);
@@ -381,8 +387,12 @@ public static class BookingIcal
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or BookingException or SocketException or IOException)
         {
-            values["last_error"] = B.Clip(ex is TaskCanceledException ? "Keine Antwort innerhalb von 20 Sekunden." : ex.Message, 300);
+            values["last_error"] = B.Clip(ex is TaskCanceledException ? BookingStrings.Pack("booking.ical.timeout") : ex is BookingException be ? be.Packed : ex.Message, 300);
         }
         await ctx.Data.Table(BookingStore.TFeeds).UpdateAsync(feed.Id, values, ct);
     }
+
+    /// <summary>A feed's stored conflicts (one per line) in the words of <paramref name="t"/>, joined for one line of text.</summary>
+    public static string ConflictsText(Tr t, string conflicts) =>
+        string.Join(" · ", conflicts.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(c => BookingStrings.Shown(t, c)));
 }

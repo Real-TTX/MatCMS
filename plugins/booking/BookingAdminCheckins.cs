@@ -44,7 +44,7 @@ public static class BookingAdminCheckins
             Ui.Form(Ui.Inline(Ui.Input("von", ctx.T("booking.admin.arrivalFrom"), B.Iso(from), UiInputType.Date), Ui.Input("bis", ctx.T("booking.admin.until"), B.Iso(to), UiInputType.Date),
                 Ui.Submit(ctx.T("booking.admin.show"), UiButtonKind.Ghost))) with { Action = R + "checkins" },
             Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.arrival")), Ui.Column(ctx.T("booking.admin.colStay")), Ui.Column(ctx.T("booking.admin.colGuest")), Ui.Column(ctx.T("booking.admin.colPersons"), right: true), Ui.Column(ctx.T("booking.admin.colCheckin")), Ui.Column("", actions: true) },
-                stays.Select(s => Ui.Row(B.Weekday(ctx.T, s.B.Arrival) + " " + B.Date(s.B.Arrival), s.Unit, Ui.Link(s.B.Name, R + "bookings/" + s.B.Id),
+                stays.Select(s => Ui.Row(B.Weekday(ctx.T, s.B.Arrival) + " " + B.Date(ctx.T, s.B.Arrival), s.Unit, Ui.Link(s.B.Name, R + "bookings/" + s.B.Id),
                     B.Num(s.B.Adults + s.B.Children),
                     s.People.Count > 0 ? Ui.Badge(ctx.T("booking.admin.filledN", s.People.Count), UiTone.Success) : Ui.Badge(ctx.T("booking.admin.open"), UiTone.Warning),
                     s.People.Count == 0 ? null : Ui.Inline(Ui.Button("CSV", R + "bookings/" + s.B.Id + "/travellers.csv", UiButtonKind.Ghost, "ti-table-down", small: true),
@@ -95,7 +95,7 @@ public static class BookingAdminCheckins
             row?.Text("arrival_time") is { Length: > 0 } at ? Ui.Text(ctx.T("booking.admin.arrivalTime", at)) : null,
             row?.Text("travel") is { Length: > 0 } tr ? Ui.Text(ctx.T("booking.admin.travelBy", tr)) : null,
             people.Count == 0 ? null : Ui.Table(new[] { Ui.Column(ctx.T("booking.admin.name")) }.Concat(cols.Select(c => Ui.Column(BookingCheckin.Label(ctx.T, c)))),
-                people.Select(t => Ui.Row(new object?[] { t.Name }.Concat(cols.Select(c => (object?)(c == "born" ? B.Date(t.Get(c)) : t.Get(c)))).ToArray()))),
+                people.Select(t => Ui.Row(new object?[] { t.Name }.Concat(cols.Select(c => (object?)(c == "born" ? B.Date(ctx.T, t.Get(c)) : t.Get(c)))).ToArray()))),
             people.Count == 0 ? null : Ui.Inline(Ui.Button("CSV", R + "bookings/" + b.Id + "/travellers.csv", UiButtonKind.Ghost, "ti-table-down", small: true),
                 Ui.Button(ctx.T("booking.admin.regFormPdf"), R + "bookings/" + b.Id + "/meldeschein", UiButtonKind.Ghost, "ti-file-type-pdf", small: true)),
             Ui.Muted(ctx.T("booking.admin.sent", row?.Text("mails") is { Length: > 0 } m ? string.Join(", ", m.Split(',').Select(x => x.Replace("booking.", ""))) : ctx.T("booking.admin.noGuestMail")))));

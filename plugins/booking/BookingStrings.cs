@@ -43,8 +43,55 @@ internal static partial class BookingStrings
     /// <summary>The lookup of a context, or German without one.</summary>
     public static Tr Of(IPluginContext? ctx) => ctx is null ? German : ctx.T;
 
+    // A message written before anybody knows who will read it — an exception thrown deep in a fetch, an error or a conflict stored on a feed — travels
+    // as its key with the arguments behind it (Pack) and is put into words only where it is shown (Shown), in the reader's language. An argument may be a
+    // list of small items (Item, joined by ListSep), each again a key with one argument; "date" is a day (yyyy-MM-dd) written the reader's way.
+    private const char ArgSep = '\u001f', ListSep = '\u001d', ItemSep = '\u001e';
+
+    /// <summary><paramref name="key"/> with its arguments as one string, for <see cref="Shown"/>.</summary>
+    public static string Pack(string key, params object[] args) =>
+        key + string.Concat(args.Select(a => ArgSep + Convert.ToString(a, CultureInfo.InvariantCulture)));
+
+    /// <summary>One item of a list argument of <see cref="Pack"/>: a key and its argument ("date" = a day as yyyy-MM-dd).</summary>
+    public static string Item(string key, string arg = "") => key + ItemSep + arg;
+
+    /// <summary>Items joined into one list argument of <see cref="Pack"/>.</summary>
+    public static string List(IEnumerable<string> items) => string.Join(ListSep, items);
+
+    /// <summary>
+    /// A message in the words of <paramref name="t"/>: a packed key with its arguments, or — anything else, e.g. a text stored by an older version or
+    /// a message of .NET itself — the message as it is. A packed key may come back with " (host:port)" behind it (SocketsHttpHandler adds that to an
+    /// exception thrown in its connect callback); that stays behind the text.
+    /// </summary>
+    public static string Shown(Tr t, string? message)
+    {
+        message ??= "";
+        if (message.Length == 0 || !message.StartsWith("booking.", StringComparison.Ordinal)) return message;
+        var parts = message.Split(ArgSep);
+        var key = parts[0];
+        var tail = "";
+        if (!Has(key) && parts.Length == 1 && key.IndexOf(" (", StringComparison.Ordinal) is var cut and > 0) { tail = key[cut..]; key = key[..cut]; }
+        if (!Has(key)) return message;
+        return t(key, parts.Skip(1).Select(a => (object)Arg(t, a)).ToArray()) + tail;
+    }
+
+    private static string Arg(Tr t, string a)
+    {
+        if (a.IndexOf(ItemSep) < 0) return a;
+        return string.Join(", ", a.Split(ListSep).Select(item =>
+        {
+            var cut = item.IndexOf(ItemSep);
+            if (cut < 0) return item;
+            var (k, v) = (item[..cut], item[(cut + 1)..]);
+            return k == "date" ? B.Date(t, v) : Has(k) ? t(k, v) : v;
+        }));
+    }
+
     private static readonly (string Key, string De, string En)[] Core =
     [
+        // which language a table is — B.Money/B.Date write amounts and days the way the words around them are
+        ("booking.fmt.lang", "de", "en"),
+
         // weekdays (ISO 1 = Monday) and months, short and long
         ("booking.day.1", "Mo", "Mon"), ("booking.day.2", "Di", "Tue"), ("booking.day.3", "Mi", "Wed"), ("booking.day.4", "Do", "Thu"),
         ("booking.day.5", "Fr", "Fri"), ("booking.day.6", "Sa", "Sat"), ("booking.day.7", "So", "Sun"),

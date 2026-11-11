@@ -143,7 +143,7 @@ public static class Pricing
 
     private static string FeeDetail(Fee f, Stay stay, string currency, Tr t)
     {
-        var parts = new List<string> { B.Money(f.Amount, currency) + " " + FeePer.Label(t, f.Per) };
+        var parts = new List<string> { B.Money(t, f.Amount, currency) + " " + FeePer.Label(t, f.Per) };
         if (f.Per is FeePer.Person or FeePer.PersonNight)
         {
             var who = t("booking.price.adults", stay.Adults);

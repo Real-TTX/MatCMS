@@ -276,6 +276,10 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   (the blog collects it under every post; drawn for a guest — an event knows no visitor, writing happens on the forum's page) and `content.item`
   {source} → {title, url} (the owner says whether the content exists and is public; the forum asks before it opens a thread). A shop could add
   product discussions with the same two events.
+- **Docs / Wiki** (`plugins/docs`, native, key `docs`, see its README): a tree of pages per (language, version) at `/docs` (`/en/docs`, older versions
+  `/docs/v/{name}`), Markdown through its OWN renderer `DocsMarkdown` (encode everything, only its own tags out, addresses checked by `SafeUrl`; `doc:path` links), the tree
+  kept in memory and rebuilt when the `meta.rev` counter moves (every write calls `DocsStore.TouchAsync`). A page is named by its PATH for the API
+  (`PUT /api/v1/docs/pages`, parents first, `translationOf` = the default language's path). Shown on its own domain with Domain routing (below).
 - **The club** (`plugins/verein`, native, key `verein`, see its README; 1.18): the member area `/mitglied` is two BLOCK PAGES like the shop's —
   roles `area` (the frame of every signed-in page) and `signin` — whose starting layout is ONE `verein_slot` with `page_html`, the exact markup of
   before, so an untouched site looks the same; `head_html`/`content_html`/`form_html` are the pieces to lay out, forms stay whole, and the calls sit in
@@ -626,6 +630,18 @@ basic instruction, fallback, sources, customer data, limits and history are its 
 - The widget renders everything as DOM text; from an answer only `**bold**`, lists and links to `/local` or `https://` addresses become markup. The
   conversation lives in `sessionStorage` (this tab). A site that switches the bot on needs a paragraph in its privacy statement.
 - Tests: `BotTests` (whole app, `FakeAi`, shop on: own orders yes, another customer's no, members-only page, limits, history roles, chats).
+
+## Domain routing (one site, several domains)
+
+Settings → Domains (`site.domainRoutes`, `Services/DomainRoutes.cs`, middleware in `Program.cs` right after the https-proxy one): a further domain shows
+ONE part of the site — `docs.matmon.eu | /docs | umleiten`. On that domain the request is rewritten BEFORE static files, localization and routing
+(`/x` → `/docs/x`, `/en/x` → `/en/docs/x`), so plugin routes and pages work unchanged; the HTML that comes back has its `href`/`action` written for the
+domain (`/docs/x` → `/x`, the rest of the site → the canonical main address, absolute main-site addresses below the prefix → the domain) and so does a
+`Location` header; a GET of the long form there is a 301 to the short one. At the main address a mapping with `umleiten` sends the part to its domain
+(301) — not for a request carrying the admin cookie, whose session lives on the main address. The host's own areas (`DomainRoutes.SystemSegments`:
+admin, login, uploads, thumbs, plugin assets, static folders, sitemap, robots …) are never rewritten. Each host's sitemap/robots name its own
+addresses only. Needs the canonical URL for links back to the main site, and the domain must reach the instance (DNS, the cloud's domain/edge).
+Only HTML answers on a mapped domain are buffered; a new top-level static folder or host area must be added to `SystemSegments`. Tests: `DomainRoutingTests`.
 
 ## Fonts are served by this server (LocalFonts)
 

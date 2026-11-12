@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Docs / Wiki as a NATIVE plugin (a compiled DLL). Same settings as Forum and Blog so it stays loadable and unloadable
+       (docs/plugin-system-v2.md, section 7). Written against MatCMS.Plugin.Abstractions only. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>MatCMS.Plugin.Docs</RootNamespace>
+    <AssemblyName>Docs</AssemblyName>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MatCMS.Plugin.Abstractions\MatCMS.Plugin.Abstractions.csproj">
+      <Private>false</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MatCMS.Plugins.Tests" />
+    <!-- assets/ is the plugin's static files (pack-native.ps1 puts them into the bundle's assets/), not part of the build. -->
+    <None Remove="assets\**" />
+  </ItemGroup>
+
+</Project>

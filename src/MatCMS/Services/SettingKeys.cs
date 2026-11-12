@@ -60,6 +60,13 @@ public static class SettingKeys
     // robots.txt. Empty = derive from the request (only correct when not behind a scheme-changing proxy).
     public const string CanonicalUrl = "site.canonicalUrl";
 
+    /// <summary>Domain routing (Settings → Domains, <see cref="MatCMS.Services.DomainRoutes"/>): one line per further domain, <c>host | /path | umleiten</c> —
+    /// <c>docs.matmon.eu | /docs</c> shows the site's <c>/docs</c> part under that domain. A free key, so a cloud profile or instance config can roll it out.</summary>
+    public const string DomainRouting = "site.domainRoutes";
+
+    /// <summary>Settings → Domains.</summary>
+    public static readonly string[] Domains = [DomainRouting];
+
     /// <summary>"1" lets visitors create their own guest-area account on <c>/registrieren</c>. Off unless the operator ticks it: until then only an
     /// administrator creates accounts, as always. A plugin that creates accounts for its own purpose (a shop's checkout) is not bound by it.</summary>
     public const string MembersSelfRegistration = "members.selfRegistration";

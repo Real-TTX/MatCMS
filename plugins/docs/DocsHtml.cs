@@ -229,10 +229,13 @@ internal static class DocsHtml
         .docs{--d-line:var(--docs-line,var(--line,rgba(127,127,127,.22)));--d-accent:var(--docs-accent,var(--accent,#2563eb));--d-on-accent:var(--docs-on-accent,#fff);--d-soft:var(--docs-soft,rgba(127,127,127,.07));--d-code-bg:var(--docs-code-bg,rgba(127,127,127,.1));--d-radius:var(--docs-radius,10px);--d-top:calc(var(--mat-adminbar-h,0px) + var(--docs-sticky-top,84px));color:inherit}
         .docs-layout{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:40px;align-items:start}
         .docs-layout.docs-has-toc{grid-template-columns:minmax(0,260px) minmax(0,1fr) minmax(0,220px)}
-        .docs-sidebar,.docs-toc{position:sticky;top:var(--d-top);max-height:calc(100vh - var(--d-top) - 16px);overflow:auto;font-size:.93em;padding-bottom:16px}
+        .docs-sidebar,.docs-toc{position:sticky;top:var(--d-top);max-height:calc(100vh - var(--d-top) - 16px);overflow-y:auto;overflow-x:hidden;font-size:.93em;padding:0 14px 16px 0;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:transparent transparent}
+        .docs-sidebar:hover,.docs-toc:hover,.docs-sidebar:focus-within{scrollbar-color:rgba(127,127,127,.45) transparent}
+        .docs-sidebar::-webkit-scrollbar,.docs-toc::-webkit-scrollbar{width:8px}.docs-sidebar::-webkit-scrollbar-thumb,.docs-toc::-webkit-scrollbar-thumb{background:transparent;border-radius:8px}
+        .docs-sidebar:hover::-webkit-scrollbar-thumb,.docs-toc:hover::-webkit-scrollbar-thumb{background:rgba(127,127,127,.45)}
         .docs-main{min-width:0}
         .docs-nav-cb{position:absolute;opacity:0;pointer-events:none}.docs-nav-btn{display:none}
-        .docs-nav a{text-decoration:none;color:inherit;display:block;padding:5px 10px;border-radius:6px;line-height:1.35}
+        .docs-nav a{text-decoration:none;color:inherit;display:block;padding:6px 12px;border-radius:6px;line-height:1.4}
         .docs-nav a:hover{background:var(--d-soft)}.docs-nav .docs-current>a,.docs-nav .docs-current>details>summary>a,.docs-nav-home.docs-current{color:var(--d-accent);background:var(--d-soft);font-weight:650}
         .docs-nav-home{font-weight:700;margin:0 0 8px}
         .docs-nav ul{list-style:none;margin:0;padding:0}.docs-nav ul ul{margin:2px 0 4px 12px;padding-left:8px;border-left:1px solid var(--d-line)}

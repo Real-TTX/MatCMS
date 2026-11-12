@@ -204,8 +204,12 @@ public static class M
         return t.Length > max ? t[..max] : t;
     }
 
-    /// <summary>One line: no line breaks, no commas (a tag name is never a list).</summary>
-    public static string Line(string? s, int max) => Clip(string.Join(' ', (s ?? "").Replace(",", " ").Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)).Trim(), max);
+    /// <summary>One line: no line breaks. Commas stay — a caption or an album title may have them (1.5 took them out of every caption).</summary>
+    public static string Line(string? s, int max) => Clip(string.Join(' ', (s ?? "").Split(new[] { '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)).Trim(), max);
+
+    /// <summary>A NAME that travels in comma-separated lists (a tag, a person, a household): one line and no commas, so it never splits into two.</summary>
+    public static string Name(string? s, int max) =>
+        Clip(string.Join(' ', (s ?? "").Split(new[] { ',', ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries)), max);
 
     /// <summary>Plain text with its line breaks: nothing a person typed ever becomes markup.</summary>
     public static string Text(string? text) => H(text).Replace("\r\n", "\n").Replace("\n", "<br>");

@@ -608,7 +608,7 @@ public static class MomentsPublic
             case "tag":
             {
                 if (!v.Admin && !ctx.Settings.GetBool(MomentsSettings.GuestTags)) return ("", ctx.T("moments.err.taggingOff"));
-                var name = M.Line(r.F("tag"), 40);
+                var name = M.Name(r.F("tag"), 40);
                 if (name.Length < 2) return ("", ctx.T("moments.err.tagName"));
                 var tag = await store.TagByNameAsync(name, ct);
                 if (tag is null)

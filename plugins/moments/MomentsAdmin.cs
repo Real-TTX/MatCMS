@@ -280,7 +280,7 @@ public static class MomentsAdmin
     /// <summary>Sets a photo's marks to the posted list: new names become tags (a name from the guest list a person, anything else a keyword), marks no longer listed go.</summary>
     private static async Task SaveMarksAsync(MomentsStore store, long photoId, string posted, IReadOnlyList<Guest> guests, CancellationToken ct)
     {
-        var names = posted.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(n => M.Line(n, 40)).Where(n => n.Length >= 2)
+        var names = posted.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(n => M.Name(n, 40)).Where(n => n.Length >= 2)
             .Distinct(StringComparer.OrdinalIgnoreCase).Take(30).ToList();
         var people = guests.SelectMany(g => g.PeopleList).ToList();
         var wanted = new HashSet<long>();
@@ -483,7 +483,7 @@ public static class MomentsAdmin
             foreach (var line in lines)
             {
                 var parts = line.Split('|').Select(x => x.Trim()).ToArray();
-                var name = M.Line(parts[0], 120);
+                var name = M.Name(parts[0], 120);
                 if (name.Length == 0 || known.Contains(name)) continue;
                 var login = parts.Length > 3 ? Passwords.CleanLogin(parts[3]) : "";
                 var password = parts.Length > 4 ? parts[4] : "";
@@ -559,7 +559,7 @@ public static class MomentsAdmin
             {
                 case "save":
                 {
-                    var name = M.Line(ctx.Request.F("name"), 120);
+                    var name = M.Name(ctx.Request.F("name"), 120);
                     if (name.Length == 0) return PluginResult.Redirect(here, ctx.T("moments.err.name"), true);
                     var all = await store.GuestsAsync(ct);
                     // the code: kept, typed by the hosts ("START12345"), or made in the chosen format for a new household
@@ -706,7 +706,7 @@ public static class MomentsAdmin
             {
                 case "save":
                 {
-                    var name = M.Line(ctx.Request.F("name"), 40);
+                    var name = M.Name(ctx.Request.F("name"), 40);
                     if (name.Length < 2) return PluginResult.Redirect(Root + "tags/" + t.Id, ctx.T("moments.err.name"), true);
                     if (tags.FirstOrDefault(x => x.Id != t.Id && string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)) is Tag twin)
                     {

@@ -311,6 +311,12 @@ public class MomentsTests : IClassFixture<MomentsApp>
         Assert.Contains("herzen=1", await a.GetStringAsync("/moments"));
         Assert.DoesNotContain("herzen=1", await bb.GetStringAsync("/moments"));
 
+        // a caption keeps its commas (1.5 dropped them); a NAME never has one — it travels in comma-separated lists
+        await PostFormAsync(a, page, new Dictionary<string, string> { ["action"] = "caption", ["caption"] = "Am See, kurz nach Sonnenuntergang", ["q"] = "" });
+        Assert.Equal("Am See, kurz nach Sonnenuntergang", _app.Db(db => db.Database.SqlQueryRaw<string>("select caption as Value from p_moments_photos where id = {0}", id).AsEnumerable().Single()));
+        await PostFormAsync(bb, page, new Dictionary<string, string> { ["action"] = "tag", ["tag"] = "Tanz, Musik", ["q"] = "" });
+        Assert.Equal(1, _app.Db(db => db.Database.SqlQueryRaw<int>("select count(*) as Value from p_moments_tags where name = 'Tanz Musik'").AsEnumerable().Single()));
+
         // B cannot delete A's photo, nor A's... the hosts can remove the comment in the back office
         var del = await PostFormAsync(bb, page, new Dictionary<string, string> { ["action"] = "delete", ["q"] = "" });
         var delText = Text(await del.Content.ReadAsStringAsync());

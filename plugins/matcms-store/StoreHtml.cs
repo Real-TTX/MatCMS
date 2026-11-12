@@ -34,13 +34,13 @@ internal static class StoreHtml
     internal static string Localize(IPluginContext ctx, string body) =>
         Prefix(ctx) is { Length: > 0 } p ? StoreLink.Replace(body, m => m.Groups[1].Value + "=\"" + p + "/store") : body;
 
-    /// <summary>"/en" on a page in another language than the site's default, "" otherwise.</summary>
-    private static string Prefix(IPluginContext ctx)
-    {
-        var locales = ctx.Site.Locales;
-        if (string.IsNullOrEmpty(ctx.Locale) || locales.Count == 0 || string.Equals(ctx.Locale, locales[0], StringComparison.OrdinalIgnoreCase)) return "";
-        return "/" + ctx.Locale.ToLowerInvariant();
-    }
+    /// <summary>
+    /// The site's own prefix for the visitor's language: "" for the default language while it lives at the plain addresses, <c>/en</c>, <c>/de</c> …
+    /// for the others. Asked from the host (<see cref="IPluginSite.LocalePrefix"/>) — <c>Site.Locales[0]</c> is the first SUPPORTED language, not the
+    /// default one, so a site whose default is English sent its English visitors to <c>/en/store</c>, which the host does not serve there.
+    /// </summary>
+    internal static string Prefix(IPluginContext ctx) =>
+        string.IsNullOrEmpty(ctx.Locale) ? "" : ctx.Site.LocalePrefix(ctx.Locale);
 
     /// <summary>A redirect to one of the store's own pages, in the language the visitor is in (see <see cref="Localize"/>).</summary>
     internal static PluginResult Go(IPluginContext ctx, string url) =>

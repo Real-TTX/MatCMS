@@ -32,6 +32,49 @@ public static partial class DocsMarkdown
         public string CopyLabel { get; init; } = "";
         /// <summary>What the copy button says for a moment after copying.</summary>
         public string CopiedLabel { get; init; } = "";
+        /// <summary>
+        /// Draws for the back office's visual editor instead of for a reader: headings without anchors, a code block's head and an alert's title not
+        /// editable, an alert's kind on <c>data-kind</c>, task boxes clickable, and a <c>doc:</c> link keeps its <c>doc:path#anchor</c> as address
+        /// (marked <c>docs-broken</c> when the page is not there) — so <see cref="DocsVisual"/> can write exactly that Markdown back.
+        /// </summary>
+        public bool Editor { get; init; }
+    }
+
+    /// <summary>One top-level block of a text for the visual editor: its Markdown exactly as written (with the blank lines after it) and its HTML.</summary>
+    public sealed record EditorBlock(string Raw, string Html);
+
+    /// <summary>A text cut into its top-level blocks; <see cref="Lead"/> is what stands before the first one (blank lines). Lead + every Raw = the text.</summary>
+    public sealed record EditorDoc(string Lead, IReadOnlyList<EditorBlock> Blocks);
+
+    /// <summary>
+    /// The text for the visual editor: cut into the blocks the renderer itself finds, each with the Markdown it came from (byte for byte, line ends
+    /// included) and its HTML drawn with <see cref="Options.Editor"/>. A block the editor did not touch goes back as its <see cref="EditorBlock.Raw"/>,
+    /// which is what makes switching back and forth lossless — the visual mode is a view of the Markdown, not a second format.
+    /// </summary>
+    public static EditorDoc ToEditor(string? markdown, Options? options = null)
+    {
+        var src = markdown ?? "";
+        // The lines of the original WITH their own line ends ("\r\n", "\n" or a lone "\r") — as many as the renderer's normalised split gives.
+        var raw = new List<string>();
+        var start = 0;
+        for (var k = 0; k < src.Length; k++)
+        {
+            if (src[k] == '\r' && k + 1 < src.Length && src[k + 1] == '\n') { raw.Add(src[start..(k + 2)]); start = k + 2; k++; }
+            else if (src[k] is '\n' or '\r') { raw.Add(src[start..(k + 1)]); start = k + 1; }
+        }
+        raw.Add(src[start..]);
+        var o = options ?? new Options();
+        var r = new Renderer(new Options { ResolveDoc = o.ResolveDoc, AlertTitle = o.AlertTitle, Editor = true }) { Spans = new() };
+        var html = r.Blocks(raw.Select(l => l.TrimEnd('\r', '\n').Replace("\t", "    ")).ToList());
+        string Lines(int from, int to) => string.Concat(raw.Skip(from).Take(to - from));
+        var spans = r.Spans!;
+        var blocks = new List<EditorBlock>(spans.Count);
+        for (var k = 0; k < spans.Count; k++)
+        {
+            var to = k + 1 < spans.Count ? spans[k + 1].Start : raw.Count;
+            blocks.Add(new EditorBlock(Lines(spans[k].Start, to), html[spans[k].HtmlStart..spans[k].HtmlEnd]));
+        }
+        return new EditorDoc(spans.Count == 0 ? src : Lines(0, spans[0].Start), blocks);
     }
 
     /// <summary>Encodes the five characters that matter in HTML and leaves every other letter as it is (WebUtility would write "ä" as a number).</summary>
@@ -133,6 +176,8 @@ public static partial class DocsMarkdown
         private readonly HashSet<string> _ids = new(StringComparer.Ordinal);
         public List<TocEntry> Toc { get; } = new();
         private int _depth;
+        /// <summary>When set, every top-level block is noted here: its first line, the line after it, and where its HTML stands.</summary>
+        public List<(int Start, int End, int HtmlStart, int HtmlEnd)>? Spans { get; init; }
 
         public Renderer(Options o) => _o = o;
 
@@ -146,25 +191,33 @@ public static partial class DocsMarkdown
             var i = 0;
             while (i < lines.Count)
             {
-                var line = lines[i];
-                if (line.Trim().Length == 0) { i++; continue; }
-                var t = line.TrimStart();
-                var indent = line.Length - t.Length;
-
-                if (indent < 4 && FenceRx().Match(t) is { Success: true } fence) { i = Code(lines, i, indent, fence, sb); continue; }
-                if (indent < 4 && AtxRx().Match(t) is { Success: true } h) { Heading(h.Groups[1].Value.Length, h.Groups[2].Value, sb); i++; continue; }
-                if (indent < 4 && HrRx().IsMatch(t)) { sb.Append("<hr>"); i++; continue; }
-                if (indent < 4 && t.StartsWith('>')) { i = Quote(lines, i, sb); continue; }
-                if (indent < 4 && ListRx().Match(line) is { Success: true }) { i = List(lines, i, sb); continue; }
-                if (indent < 4 && t.StartsWith('|') || (i + 1 < lines.Count && t.Contains('|') && TableSepRx().IsMatch(lines[i + 1].Trim())))
-                {
-                    var end = Table(lines, i, sb);
-                    if (end > i) { i = end; continue; }
-                }
-                i = Paragraph(lines, i, sb);
+                if (lines[i].Trim().Length == 0) { i++; continue; }
+                var (from, mark) = (i, sb.Length);
+                i = Block(lines, i, sb);
+                if (_depth == 1) Spans?.Add((from, i, mark, sb.Length));
             }
             _depth--;
             return sb.ToString();
+        }
+
+        /// <summary>The one block that starts at line <paramref name="i"/>; returns the line after it.</summary>
+        private int Block(IReadOnlyList<string> lines, int i, StringBuilder sb)
+        {
+            var line = lines[i];
+            var t = line.TrimStart();
+            var indent = line.Length - t.Length;
+
+            if (indent < 4 && FenceRx().Match(t) is { Success: true } fence) return Code(lines, i, indent, fence, sb);
+            if (indent < 4 && AtxRx().Match(t) is { Success: true } h) { Heading(h.Groups[1].Value.Length, h.Groups[2].Value, sb); return i + 1; }
+            if (indent < 4 && HrRx().IsMatch(t)) { sb.Append("<hr>"); return i + 1; }
+            if (indent < 4 && t.StartsWith('>')) return Quote(lines, i, sb);
+            if (indent < 4 && ListRx().Match(line) is { Success: true }) return List(lines, i, sb);
+            if (indent < 4 && t.StartsWith('|') || (i + 1 < lines.Count && t.Contains('|') && TableSepRx().IsMatch(lines[i + 1].Trim())))
+            {
+                var end = Table(lines, i, sb);
+                if (end > i) return end;
+            }
+            return Paragraph(lines, i, sb);
         }
 
         private void Heading(int level, string raw, StringBuilder sb)
@@ -174,6 +227,7 @@ public static partial class DocsMarkdown
             var plain = Plain(inner);
             var id = UniqueId(plain, _ids);
             if (level is 2 or 3 && plain.Length > 0) Toc.Add(new TocEntry(level, id, plain));
+            if (_o.Editor) { sb.Append($"<h{level}>{inner}</h{level}>"); return; }
             sb.Append($"<h{level} id=\"{id}\">{inner}<a class=\"docs-anchor\" href=\"#{id}\" aria-hidden=\"true\" tabindex=\"-1\">#</a></h{level}>");
         }
 
@@ -194,6 +248,12 @@ public static partial class DocsMarkdown
             }
             var langAttr = lang.Length > 0 ? $" class=\"language-{E(lang)}\"" : "";
             var label = lang.Length > 0 ? $"<span class=\"docs-code-lang\">{E(lang)}</span>" : "";
+            if (_o.Editor)
+            {
+                // The language sits in a head the editor does not type into; a click there asks for it (docs-editor.js).
+                sb.Append($"<div class=\"docs-code docs-code-has-head\" data-lang=\"{E(lang)}\"><div class=\"docs-code-head\" contenteditable=\"false\"><span class=\"docs-code-lang\" data-docs-lang>{E(lang)}</span></div><pre><code{langAttr}>{E(string.Join("\n", body))}</code></pre></div>");
+                return i;
+            }
             var copy = _o.CopyLabel.Length > 0 ? $"<button type=\"button\" class=\"docs-copy\" data-docs-copy data-copied=\"{E(_o.CopiedLabel)}\" hidden>{E(_o.CopyLabel)}</button>" : "";
             // Language and copy button in a head row of their own ABOVE the code: laid over the code they covered each other and its first line.
             var head = label.Length + copy.Length > 0 ? $"<div class=\"docs-code-head\">{(label.Length > 0 ? label : "<span></span>")}{copy}</div>" : "";
@@ -218,7 +278,9 @@ public static partial class DocsMarkdown
                 var kind = a.Groups[1].Value.ToLowerInvariant();
                 var rest = inner.Skip(1).ToList();
                 var title = _o.AlertTitle?.Invoke(kind) ?? kind;
-                sb.Append($"<div class=\"docs-callout docs-callout-{kind}\" role=\"note\"><p class=\"docs-callout-title\">{E(title)}</p>{Blocks(rest)}</div>");
+                sb.Append(_o.Editor
+                    ? $"<div class=\"docs-callout docs-callout-{kind}\" data-kind=\"{kind}\"><p class=\"docs-callout-title\" contenteditable=\"false\">{E(title)}</p>{Blocks(rest)}</div>"
+                    : $"<div class=\"docs-callout docs-callout-{kind}\" role=\"note\"><p class=\"docs-callout-title\">{E(title)}</p>{Blocks(rest)}</div>");
                 return i;
             }
             sb.Append("<blockquote>").Append(Blocks(inner)).Append("</blockquote>");
@@ -280,7 +342,7 @@ public static partial class DocsMarkdown
                 var check = "";
                 if (task.Success)
                 {
-                    check = $"<input type=\"checkbox\" disabled{(task.Groups[1].Value.Trim().Length > 0 ? " checked" : "")}> ";
+                    check = $"<input type=\"checkbox\"{(_o.Editor ? "" : " disabled")}{(task.Groups[1].Value.Trim().Length > 0 ? " checked" : "")}> ";
                     item[0] = text[task.Length..];
                 }
                 var tight = !loose && !item.Skip(1).Any(l => l.Trim().Length == 0);
@@ -390,6 +452,12 @@ public static partial class DocsMarkdown
                     var cut = target.IndexOf('#');
                     if (cut >= 0) { hash = target[cut..]; target = target[..cut]; }
                     var resolved = _o.ResolveDoc?.Invoke(target.Trim('/'));
+                    if (_o.Editor)
+                    {
+                        // The editor keeps the link as written; whether the page is there is only a mark.
+                        var docTitle = m.Groups[3].Success ? $" title=\"{E(m.Groups[3].Value)}\"" : "";
+                        return Slot($"<a href=\"{E(href)}\" class=\"docs-doclink{(resolved is null && _o.ResolveDoc is not null ? " docs-broken" : "")}\"{docTitle}>{label}</a>");
+                    }
                     if (resolved is null) return Slot($"<span class=\"docs-broken\">{label}</span>");
                     href = resolved + hash;
                 }

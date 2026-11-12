@@ -32,8 +32,11 @@ public sealed partial class DocsPlugin : IPlugin
             .Page("pages", "docs.admin.pages", DocsAdmin.PagesAsync)
             .Page("pages/{id}", null, DocsAdmin.EditAsync)
             .Page("versions", "docs.admin.versions", DocsAdmin.VersionsAsync)
+            .Page("convert", null, DocsAdmin.ConvertAsync)
+            .Page("transfer", "docs.admin.transfer", DocsTransfer.PageAsync)
             .Link("docs.admin.pages", "pages", "ti-list-tree", also: new[] { "pages/{id}" })
             .Link("docs.admin.versions", "versions", "ti-versions")
+            .Link("docs.admin.transfer", "transfer", "ti-file-zip")
             .Link("docs.admin.settings", "_settings", "ti-settings");
         b.Admin.Tile(DocsAdmin.TileAsync);
         b.Admin.RecentlyEdited(DocsAdmin.RecentAsync);

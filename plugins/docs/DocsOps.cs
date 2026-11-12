@@ -129,7 +129,8 @@ internal static class DocsOps
         return o;
     }
 
-    public static async Task<JsonObject> UpsertAsync(IPluginContext ctx, JsonObject a, CancellationToken ct)
+    /// <summary>Creates or changes the page at a path. <paramref name="by"/> names the writer in "last changed by" (default: the API key).</summary>
+    public static async Task<JsonObject> UpsertAsync(IPluginContext ctx, JsonObject a, CancellationToken ct, string? by = null)
     {
         var (locale, version, versions, error) = await ScopeAsync(ctx, a, ct);
         if (error is not null) return error;
@@ -150,7 +151,7 @@ internal static class DocsOps
         if (format == "html") body = DocsUrls.Sanitize(ctx, body);
         var p = (existing?.Page ?? new DocPage { Locale = locale, Version = version, ParentId = parent?.Page.Id ?? 0, Slug = segs[^1] }) with
         {
-            Format = format, Body = body, UpdatedBy = ctx.Request.ApiCaller.Length > 0 ? "api:" + ctx.Request.ApiCaller : "api"
+            Format = format, Body = body, UpdatedBy = by ?? (ctx.Request.ApiCaller.Length > 0 ? "api:" + ctx.Request.ApiCaller : "api")
         };
         if (title.Length > 0) p = p with { Title = title.Length > 200 ? title[..200] : title };
         if (a.ContainsKey("summary")) p = p with { Summary = Str(a, "summary").Trim() };

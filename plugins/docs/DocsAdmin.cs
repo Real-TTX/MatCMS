@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace MatCMS.Plugin.Docs;
 
@@ -144,6 +146,8 @@ internal static class DocsAdmin
         var f = ctx.Request;
         var format = f.F("format") == "html" ? "html" : "md";
         var body = f.F(page.Format == "html" ? "body_html" : "body");
+        // Saved from the visual mode: the editor's blocks are written back as Markdown here (untouched ones exactly as they were).
+        if (page.Format != "html" && f.F("md_mode") == "visual" && ParseState(f.F("md_visual")) is { } state) body = DocsVisual.FromEditor(state);
         // Switching the format takes the text along: Markdown becomes the HTML it draws, rich text becomes its plain text.
         if (format != page.Format && page.Id > 0)
             body = format == "html" ? DocsMarkdown.Render(body).Html : DocsMarkdown.Plain(body);
@@ -250,10 +254,122 @@ internal static class DocsAdmin
 
         var hidden = new Dictionary<string, string> { ["lang"] = p.Locale, ["v"] = p.Version };
         if (original is not null) hidden["translationOf"] = I(original.Id);
-        var formNode = Ui.Form(Ui.Columns(main, side)) with { Hidden = hidden };
+        if (p.Format == "md") { hidden["md_mode"] = "md"; hidden["md_visual"] = ""; }
+        var formNode = Ui.Form(Ui.Columns(main, side)) with { Hidden = hidden, Id = "docs-page-form" };
         var back = Ui.PageHead(null, null, Ui.Button(ctx.T("docs.admin.back"), ListUrl(p.Locale, p.Version), UiButtonKind.Ghost, "ti-arrow-left"));
         var title = original is not null ? ctx.T("docs.admin.newTranslation") : isNew ? (p.ParentId == 0 ? ctx.T("docs.admin.newSection") : ctx.T("docs.admin.newPage")) : ctx.T("docs.admin.editTitle", p.Title);
-        return PluginResult.Page(Ui.Stack(back, formNode), title);
+        return PluginResult.Page(Ui.Stack(back, formNode, p.Format == "md" ? EditorParts(ctx, tree, p) : null), title);
+    }
+
+    // ---- the visual Markdown editor ---------------------------------------------------------------------------------
+
+    private static JsonNode? ParseState(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonNode.Parse(json) as JsonObject; }
+        catch (JsonException) { return null; }
+    }
+
+    /// <summary>
+    /// What the editor's script (assets/docs-editor.js) builds on: its settings and words, the dialog that picks a page for a <c>doc:</c> link, the
+    /// script. The script wraps the Markdown text area with the switch "Visuell | Markdown", the toolbar and the preview; without it the page is the
+    /// plain text area it always was.
+    /// </summary>
+    private static UiNode EditorParts(IPluginContext ctx, DocTree tree, DocPage p)
+    {
+        var words = new JsonObject();
+        foreach (var key in EditorWords) words[key] = ctx.T("docs.ed." + key);
+        foreach (var kind in new[] { "note", "tip", "important", "warning", "caution" }) words["alert_" + kind] = ctx.T("docs.alert." + kind);
+        var config = $"<div id=\"docs-ed-config\" hidden data-url=\"{E(Section + "/convert")}\" data-lang=\"{E(p.Locale)}\" data-v=\"{E(p.Version)}\" " +
+                     $"data-words=\"{E(words.ToJsonString())}\"></div>";
+        var pages = new List<UiOption> { Ui.Option("", ctx.T("docs.ed.docPick")) };
+        pages.AddRange(tree.Flat.Select(n => Ui.Option(n.Path, string.Concat(Enumerable.Repeat("— ", n.Depth)) + n.Page.Title + "  ·  " + n.Path)));
+        var docDialog = Ui.Dialog("docs-ed-doc", ctx.T("docs.ed.docTitle"),
+            Ui.Select("docs_ed_doc", ctx.T("docs.ed.docPage"), "", pages.ToArray()) with { Id = "docs-ed-doc-page" },
+            Ui.Input("docs_ed_anchor", ctx.T("docs.ed.docAnchor"), "") with { Id = "docs-ed-doc-anchor", Placeholder = "abschnitt", Help = ctx.T("docs.ed.docAnchorHelp") },
+            Ui.Input("docs_ed_text", ctx.T("docs.ed.docText"), "") with { Id = "docs-ed-doc-text", Help = ctx.T("docs.ed.docTextHelp") },
+            Ui.Button(ctx.T("docs.ed.insert"), "#", icon: "ti-link", small: true) with { Href = null, NoSubmit = true, Data = new Dictionary<string, string> { ["docs-ed-doc-go"] = "" } });
+        var css = $"<style>{DocsHtml.Css}{EditorCss}</style>";
+        var script = $"<script src=\"{E(ctx.AssetUrl("docs-editor.js"))}\"></script>";
+        return Ui.Stack(docDialog, Ui.Html(css + config + script));
+    }
+
+    private static readonly string[] EditorWords =
+    [
+        "visual", "markdown", "preview", "previewEmpty", "paragraph", "h2", "h3", "h4", "bold", "italic", "strike", "code", "link", "docLink", "image",
+        "ul", "ol", "task", "quote", "callout", "codeBlock", "table", "hr", "rowAdd", "colAdd", "rowDel", "colDel", "linkUrl", "imageUrl", "imageAlt",
+        "language", "failed", "busy", "undo", "redo", "clear"
+    ];
+
+    /// <summary>The editor's own look. The text inside the visual area is drawn with the PUBLIC stylesheet (<see cref="DocsHtml.Css"/>), scoped under .docs.</summary>
+    private const string EditorCss = """
+        .docs-ed-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 8px}
+        .docs-ed-bar .docs-ed-sep{width:1px;align-self:stretch;margin:2px 4px;background:var(--line)}
+        .docs-ed-bar .btn.is-on{background:var(--hover);color:var(--accent)}
+        .docs-ed-bar .docs-ed-grow{flex:1}
+        .docs-ed-modes{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+        .docs-ed-modes button{border:0;background:transparent;color:inherit;font:inherit;font-size:.86em;padding:5px 12px;cursor:pointer}
+        .docs-ed-modes button.is-on{background:var(--accent);color:#fff}
+        .docs-ed-split{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+        .docs-ed-split.has-preview{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+        @media(max-width:1100px){.docs-ed-split.has-preview{grid-template-columns:minmax(0,1fr)}}
+        .docs-ed-visual{min-height:420px;max-height:75vh;overflow:auto;padding:14px 18px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text,inherit)}
+        .docs-ed-visual:focus-within{border-color:var(--accent)}
+        .docs-ed-visual .docs-content{outline:none;min-height:390px}
+        .docs-ed-visual .docs-content :is(p,ul,ol,h2,h3,h4,.docs-code,.docs-table,.docs-callout,blockquote,hr){margin-top:0}
+        .docs-ed-visual .docs-doclink{text-decoration:underline dashed}
+        .docs-ed-visual .docs-doclink::before{content:"\2197\FE0E";font-size:.8em;margin-right:2px;opacity:.6}
+        .docs-ed-visual .docs-code-lang{cursor:pointer;min-width:3em;display:inline-block}
+        .docs-ed-visual .docs-code-lang:empty::before{content:var(--docs-ed-code);opacity:.6}
+        .docs-ed-visual .docs-callout-title{cursor:pointer;user-select:none}
+        .docs-ed-visual li.docs-task{list-style:none}
+        .docs-ed-visual table td,.docs-ed-visual table th{min-width:3em}
+        .docs-ed-preview{height:75vh;min-height:420px;border:1px solid var(--line);border-radius:10px;background:#fff;width:100%}
+        .docs-ed-hidden{display:none!important}
+        .docs-ed-pop{position:absolute;z-index:50;display:flex;flex-direction:column;gap:2px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+        .docs-ed-pop .btn{justify-content:flex-start}
+        .docs-ed-status{font-size:.82em;color:var(--text-muted)}
+        """;
+
+    /// <summary>
+    /// The editor's server side (POST, admin only, antiforgery as every admin form): <c>visual</c> cuts Markdown into the blocks the visual mode shows,
+    /// <c>markdown</c> writes the visual mode's blocks back as Markdown, <c>preview</c> draws a text with <see cref="DocsMarkdown"/> and the public
+    /// stylesheet — the one renderer, so the preview is the page.
+    /// </summary>
+    public static async Task<PluginResult> ConvertAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var f = ctx.Request;
+        if (!f.IsPost) return PluginResult.Status(405);
+        var store = new DocsStore(ctx.Data);
+        var (locale, version) = Scope(ctx, await store.VersionsAsync(ct));
+        var view = await DocsView.CreateAsync(ctx, locale, version, true, ct);
+        string Markdown() => f.F("mode") == "visual" && ParseState(f.F("visual")) is { } s ? DocsVisual.FromEditor(s) : f.F("body");
+        switch (f.Action)
+        {
+            case "visual":
+                return PluginResult.Json(DocsVisual.ToJson(DocsMarkdown.ToEditor(f.F("body"), view.MarkdownOptions)));
+            case "markdown":
+                return ParseState(f.F("visual")) is { } state
+                    ? PluginResult.Json(new JsonObject { ["markdown"] = DocsVisual.FromEditor(state) })
+                    : PluginResult.Json(new JsonObject { ["error"] = "bad state" }, 400);
+            case "preview":
+            {
+                var md = Markdown();
+                var r = DocsMarkdown.Render(md, view.MarkdownOptions);
+                var title = f.F("title").Trim();
+                var summary = f.F("summary").Trim();
+                var head = title.Length + summary.Length > 0
+                    ? $"<div class=\"docs-head\">{(title.Length > 0 ? $"<h1>{E(title)}</h1>" : "")}{(summary.Length > 0 ? $"<p class=\"docs-lead\">{E(summary)}</p>" : "")}</div>"
+                    : "";
+                var own = (ctx.Settings.Get(DocsSettings.CustomCss) ?? "").Replace("</style", "<\\/style", StringComparison.OrdinalIgnoreCase);
+                var doc = "<!doctype html><html lang=\"" + E(locale) + "\"><head><meta charset=\"utf-8\"><base target=\"_blank\">" +
+                          "<style>body{margin:0;padding:18px 22px;font:16px/1.6 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#1f2937;background:#fff}" +
+                          "a{color:var(--accent,#2563eb)}</style><style>" + DocsHtml.Css + own + "</style></head><body><div class=\"docs\"><div class=\"docs-main\">" +
+                          head + "<div class=\"docs-content\">" + r.Html + "</div></div></div></body></html>";
+                return PluginResult.Json(new JsonObject { ["html"] = doc, ["markdown"] = f.F("mode") == "visual" ? md : null });
+            }
+        }
+        return PluginResult.Status(400);
     }
 
     /// <summary>The short Markdown reference beside the editor (examples as code, so they are shown and not drawn).</summary>

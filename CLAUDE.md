@@ -280,6 +280,10 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   `/docs/v/{name}`), Markdown through its OWN renderer `DocsMarkdown` (encode everything, only its own tags out, addresses checked by `SafeUrl`; `doc:path` links), the tree
   kept in memory and rebuilt when the `meta.rev` counter moves (every write calls `DocsStore.TouchAsync`). A page is named by its PATH for the API
   (`PUT /api/v1/docs/pages`, parents first, `translationOf` = the default language's path). Shown on its own domain with Domain routing (below).
+  Since 1.3 the back office has a visual mode for Markdown pages that is only a VIEW of the Markdown: the server cuts the text into the renderer's own
+  blocks (`DocsMarkdown.ToEditor`, raw + HTML each), an untouched block goes back as its raw text, only a touched one is written from its HTML
+  (`DocsVisual`, C#) — keep it that way, a JS Markdown library would normalise every page on the first switch. Preview and import/export (ZIP of
+  `<locale>/[v/<version>/]<path>.md`, optional front matter, dry run first, written through `DocsOps.UpsertAsync`) are in `DocsAdmin`/`DocsTransfer`.
 - **The club** (`plugins/verein`, native, key `verein`, see its README; 1.18): the member area `/mitglied` is two BLOCK PAGES like the shop's —
   roles `area` (the frame of every signed-in page) and `signin` — whose starting layout is ONE `verein_slot` with `page_html`, the exact markup of
   before, so an untouched site looks the same; `head_html`/`content_html`/`form_html` are the pieces to lay out, forms stay whole, and the calls sit in

@@ -22,6 +22,7 @@ internal sealed class CatalogStub : IDisposable
     public string Body { get; set; } = "{}";
     public int Requests;
     public int PictureRequests;
+    public int OfficialRequests;
     public static readonly byte[] Png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
     public string Url => "http://127.0.0.1:" + ((IPEndPoint)_listener.LocalEndpoint).Port;
 
@@ -42,8 +43,10 @@ internal sealed class CatalogStub : IDisposable
                         var buf = new byte[8192]; var head = new StringBuilder();
                         while (!head.ToString().Contains("\r\n\r\n")) { var n = await stream.ReadAsync(buf); if (n == 0) return; head.Append(Encoding.ASCII.GetString(buf, 0, n)); }
                         Interlocked.Increment(ref Requests);
-                        var ok = head.ToString().StartsWith("GET /api/public/store ", StringComparison.Ordinal);
-                        var picture = head.ToString().StartsWith("GET /api/public/store/plugins/leserstimmen/image/", StringComparison.Ordinal);
+                        var ok = head.ToString().StartsWith("GET /api/public/store ", StringComparison.Ordinal) || head.ToString().StartsWith("GET /store/api/catalog ", StringComparison.Ordinal);
+                        if (head.ToString().StartsWith("GET /store/api/", StringComparison.Ordinal)) Interlocked.Increment(ref OfficialRequests);
+                        var picture = head.ToString().StartsWith("GET /api/public/store/plugins/leserstimmen/image/", StringComparison.Ordinal)
+                            || head.ToString().StartsWith("GET /store/api/plugins/leserstimmen/images/", StringComparison.Ordinal);
                         if (picture) Interlocked.Increment(ref PictureRequests);
                         var body = picture ? Png : Encoding.UTF8.GetBytes(ok ? Body : "nope");
                         var header = $"HTTP/1.1 {(ok || picture ? "200 OK" : "404 Not Found")}\r\nContent-Type: {(picture ? "image/png" : "application/json")}\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n";
@@ -110,7 +113,7 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         return page.Id;
     }
 
-    private async Task<int> InstallAsync(Func<IServiceProvider, Models.Plugin> create, string storeUrl)
+    private async Task<int> InstallAsync(Func<IServiceProvider, Models.Plugin> create, string storeUrl, string source = "cloud")
     {
         using var scope = _app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -126,7 +129,7 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
             row.Code = fresh.Code; row.FilesJson = fresh.FilesJson; row.Kind = fresh.Kind; row.Entry = fresh.Entry; row.Sha256 = fresh.Sha256;
             row.Api = fresh.Api; row.Version = fresh.Version;
         }
-        row.ConfigJson = new JsonObject { ["storeUrl"] = storeUrl, ["cacheMinutes"] = "1" }.ToJsonString();
+        row.ConfigJson = new JsonObject { ["storeUrl"] = storeUrl, ["cacheMinutes"] = "1", ["source"] = source }.ToJsonString();
         row.Enabled = true;
         await db.SaveChangesAsync();
         await scope.ServiceProvider.GetRequiredService<PluginRunner>().ReloadAsync(row.Id);
@@ -249,6 +252,18 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/store-einblick/bild/demo-native/7")).StatusCode);     // another plugin's id
         Assert.Equal(HttpStatusCode.NotFound, (await visitor.GetAsync("/store-einblick/bild/leserstimmen/abc")).StatusCode);
         Assert.Equal(1, stub.PictureRequests);                                             // none of those reached the cloud
+    }
+
+    [Fact]
+    public async Task The_official_MatCMS_Store_is_read_at_its_own_addresses()
+    {
+        using var stub = new CatalogStub { Body = Catalog };
+        await PageWithBlockAsync("store-official");
+        await InstallAsync(Script, stub.Url, source: "matcms");
+        var html = WebUtility.HtmlDecode(Section(await _app.Browser().GetStringAsync("/store-official")));
+        Assert.Contains("Leserstimmen", html);
+        Assert.Equal(HttpStatusCode.OK, (await _app.Browser().GetAsync("/store-einblick/bild/leserstimmen/8")).StatusCode);
+        Assert.True(stub.OfficialRequests >= 2);    // catalogue and picture both at /store/api/…, never at a cloud's /api/public/store
     }
 
     [Fact]

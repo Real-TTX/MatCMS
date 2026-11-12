@@ -31,6 +31,7 @@ public static class SeShowcase
         b.Strings("en", SeText.En);
 
         b.Settings
+            .Choice("source", "se.set.source", "cloud", new[] { new FieldOption("cloud", "se.o.srcCloud"), new FieldOption("matcms", "se.o.srcMatcms") }, "se.set.sourceHelp")
             .Text("storeUrl", "se.set.url", "https://cloud2.matthix.de", "se.set.urlHelp")
             .Number("cacheMinutes", "se.set.cache", 30, 1, 1440, "se.set.cacheHelp");
 
@@ -85,24 +86,33 @@ public static class SeShowcase
         var url = BaseUrl(ctx);
         if (url is null) return (null, ctx.T("se.err.url"));
         var minutes = double.TryParse(ctx.Settings.Get("cacheMinutes"), NumberStyles.Float, CultureInfo.InvariantCulture, out var m) ? Math.Clamp(m, 1, 1440) : 30;
-        if (!fresh && Cache.TryGetValue(url, out var hit) && DateTime.UtcNow - hit.At < TimeSpan.FromMinutes(minutes)) return (hit.Data, null);
+        var cacheKey = url + "|" + Source(ctx);
+        if (!fresh && Cache.TryGetValue(cacheKey, out var hit) && DateTime.UtcNow - hit.At < TimeSpan.FromMinutes(minutes)) return (hit.Data, null);
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd(Agent);
-            using var res = await http.GetAsync(url + "/api/public/store", ct);
+            using var res = await http.GetAsync(url + CatalogPath(ctx), ct);
             if (!res.IsSuccessStatusCode) throw new HttpRequestException("HTTP " + (int)res.StatusCode);
             var body = await res.Content.ReadAsStringAsync(ct);
             if (body.Length > 2_000_000 || JsonNode.Parse(body) is not JsonObject data) throw new HttpRequestException("keine gültige Antwort");
-            Cache[url] = new Cached(DateTime.UtcNow, data);
+            Cache[cacheKey] = new Cached(DateTime.UtcNow, data);
             return (data, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             ctx.Log("Store-Einblick: " + url + " – " + ex.Message);
-            return Cache.TryGetValue(url, out var stale) ? (stale.Data, null) : (null, ctx.T("se.err.fetch"));
+            return Cache.TryGetValue(cacheKey, out var stale) ? (stale.Data, null) : (null, ctx.T("se.err.fetch"));
         }
     }
+
+    /// <summary>Where the catalogue comes from: a MatCMS cloud's store ("cloud", <c>/api/public/store</c>) or the official MatCMS Store on
+    /// matcms.de ("matcms", <c>/store/api/catalog</c> — the same shape, see plugins/matcms-store). Only these two, never a path from the settings.</summary>
+    public static string Source(IPluginContext ctx) => ctx.Settings.Get("source") == "matcms" ? "matcms" : "cloud";
+    private static string CatalogPath(IPluginContext ctx) => Source(ctx) == "matcms" ? "/store/api/catalog" : "/api/public/store";
+    private static string ImagePath(IPluginContext ctx, string key, int id) => Source(ctx) == "matcms"
+        ? "/store/api/plugins/" + Uri.EscapeDataString(key) + "/images/" + N(id)
+        : "/api/public/store/plugins/" + Uri.EscapeDataString(key) + "/image/" + N(id);
 
     /// <summary>The cloud's address from the settings: only http(s), no path, no trailing slash.</summary>
     public static string? BaseUrl(IPluginContext ctx)
@@ -456,7 +466,8 @@ public static class SeShowcase
     {
         var key = ctx.Request.R("key") ?? "";
         if (!int.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || id <= 0) return PluginResult.NotFound();
-        var cacheKey = key + "/" + N(id);
+        // per store: the same key and id mean another picture in another catalogue
+        var cacheKey = (BaseUrl(ctx) ?? "") + "|" + Source(ctx) + "|" + key + "/" + N(id);
         if (Pics.TryGetValue(cacheKey, out var hit)) return Answer(hit);
         var (data, _) = await CatalogAsync(ctx, false, ct);
         var entry = (data?["plugins"] as JsonArray ?? new JsonArray()).OfType<JsonObject>().FirstOrDefault(p => S(p["key"]) == key);
@@ -465,7 +476,7 @@ public static class SeShowcase
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
             http.DefaultRequestHeaders.UserAgent.ParseAdd(Agent);
-            using var res = await http.GetAsync(url + "/api/public/store/plugins/" + Uri.EscapeDataString(key) + "/image/" + N(id),
+            using var res = await http.GetAsync(url + ImagePath(ctx, key, id),
                 HttpCompletionOption.ResponseHeadersRead, ct);
             if (!res.IsSuccessStatusCode || res.Content.Headers.ContentLength > MaxPictureBytes) return PluginResult.NotFound();
             var bytes = await res.Content.ReadAsByteArrayAsync(ct);
@@ -684,6 +695,7 @@ public static class SeText
     {
         ["se.nav"] = "Store-Einblick", ["se.tab.status"] = "Status",
         ["se.set.url"] = "Adresse der Cloud", ["se.set.urlHelp"] = "Die MatCMS-Cloud, deren Store gezeigt wird, z. B. https://cloud2.matthix.de. Gelesen wird ihr öffentlicher Katalog – ohne Schlüssel.",
+        ["se.set.source"] = "Quelle", ["se.set.sourceHelp"] = "Der Store einer MatCMS-Cloud oder der offizielle MatCMS Store (dann als Adresse https://matcms.de).", ["se.o.srcCloud"] = "Store einer Cloud", ["se.o.srcMatcms"] = "MatCMS Store (matcms.de)",
         ["se.set.cache"] = "Zwischenspeichern (Minuten)", ["se.set.cacheHelp"] = "So lange zeigt die Website den zuletzt geholten Katalog, bevor sie neu fragt.",
         ["se.block.name"] = "Store-Einblick", ["se.block.desc"] = "Zeigt die Plugins, Templates und Komponenten aus dem Store einer MatCMS-Cloud.",
         ["se.f.heading"] = "Überschrift", ["se.f.intro"] = "Einleitung", ["se.f.show"] = "Was zeigen", ["se.f.kind"] = "Art der Plugins",
@@ -709,6 +721,7 @@ public static class SeText
     public static readonly Dictionary<string, string> En = new()
     {
         ["se.nav"] = "Store showcase", ["se.tab.status"] = "Status",
+        ["se.set.source"] = "Source", ["se.set.sourceHelp"] = "The store of a MatCMS cloud or the official MatCMS Store (then the address is https://matcms.de).", ["se.o.srcCloud"] = "A cloud's store", ["se.o.srcMatcms"] = "MatCMS Store (matcms.de)",
         ["se.set.url"] = "Cloud address", ["se.set.urlHelp"] = "The MatCMS cloud whose store is shown, e.g. https://cloud2.matthix.de. Its public catalogue is read – no key needed.",
         ["se.set.cache"] = "Keep for (minutes)", ["se.set.cacheHelp"] = "How long the site shows the catalogue it fetched last before it asks again.",
         ["se.block.name"] = "Store showcase", ["se.block.desc"] = "Shows the plugins, templates and components of a MatCMS cloud's store.",

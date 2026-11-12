@@ -6,8 +6,12 @@ namespace MatCMS.Plugin.Shop;
 /// <summary>The translations of a product or a category in the back office: one block of fields per language other than the main one, inside the same form, saved with it.</summary>
 internal static class ShopAdminTranslations
 {
-    /// <summary>The site's languages except the main (first) one — the main language is the form itself.</summary>
-    public static IReadOnlyList<string> Locales(IPluginContext ctx) => ctx.Site.Locales.Skip(1).ToList();
+    /// <summary>
+    /// The site's languages except its DEFAULT one — the default language is the form itself. Not <c>Locales.Skip(1)</c>: the list is in the
+    /// order of the supported languages (de before en), so a site whose default is English offered English as a translation and hid German.
+    /// </summary>
+    public static IReadOnlyList<string> Locales(IPluginContext ctx) =>
+        ctx.Site.Locales.Where(l => !string.Equals(l, ctx.Site.DefaultCulture, StringComparison.OrdinalIgnoreCase)).ToList();
 
     private static string NameOf(string locale)
     {

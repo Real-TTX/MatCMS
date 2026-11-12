@@ -30,6 +30,15 @@ public static class CloudProtocol
     /// saw, and something would then be deleted on the strength of it.</para>
     /// </summary>
     public const string BackupRequestHeader = "X-MatCMS-Backup-Request";
+
+    /// <summary>
+    /// Header the cloud's EDGE puts on the requests of a further domain shown as an alias (<c>docs.matmon.eu</c>), carrying that domain.
+    /// The edge rewrites <c>Host</c> to the node's host address, and the node's proxy does not trust the edge's X-Forwarded-Host — so
+    /// without this the site saw every alias as its host address and its domain routing (Settings → Domains) never matched.
+    /// The site only uses it to pick one of ITS OWN configured mappings; a forged value shows a public part of the site that the
+    /// visitor could open by name anyway.
+    /// </summary>
+    public const string EdgeHostHeader = "X-MatCMS-Host";
 }
 
 /// <summary>

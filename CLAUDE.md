@@ -641,7 +641,9 @@ domain (`/docs/x` → `/x`, the rest of the site → the canonical main address,
 (302, like the language redirects: a cached 301 would outlive taking a mapping back) — not for a request carrying the admin cookie, whose session lives on the main address. The host's own areas (`DomainRoutes.SystemSegments`:
 admin, login, uploads, thumbs, plugin assets, static folders, sitemap, robots …) are never rewritten. Each host's sitemap/robots name its own
 addresses only. Needs the canonical URL for links back to the main site, and the domain must reach the instance (DNS, the cloud's domain/edge).
-Only HTML answers on a mapped domain are buffered; a new top-level static folder or host area must be added to `SystemSegments`. Tests: `DomainRoutingTests`.
+Behind the cloud's EDGE the Host is rewritten to the node's host address (and the node's proxy overwrites X-Forwarded-Host), so the edge route of
+an ALIAS domain carries the domain in `CloudProtocol.EdgeHostHeader` (`X-MatCMS-Host`) and the site matches a mapping by Host OR that header
+(`DomainRoutes.ForRequest`) — publish such a domain in the cloud as "alias". Only HTML answers on a mapped domain are buffered; a new top-level static folder or host area must be added to `SystemSegments`. Tests: `DomainRoutingTests`.
 
 ## Fonts are served by this server (LocalFonts)
 

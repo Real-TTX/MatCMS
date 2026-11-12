@@ -441,6 +441,17 @@ public class ProxyService
             ? new ProxyRouteOptions(RewriteHost: true, UpstreamHeaders: new() { [Node.EdgeGuardHeader] = t })
             : null;
 
+    /// <summary>An ALIAS domain's edge route: as <see cref="EdgeRouteOptions"/>, plus the domain itself in
+    /// <see cref="MatCMS.Shared.CloudProtocol.EdgeHostHeader"/> — the Host rewrite would otherwise leave the site no way to tell
+    /// docs.example.com from its main domain, and its domain routing (Settings → Domains) could never match.</summary>
+    private ProxyRouteOptions? AliasEdgeRouteOptions(Node? node, bool rewrite, string domain)
+    {
+        if (!rewrite) return EdgeRouteOptions(node, rewrite);
+        var headers = new Dictionary<string, string> { [MatCMS.Shared.CloudProtocol.EdgeHostHeader] = domain };
+        if (GuardToken(node) is { } t) headers[Node.EdgeGuardHeader] = t;
+        return new ProxyRouteOptions(RewriteHost: true, UpstreamHeaders: headers);
+    }
+
     /// <summary>A node whose proxy op would carry options needs an agent that understands them — an older agent drops the field
     /// without a word and would publish an OPEN route where a guarded one was asked for. Null = fine.</summary>
     private string? OptionsBlocker(Node? node, ProxyRouteOptions? options)
@@ -768,7 +779,7 @@ public class ProxyService
                 var (up, rewrite, err) = await EdgeTargetAsync(inst.HostDomain, node, inst.LocalPort, EdgeSettings, ct);
                 if (err is not null) return Record(d, new(false, err));
                 r = await ProxyEngine.ExecuteAsync(new ProxyOp("publish", EdgeSettings, inst.ContainerId, inst.LocalPort, d.Domain, key, name,
-                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: up, RewriteHost: rewrite, Options: EdgeRouteOptions(node, rewrite)), Http(), _docker, ct);
+                    RouteId: d.RouteId, OldKind: d.Provider, Upstream: up, RewriteHost: rewrite, Options: AliasEdgeRouteOptions(node, rewrite, d.Domain)), Http(), _docker, ct);
             }
             else
                 r = await RunAsync(node, x => new ProxyOp("publish", x, inst.ContainerId, inst.LocalPort, d.Domain, key, name,

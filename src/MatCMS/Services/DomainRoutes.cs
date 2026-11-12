@@ -85,6 +85,11 @@ public static partial class DomainRoutes
         return h is null ? null : routes.FirstOrDefault(r => r.Host == h);
     }
 
+    /// <summary>The mapping a request is for: by its <c>Host</c>, else by the domain the cloud's edge names in
+    /// <see cref="MatCMS.Shared.CloudProtocol.EdgeHostHeader"/> (the edge rewrites Host to the node's address).</summary>
+    public static DomainRoute? ForRequest(IReadOnlyList<DomainRoute> routes, string? host, string? edgeHost) =>
+        ForHost(routes, host) ?? ForHost(routes, edgeHost);
+
     /// <summary>True for a path of the host's own areas (and anything with a file extension at the top level, like <c>/favicon.svg</c>).</summary>
     public static bool IsSystemPath(string path)
     {

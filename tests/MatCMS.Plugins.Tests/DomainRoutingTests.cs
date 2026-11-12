@@ -120,6 +120,18 @@ public class DomainRoutingTests : IClassFixture<DocsApp>
     }
 
     [Fact]
+    public async Task Behind_the_edge_the_domain_comes_from_its_header()
+    {
+        // The cloud's edge rewrites Host to the node's host address; the alias domain travels in X-MatCMS-Host (docs.matmon.eu showed the home page).
+        await SetupAsync();
+        var edge = On("matmon.node.example.net");
+        edge.DefaultRequestHeaders.Add(MatCMS.Shared.CloudProtocol.EdgeHostHeader, "docs.example.org");
+        Assert.Contains("<h1>Start</h1>", await edge.GetStringAsync("/start"));
+        Assert.Contains("http://docs.example.org/sitemap.xml", await edge.GetStringAsync("/robots.txt"));
+        Assert.Null(DomainRoutes.ForRequest(DomainRoutes.Parse("docs.example.org | /docs"), "matmon.node.example.net", "other.example.org"));
+    }
+
+    [Fact]
     public async Task The_main_address_sends_the_part_to_its_domain_but_not_a_signed_in_admin()
     {
         await SetupAsync();

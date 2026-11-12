@@ -516,7 +516,7 @@ app.Use(async (ctx, next) =>
     if (routes.Count == 0) { await next(); return; }
     var path = ctx.Request.Path.Value ?? "/";
     var isRead = HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsHead(ctx.Request.Method);
-    var route = MatCMS.Services.DomainRoutes.ForHost(routes, ctx.Request.Host.Host);
+    var route = MatCMS.Services.DomainRoutes.ForRequest(routes, ctx.Request.Host.Host, ctx.Request.Headers[MatCMS.Shared.CloudProtocol.EdgeHostHeader].ToString());
 
     if (route is null)
     {
@@ -1188,7 +1188,7 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
     // Domain routing: a sitemap names the addresses of ITS host. On a mapped domain only that domain's part, written short; at the main address
     // everything else — a part that is sent to its own domain is listed there, not here.
     var routes = MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting));
-    var mapped = MatCMS.Services.DomainRoutes.ForHost(routes, ctx.Request.Host.Host);
+    var mapped = MatCMS.Services.DomainRoutes.ForRequest(routes, ctx.Request.Host.Host, ctx.Request.Headers[MatCMS.Shared.CloudProtocol.EdgeHostHeader].ToString());
     if (mapped is not null) baseUrl = $"{ctx.Request.Scheme}://{mapped.Host}";
     string? Loc(string path)
     {
@@ -1225,7 +1225,7 @@ app.MapGet("/sitemap.xml", async (HttpContext ctx, MatCMS.Data.AppDbContext db, 
 app.MapGet("/robots.txt", (HttpContext ctx, MatCMS.Services.SiteContext site) =>
 {
     if (!site.SitemapEnabled) return Results.NotFound();
-    var mapped = MatCMS.Services.DomainRoutes.ForHost(MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting)), ctx.Request.Host.Host);
+    var mapped = MatCMS.Services.DomainRoutes.ForRequest(MatCMS.Services.DomainRoutes.Parse(site.Get(MatCMS.Services.SettingKeys.DomainRouting)), ctx.Request.Host.Host, ctx.Request.Headers[MatCMS.Shared.CloudProtocol.EdgeHostHeader].ToString());
     var origin = mapped is null ? site.CanonicalBaseUrl(ctx.Request) : $"{ctx.Request.Scheme}://{mapped.Host}";
     var body = $"User-agent: *\nDisallow: /admin/\n\nSitemap: {origin}/sitemap.xml\n";
     return Results.Text(body, "text/plain", System.Text.Encoding.UTF8);

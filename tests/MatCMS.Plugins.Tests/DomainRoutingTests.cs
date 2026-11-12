@@ -106,7 +106,7 @@ public class DomainRoutingTests : IClassFixture<DocsApp>
 
         // The long form on the domain becomes the short one; the host's own areas are not rewritten.
         var longForm = await docs.GetAsync("/docs/start?x=1");
-        Assert.Equal(HttpStatusCode.MovedPermanently, longForm.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, longForm.StatusCode);
         Assert.Equal("/start?x=1", longForm.Headers.Location!.ToString());
         Assert.Equal(HttpStatusCode.OK, (await docs.GetAsync("/robots.txt")).StatusCode);
         Assert.Contains("http://docs.example.org/sitemap.xml", await docs.GetStringAsync("/robots.txt"));
@@ -125,7 +125,7 @@ public class DomainRoutingTests : IClassFixture<DocsApp>
         await SetupAsync();
         var guest = On("www.example.org");
         var r = await guest.GetAsync("/docs/start/weiter");
-        Assert.Equal(HttpStatusCode.MovedPermanently, r.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, r.StatusCode);
         Assert.Equal("http://docs.example.org/start/weiter", r.Headers.Location!.ToString());
         var en = await guest.GetAsync("/en/docs");
         Assert.Equal("http://docs.example.org/en", en.Headers.Location!.ToString());

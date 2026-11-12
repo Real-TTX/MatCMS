@@ -637,8 +637,8 @@ Settings → Domains (`site.domainRoutes`, `Services/DomainRoutes.cs`, middlewar
 ONE part of the site — `docs.matmon.eu | /docs | umleiten`. On that domain the request is rewritten BEFORE static files, localization and routing
 (`/x` → `/docs/x`, `/en/x` → `/en/docs/x`), so plugin routes and pages work unchanged; the HTML that comes back has its `href`/`action` written for the
 domain (`/docs/x` → `/x`, the rest of the site → the canonical main address, absolute main-site addresses below the prefix → the domain) and so does a
-`Location` header; a GET of the long form there is a 301 to the short one. At the main address a mapping with `umleiten` sends the part to its domain
-(301) — not for a request carrying the admin cookie, whose session lives on the main address. The host's own areas (`DomainRoutes.SystemSegments`:
+`Location` header; a GET of the long form there is a redirect to the short one. At the main address a mapping with `umleiten` sends the part to its domain
+(302, like the language redirects: a cached 301 would outlive taking a mapping back) — not for a request carrying the admin cookie, whose session lives on the main address. The host's own areas (`DomainRoutes.SystemSegments`:
 admin, login, uploads, thumbs, plugin assets, static folders, sitemap, robots …) are never rewritten. Each host's sitemap/robots name its own
 addresses only. Needs the canonical URL for links back to the main site, and the domain must reach the instance (DNS, the cloud's domain/edge).
 Only HTML answers on a mapped domain are buffered; a new top-level static folder or host area must be added to `SystemSegments`. Tests: `DomainRoutingTests`.

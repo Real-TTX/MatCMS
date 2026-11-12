@@ -12,7 +12,7 @@ public sealed record DomainRoute(string Host, string Prefix, bool Redirect);
 /// path. The request on such a domain is rewritten before anything else sees it (<c>docs.matmon.eu/x</c> is served as <c>/docs/x</c>, with the
 /// language prefix in front where there is one: <c>/en/x</c> → <c>/en/docs/x</c>), the page that comes back has its links written for that domain
 /// (<c>/docs/x</c> → <c>/x</c>; a link to the rest of the site → the site's main address), and a visitor who opens the part at the main address is
-/// sent to its domain (301) when the mapping asks for it. Pure functions here; the middleware in <c>Program.cs</c> applies them.
+/// sent to its domain (302 — a cached 301 would outlive taking the mapping back) when the mapping asks for it. Pure functions here; the middleware in <c>Program.cs</c> applies them.
 /// <para>The host's own areas (admin, sign-in, uploads, static files, sitemap, robots) are never rewritten: they work on every domain as they are.</para>
 /// <para>A domain must also reach the instance (DNS, the edge's route and certificate) — that is the cloud's or the operator's part, not this one.</para>
 /// </summary>

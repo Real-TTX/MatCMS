@@ -525,7 +525,7 @@ app.Use(async (ctx, next) =>
             && MatCMS.Services.DomainRoutes.Owning(routes, path) is { Redirect: true } owner
             && MatCMS.Services.DomainRoutes.Strip(owner, path) is { } shortPath)
         {
-            ctx.Response.Redirect($"{ctx.Request.Scheme}://{owner.Host}{shortPath}{ctx.Request.QueryString}", permanent: true);
+            ctx.Response.Redirect($"{ctx.Request.Scheme}://{owner.Host}{shortPath}{ctx.Request.QueryString}");   // 302 on purpose: a cached 301 would outlive taking the mapping back
             return;
         }
         await next();
@@ -536,7 +536,7 @@ app.Use(async (ctx, next) =>
     // An address that names the prefix itself (a link written for the main address, a bookmark): the short form is the one address.
     if (isRead && MatCMS.Services.DomainRoutes.Strip(route, path) is { } own)
     {
-        ctx.Response.Redirect(own + ctx.Request.QueryString, permanent: true);
+        ctx.Response.Redirect(own + ctx.Request.QueryString);
         return;
     }
     ctx.Items[MatCMS.Services.DomainRoutes.ItemKey] = route;

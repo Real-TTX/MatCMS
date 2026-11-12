@@ -1620,7 +1620,7 @@
   "settings.domains.heading": "Further domains",
   "settings.domains.intro": "A further domain can show one part of this site – e.g. docs.example.org the documentation under /docs. On that domain the pages are named without the part in front (docs.example.org/installation instead of /docs/installation); links to the rest of the site lead to the main address.",
   "settings.domains.label": "Mappings (one per line: domain | path | redirect)",
-  "settings.domains.help": "\"redirect\" at the end: whoever opens the part at the main address lands on the domain (301; not signed-in admins). For links to the main address, set the canonical URL under General.",
+  "settings.domains.help": "\"redirect\" at the end: whoever opens the part at the main address lands on the domain (not signed-in admins). For links to the main address, set the canonical URL under General.",
   "settings.domains.colHost": "Domain",
   "settings.domains.colPath": "Shows",
   "settings.domains.colRedirect": "Redirect",

@@ -1620,7 +1620,7 @@
   "settings.domains.heading": "Weitere Domains",
   "settings.domains.intro": "Eine weitere Domain kann einen Teil dieser Website zeigen – z. B. docs.example.org die Dokumentation unter /docs. Unter der Domain heißen die Seiten dann ohne den Teil davor (docs.example.org/installation statt /docs/installation), Links zum Rest der Website führen zur Hauptadresse.",
   "settings.domains.label": "Zuordnungen (eine je Zeile: Domain | Pfad | umleiten)",
-  "settings.domains.help": "„umleiten“ am Ende: wer den Teil unter der Hauptadresse öffnet, landet auf der Domain (301; angemeldete Admins nicht). Für die Links zur Hauptadresse muss unter Allgemein die Kanonische URL gesetzt sein.",
+  "settings.domains.help": "„umleiten“ am Ende: wer den Teil unter der Hauptadresse öffnet, landet auf der Domain (angemeldete Admins nicht). Für die Links zur Hauptadresse muss unter Allgemein die Kanonische URL gesetzt sein.",
   "settings.domains.colHost": "Domain",
   "settings.domains.colPath": "Zeigt",
   "settings.domains.colRedirect": "Umleiten",

@@ -114,7 +114,7 @@ internal static class StoreText
         ("store.backHome", "Zum Store", "To the store"),
         ("store.install", "So kommt es auf Ihre Website: im Admin unter Plugins → „Weiter durchsuchen …“ → „Installieren“ – oder das Paket herunterladen und unter Plugins importieren.",
             "To put it on your website: in the admin, Plugins → “Browse further …” → “Install” – or download the package and import it under Plugins."),
-        ("store.installNative", "Ein natives Plugin läuft nur, wo „Native Plugins erlauben“ eingeschaltet ist.", "A native plugin only runs where “Allow native plugins” is switched on."),
+        ("store.installNative", "Native Plugins aus dem MatCMS Store sind signiert und laufen ab MatCMS 1.13.388 ohne „Native Plugins erlauben“; ein unsigniertes natives Plugin braucht den Schalter weiterhin.", "Native plugins from the MatCMS Store are signed and run without “Allow native plugins” from MatCMS 1.13.388 on; an unsigned native plugin still needs the switch."),
         ("store.downloadPackage", "Paket {0} herunterladen", "Download package {0}"),
         ("store.homepage", "Website des Plugins", "Plugin website"),
         ("store.versions", "Versionen", "Versions"),

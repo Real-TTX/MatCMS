@@ -195,7 +195,9 @@ public static partial class DocsMarkdown
             var langAttr = lang.Length > 0 ? $" class=\"language-{E(lang)}\"" : "";
             var label = lang.Length > 0 ? $"<span class=\"docs-code-lang\">{E(lang)}</span>" : "";
             var copy = _o.CopyLabel.Length > 0 ? $"<button type=\"button\" class=\"docs-copy\" data-docs-copy data-copied=\"{E(_o.CopiedLabel)}\" hidden>{E(_o.CopyLabel)}</button>" : "";
-            sb.Append($"<div class=\"docs-code\">{label}{copy}<pre><code{langAttr}>{E(string.Join("\n", body))}</code></pre></div>");
+            // Language and copy button in a head row of their own ABOVE the code: laid over the code they covered each other and its first line.
+            var head = label.Length + copy.Length > 0 ? $"<div class=\"docs-code-head\">{(label.Length > 0 ? label : "<span></span>")}{copy}</div>" : "";
+            sb.Append($"<div class=\"docs-code{(head.Length > 0 ? " docs-code-has-head" : "")}\">{head}<pre><code{langAttr}>{E(string.Join("\n", body))}</code></pre></div>");
             return i;
         }
 
@@ -216,7 +218,7 @@ public static partial class DocsMarkdown
                 var kind = a.Groups[1].Value.ToLowerInvariant();
                 var rest = inner.Skip(1).ToList();
                 var title = _o.AlertTitle?.Invoke(kind) ?? kind;
-                sb.Append($"<div class=\"docs-callout {kind}\" role=\"note\"><p class=\"docs-callout-title\">{E(title)}</p>{Blocks(rest)}</div>");
+                sb.Append($"<div class=\"docs-callout docs-callout-{kind}\" role=\"note\"><p class=\"docs-callout-title\">{E(title)}</p>{Blocks(rest)}</div>");
                 return i;
             }
             sb.Append("<blockquote>").Append(Blocks(inner)).Append("</blockquote>");
@@ -291,7 +293,7 @@ public static partial class DocsMarkdown
                     inner = Inline(string.Join("\n", textLines)) + Blocks(item.Skip(textLines.Count).ToList());
                 }
                 else inner = Blocks(item);
-                sb.Append(task.Success ? "<li class=\"task\">" : "<li>").Append(check).Append(inner).Append("</li>");
+                sb.Append(task.Success ? "<li class=\"docs-task\">" : "<li>").Append(check).Append(inner).Append("</li>");
             }
             sb.Append($"</{tag}>");
             return i;

@@ -88,6 +88,21 @@ public class DocsTests : IClassFixture<DocsApp>
     private static async Task<JsonNode> JsonOf(HttpResponseMessage r) => JsonNode.Parse(await r.Content.ReadAsStringAsync())!;
     private static string Decode(string html) => WebUtility.HtmlDecode(html);
 
+    /// <summary>
+    /// Every class the docs write inside their own markup starts with "docs-" — a site template styles generic names (<c>.section</c> got 84 px of padding on
+    /// matcms.de and tore the sidebar apart in 1.0; <c>.active</c>, <c>.next</c>, <c>.page</c> are as common). Allowed: the code block's <c>language-x</c> and Tabler's <c>ti</c>.
+    /// </summary>
+    private static void AssertOwnClassesOnly(string page)
+    {
+        var start = page.IndexOf("<div class=\"docs\">", StringComparison.Ordinal);
+        var end = page.IndexOf("docs.js", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "docs markup not found");
+        var foreign = Regex.Matches(page[start..end], "class=\"([^\"]*)\"").SelectMany(m => m.Groups[1].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(c => c != "docs" && !c.StartsWith("docs-", StringComparison.Ordinal) && !c.StartsWith("language-", StringComparison.Ordinal) && c != "ti" && !c.StartsWith("ti-", StringComparison.Ordinal))
+            .Distinct().ToList();
+        Assert.True(foreign.Count == 0, "classes without docs- prefix: " + string.Join(", ", foreign));
+    }
+
     /// <summary>Writes pages through the API (one call, top down) and checks every one was taken.</summary>
     private async Task PutAsync(string json)
     {
@@ -138,12 +153,13 @@ public class DocsTests : IClassFixture<DocsApp>
         Assert.Contains("<h2 id=\"voraussetzungen\">", page);
         Assert.Contains("href=\"#voraussetzungen\"", page);                                  // the table of contents
         Assert.Contains("class=\"language-bash\">docker compose up -d</code>", page);
-        Assert.Contains("docs-callout warning", page);
+        Assert.Contains("docs-callout docs-callout-warning", page);
         Assert.Contains("href=\"/docs/erste-schritte/konfiguration\">Konfiguration</a>", page);    // a doc: link, resolved
         Assert.Contains("aria-current=\"page\">Installation", page);                         // marked in the sidebar
-        Assert.Contains("class=\"prev\" href=\"/docs/erste-schritte\"", page);
-        Assert.Contains("class=\"next\" href=\"/docs/erste-schritte/konfiguration\"", page);
+        Assert.Contains("class=\"docs-prev\" href=\"/docs/erste-schritte\"", page);
+        Assert.Contains("class=\"docs-next\" href=\"/docs/erste-schritte/konfiguration\"", page);
         Assert.Matches("docs-crumbs.*href=\"/docs\".*href=\"/docs/erste-schritte\">Erste Schritte", page.Replace("\n", " "));
+        AssertOwnClassesOnly(page);
 
         var config = Decode(await guest.GetStringAsync("/docs/erste-schritte/konfiguration"));
         Assert.Contains("<th>Name</th>", config);
@@ -358,7 +374,7 @@ public class DocsMarkdownTests
         var html = H("- eins\n- zwei\n  - zwei a\n  - zwei b\n- drei\n\n1. erst\n2. dann\n\n- [x] erledigt\n- [ ] offen");
         Assert.Contains("<ul><li>eins</li><li>zwei<ul><li>zwei a</li><li>zwei b</li></ul></li><li>drei</li></ul>", html);
         Assert.Contains("<ol><li>erst</li><li>dann</li></ol>", html);
-        Assert.Contains("<li class=\"task\"><input type=\"checkbox\" disabled checked> erledigt</li>", html);
+        Assert.Contains("<li class=\"docs-task\"><input type=\"checkbox\" disabled checked> erledigt</li>", html);
     }
 
     [Fact]
@@ -368,13 +384,16 @@ public class DocsMarkdownTests
         Assert.Contains("<code class=\"language-js\">if (a &lt; b &amp;&amp; c) { x = &quot;&lt;b&gt;&quot;; }</code>", html);
         Assert.Contains("<th style=\"text-align:left\">L</th><th style=\"text-align:right\">R</th>", html);
         Assert.Contains("<td style=\"text-align:left\">a | b</td><td style=\"text-align:right\"><code>x|y</code></td>", html);
+        // language and copy button sit in a head row of their own above the code (laid over it, they covered each other — 1.0)
+        var withCopy = DocsMarkdown.Render("```yaml\na: 1\n```", new DocsMarkdown.Options { CopyLabel = "Kopieren", CopiedLabel = "Kopiert" }).Html;
+        Assert.Matches("<div class=\"docs-code docs-code-has-head\"><div class=\"docs-code-head\"><span class=\"docs-code-lang\">yaml</span><button [^>]*class=\"docs-copy\"[^>]*>Kopieren</button></div><pre>", withCopy);
     }
 
     [Fact]
     public void Alerts_and_quotes()
     {
         var html = DocsMarkdown.Render("> [!TIP]\n> Erst **lesen**.\n\n> Ein Zitat.", new DocsMarkdown.Options { AlertTitle = k => k == "tip" ? "Tipp" : k }).Html;
-        Assert.Contains("<div class=\"docs-callout tip\" role=\"note\"><p class=\"docs-callout-title\">Tipp</p><p>Erst <strong>lesen</strong>.</p></div>", html);
+        Assert.Contains("<div class=\"docs-callout docs-callout-tip\" role=\"note\"><p class=\"docs-callout-title\">Tipp</p><p>Erst <strong>lesen</strong>.</p></div>", html);
         Assert.Contains("<blockquote><p>Ein Zitat.</p></blockquote>", html);
     }
 

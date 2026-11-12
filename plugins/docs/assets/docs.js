@@ -9,7 +9,7 @@
         btn.hidden = false;
         var label = btn.textContent;
         btn.addEventListener("click", function () {
-          var code = btn.parentElement.querySelector("pre code");
+          var box = btn.closest(".docs-code"); var code = box && box.querySelector("pre code");
           if (!code) return;
           navigator.clipboard.writeText(code.textContent).then(function () {
             btn.textContent = btn.getAttribute("data-copied") || label;
@@ -32,8 +32,8 @@
         if (visible[id]) { current = id; break; }
       }
       if (!current) return;
-      links.forEach(function (a) { a.classList.remove("active"); });
-      if (byId[current]) byId[current].classList.add("active");
+      links.forEach(function (a) { a.classList.remove("docs-current"); });
+      if (byId[current]) byId[current].classList.add("docs-current");
     }, { rootMargin: "-80px 0px -60% 0px" });
     Object.keys(byId).forEach(function (id) { var h = document.getElementById(id); if (h) io.observe(h); });
   });

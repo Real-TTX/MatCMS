@@ -210,7 +210,7 @@ internal static class DocsPublic
             {
                 var path = string.Join(" › ", h.Node.Ancestors().Reverse().Select(a => a.Page.Title));
                 results.Append($"<li><a href=\"{E(v.PageUrl(h.Node))}\">{E(h.Node.Page.Title)}</a>");
-                if (path.Length > 0) results.Append($"<div class=\"path\">{E(path)}</div>");
+                if (path.Length > 0) results.Append($"<div class=\"docs-result-path\">{E(path)}</div>");
                 if (h.Excerpt.Length > 0) results.Append($"<p>{Mark(h.Excerpt, Terms(q))}</p>");
                 results.Append("</li>");
             }

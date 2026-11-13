@@ -22,7 +22,14 @@ internal sealed class FrontMatter
 internal sealed record DocFile(string Entry, string Locale, string Version, string Path, FrontMatter Meta, string Body);
 
 /// <summary>What the import would do with one file.</summary>
-internal sealed record PlanItem(DocFile File, string Status, string Title, IReadOnlyList<string> Changes, string? Error);
+internal sealed record PlanItem(DocFile File, string Status, string Title, IReadOnlyList<string> Changes, string? Error)
+{
+    /// <summary>Pictures of the ZIP this page names that are not in the media library yet (they are put there on import).</summary>
+    public IReadOnlyList<string> NewImages { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>What a ZIP holds: the page files, the pictures of its <c>media</c> folder (by file name) and what could not be read.</summary>
+internal sealed record ImportSet(List<DocFile> Files, Dictionary<string, byte[]> Media, List<string> Problems);
 
 /// <summary>
 /// Export and import of the whole documentation as a ZIP of Markdown files — the way to keep docs in a folder, a repository or another site without
@@ -147,6 +154,7 @@ internal static class DocsTransfer
             .ToDictionary(s => s, s => DocTree.Build(all.Where(p => p.Locale == s.Locale && p.Version == s.Version)));
         using var ms = new MemoryStream();
         using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, leaveOpen: true))
+        {
             foreach (var ((locale, version), tree) in trees)
                 foreach (var n in tree.Flat)
                 {
@@ -166,6 +174,17 @@ internal static class DocsTransfer
                     var bytes = new UTF8Encoding(false).GetBytes(Write(meta, p.Body));
                     await s.WriteAsync(bytes, ct);
                 }
+            // the pictures the pages show, as media/{name}: an import elsewhere puts them into that site's library
+            var media = new DocsMedia(ctx.Site);
+            foreach (var url in all.SelectMany(p => DocsMedia.References(p.Body)).Distinct(StringComparer.Ordinal)
+                         .Where(u => u.StartsWith("/uploads/", StringComparison.Ordinal) && DocsMedia.NameOf(u) is not null))
+            {
+                if (await media.ReadAsync(url, ct) is not { } file) { if (!media.Supported) break; continue; }
+                var entry = zip.CreateEntry("media/" + DocsMedia.NameOf(url), CompressionLevel.Optimal);
+                await using var s = entry.Open();
+                await s.WriteAsync(file.Content, ct);
+            }
+        }
         return ms.ToArray();
     }
 
@@ -176,22 +195,35 @@ internal static class DocsTransfer
 
     /// <summary>
     /// The page files of a ZIP. Folders in front of the language folder (<c>content/de/…</c>, a ZIP of a whole folder) are skipped; files that are not
-    /// <c>.md</c> are ignored. Sizes are counted while reading, never taken from the ZIP's own length fields.
+    /// <c>.md</c> are ignored — except pictures inside a folder named <c>media</c> (at any depth), which are read by their file name.
+    /// Sizes are counted while reading, never taken from the ZIP's own length fields.
     /// </summary>
-    public static (List<DocFile> Files, List<string> Problems) Read(Stream zipStream, IReadOnlyCollection<string> languages)
+    public static ImportSet Read(Stream zipStream, IReadOnlyCollection<string> languages)
     {
         var files = new List<DocFile>();
         var problems = new List<string>();
+        var media = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var set = new ImportSet(files, media, problems);
         ZipArchive zip;
         try { zip = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: true); }
-        catch (InvalidDataException) { problems.Add("zip"); return (files, problems); }
+        catch (InvalidDataException) { problems.Add("zip"); return set; }
         using (zip)
         {
             long total = 0;
             foreach (var entry in zip.Entries)
             {
                 var name = entry.FullName.Replace('\\', '/').TrimStart('/');
-                if (name.EndsWith('/') || !name.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) continue;
+                if (name.EndsWith('/')) continue;
+                var folders = name.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (DocsMedia.IsImage(name) && folders.Length > 1 && folders[..^1].Any(f => f.Equals("media", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (media.Count >= MaxFiles) { problems.Add("tooMany"); break; }
+                    var bytes = ReadAll(entry, ref total);
+                    if (bytes is null) { problems.Add("tooBig"); return set; }
+                    media[folders[^1]] = bytes;
+                    continue;
+                }
+                if (!name.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) continue;
                 if (files.Count >= MaxFiles) { problems.Add("tooMany"); break; }
                 var segs = name[..^3].Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
                 if (segs.Any(s => s is "." or "..")) { problems.Add(name); continue; }
@@ -203,21 +235,29 @@ internal static class DocsTransfer
                 if (rest.Count >= 3 && rest[0] == "v") { version = rest[1]; rest = rest.Skip(2).ToList(); }
                 var path = string.Join("/", rest.Select(s => PluginText.Slugify(s)));
 
-                using var s = entry.Open();
-                using var buffer = new MemoryStream();
-                var chunk = new byte[81920];
-                int read;
-                while ((read = s.Read(chunk, 0, chunk.Length)) > 0)
-                {
-                    total += read;
-                    if (total > MaxBytes) { problems.Add("tooBig"); return (files, problems); }
-                    buffer.Write(chunk, 0, read);
-                }
-                var (meta, body) = Split(new UTF8Encoding(false).GetString(buffer.ToArray()));
+                var text = ReadAll(entry, ref total);
+                if (text is null) { problems.Add("tooBig"); return set; }
+                var (meta, body) = Split(new UTF8Encoding(false).GetString(text));
                 files.Add(new DocFile(name, locale, version, path, meta, body));
             }
         }
-        return (files, problems);
+        return set;
+    }
+
+    /// <summary>An entry's bytes, counted into <paramref name="total"/>; null once the whole import would pass <see cref="MaxBytes"/>.</summary>
+    private static byte[]? ReadAll(ZipArchiveEntry entry, ref long total)
+    {
+        using var s = entry.Open();
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        int read;
+        while ((read = s.Read(chunk, 0, chunk.Length)) > 0)
+        {
+            total += read;
+            if (total > MaxBytes) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     /// <summary>The text as stored: line ends as written, trailing blank lines down to one line end (what the API's writers send).</summary>
@@ -240,8 +280,9 @@ internal static class DocsTransfer
 
     /// <summary>What an import would do, in the order it would do it: the default language first (originals before their translations), then by
     /// version and depth (parents before children).</summary>
-    public static async Task<List<PlanItem>> PlanAsync(IPluginContext ctx, IReadOnlyList<DocFile> files, CancellationToken ct)
+    public static async Task<List<PlanItem>> PlanAsync(IPluginContext ctx, ImportSet import, DocsMedia media, CancellationToken ct)
     {
+        var files = import.Files;
         var store = new DocsStore(ctx.Data);
         var versions = await store.VersionsAsync(ct);
         var defVersion = DocsStore.DefaultVersion(versions);
@@ -283,7 +324,24 @@ internal static class DocsTransfer
                 if (Tree(defLocale, version).ByPath(ofSegs) is null && !incoming.Contains((defLocale, version, string.Join("/", ofSegs))))
                 { plan.Add(Error("docs.io.errTranslation", of, defLocale.ToUpperInvariant())); continue; }
             }
-            if (existing is null) { plan.Add(new PlanItem(f, "new", title, Array.Empty<string>(), null)); continue; }
+            // the pictures: an identical file already in the library takes the reference, a new one is put there on import
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            var newImages = new List<string>();
+            var notes = new List<string>();
+            foreach (var reference in DocsMedia.References(f.Body))
+            {
+                if (DocsMedia.NameOf(reference) is not { } img) continue;
+                if (import.Media.TryGetValue(img, out var bytes))
+                {
+                    if (await media.FindAsync(img, bytes, ct) is { } here) map[reference] = here;
+                    else if (media.Supported && !newImages.Contains(img, StringComparer.OrdinalIgnoreCase)) newImages.Add(img);
+                }
+                else if (reference.StartsWith("/uploads/", StringComparison.Ordinal) && media.Supported && await media.ReadAsync(reference, ct) is null)
+                    notes.Add(ctx.T("docs.io.imageMissing", img));
+            }
+            if (newImages.Count > 0) notes.Insert(0, ctx.T("docs.io.fImages", newImages.Count));
+            var body = DocsMedia.Rewrite(f.Body, r => map.TryGetValue(r, out var to) ? to : null);
+            if (existing is null) { plan.Add(new PlanItem(f, "new", title, notes, null) { NewImages = newImages }); continue; }
 
             var p = existing.Page;
             var changes = new List<string>();
@@ -294,27 +352,47 @@ internal static class DocsTransfer
             if (f.Meta.Draft is { } draft && draft == p.Published) changes.Add(ctx.T(draft ? "docs.io.fDraft" : "docs.io.fPublished"));
             var format = f.Meta.Format ?? p.Format;
             if (format != p.Format) changes.Add(ctx.T("docs.io.fFormat"));
-            if (Same(f.Body) != Same(p.Body)) changes.Add(ctx.T("docs.io.fBody"));
+            if (Same(body) != Same(p.Body)) changes.Add(ctx.T("docs.io.fBody"));
             if (of.Length > 0 && f.Locale != defLocale && p.GroupKey.Length == 0) changes.Add(ctx.T("docs.io.fTranslation"));
-            plan.Add(new PlanItem(f, changes.Count > 0 ? "changed" : "unchanged", title, changes, null));
+            var changed = changes.Count > 0 || newImages.Count > 0;
+            changes.AddRange(notes);
+            plan.Add(new PlanItem(f, changed ? "changed" : "unchanged", title, changes, null) { NewImages = newImages });
         }
         return plan;
     }
 
     /// <summary>Writes the new and changed pages of a plan, in its order, through the API's upsert. Returns (written, failed with reasons).</summary>
-    public static async Task<(int Written, List<string> Failed)> ApplyAsync(IPluginContext ctx, IReadOnlyList<PlanItem> plan, CancellationToken ct)
+    public static async Task<(int Written, int Images, List<string> Failed)> ApplyAsync(IPluginContext ctx, ImportSet import, IReadOnlyList<PlanItem> plan,
+        DocsMedia media, CancellationToken ct)
     {
         var written = 0;
         var failed = new List<string>();
-        foreach (var item in plan.Where(i => i.Status is "new" or "changed"))
+        var todo = plan.Where(i => i.Status is "new" or "changed").ToList();
+        // the pictures first, so the pages can name their addresses here
+        var urls = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var added = 0;
+        var named = todo.SelectMany(i => DocsMedia.References(i.File.Body)).Select(DocsMedia.NameOf).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var (img, bytes) in import.Media)
+        {
+            if (!named.Contains(img)) continue;
+            var known = await media.FindAsync(img, bytes, ct);
+            if (known is null)
+            {
+                var (url, error) = await media.AddAsync(img, bytes, ct);
+                if (url is null) { if (error != "unsupported") failed.Add("media/" + img + ": " + error); continue; }
+                known = url;
+                added++;
+            }
+            urls[img] = known;
+        }
+        foreach (var item in todo)
         {
             var f = item.File;
+            var body = DocsMedia.Rewrite(f.Body, r => DocsMedia.NameOf(r) is { } n && urls.TryGetValue(n, out var to) ? to : null);
             var a = new JsonObject
             {
-                ["path"] = f.Path, ["locale"] = f.Locale, ["version"] = f.Version, ["title"] = item.Title,
-                ["body"] = item.Changes.Count == 0 || item.Changes.Contains(ctx.T("docs.io.fBody")) ? CleanBody(f.Body) : null
+                ["path"] = f.Path, ["locale"] = f.Locale, ["version"] = f.Version, ["title"] = item.Title, ["body"] = CleanBody(body)
             };
-            if (a["body"] is null) a.Remove("body");
             if (f.Meta.Summary is not null) a["summary"] = f.Meta.Summary;
             if (f.Meta.Icon is not null) a["icon"] = f.Meta.Icon;
             if (f.Meta.Sort is { } sort) a["sort"] = sort;
@@ -325,7 +403,7 @@ internal static class DocsTransfer
             if (r["error"] is not null) failed.Add(f.Entry + ": " + r["error"]);
             else written++;
         }
-        return (written, failed);
+        return (written, added, failed);
     }
 
     // ---- the back-office page -----------------------------------------------------------------------------------------
@@ -357,13 +435,15 @@ internal static class DocsTransfer
                 {
                     var bytes = await StashedAsync(ctx, ct);
                     if (bytes is null || Hash(bytes) != f.F("hash")) return PluginResult.Redirect(Url, ctx.T("docs.io.expired"), true);
-                    var (files, _) = Read(new MemoryStream(bytes), Languages(ctx));
-                    var plan = await PlanAsync(ctx, files, ct);
-                    var (written, failed) = await ApplyAsync(ctx, plan, ct);
+                    var import = Read(new MemoryStream(bytes), Languages(ctx));
+                    var media = new DocsMedia(ctx.Site);
+                    var plan = await PlanAsync(ctx, import, media, ct);
+                    var (written, images, failed) = await ApplyAsync(ctx, import, plan, media, ct);
                     await ctx.Files.DeleteAsync(Stash, ct);
                     var unchanged = plan.Count(i => i.Status == "unchanged");
                     var errors = plan.Count(i => i.Status == "error") + failed.Count;
-                    var notice = ctx.T("docs.io.done", written, unchanged, errors) + (failed.Count > 0 ? " " + string.Join(" · ", failed.Take(5)) : "");
+                    var notice = ctx.T("docs.io.done", written, unchanged, errors) + (images > 0 ? " " + ctx.T("docs.io.imagesDone", images) : "")
+                                 + (failed.Count > 0 ? " " + string.Join(" · ", failed.Take(5)) : "");
                     return PluginResult.Redirect(Url, notice, errors > 0);
                 }
                 case "cancel":
@@ -387,7 +467,7 @@ internal static class DocsTransfer
             ctx.T("docs.admin.transfer"));
     }
 
-    private const string Example = "de/erste-schritte.md\nde/erste-schritte/installation.md\nen/getting-started.md\nde/v/1.0/erste-schritte.md\n\n---\ntitle: \"Installation\"\nsummary: \"…\"\nicon: \"download\"\nsort: 20\ntranslationOf: \"getting-started/installation\"\ndraft: false\n---\n## …";
+    private const string Example = "de/erste-schritte.md\nde/erste-schritte/installation.md\nen/getting-started.md\nde/v/1.0/erste-schritte.md\nmedia/dashboard.png      (![Dashboard](/uploads/dashboard.png))\n\n---\ntitle: \"Installation\"\nsummary: \"…\"\nicon: \"download\"\nsort: 20\ntranslationOf: \"getting-started/installation\"\ndraft: false\n---\n## …";
 
     private static IReadOnlyCollection<string> Languages(IPluginContext ctx)
     {
@@ -408,10 +488,15 @@ internal static class DocsTransfer
 
     private static async Task<PluginResult> ShowPlanAsync(IPluginContext ctx, byte[] bytes, CancellationToken ct)
     {
-        var (files, problems) = Read(new MemoryStream(bytes), Languages(ctx));
-        var plan = await PlanAsync(ctx, files, ct);
+        var import = Read(new MemoryStream(bytes), Languages(ctx));
+        var problems = import.Problems;
+        var media = new DocsMedia(ctx.Site);
+        var plan = await PlanAsync(ctx, import, media, ct);
         var counts = new[] { "new", "changed", "unchanged", "error" }.ToDictionary(s => s, s => plan.Count(i => i.Status == s));
         var nodes = new List<UiNode?>();
+        if (import.Media.Count > 0 && !media.Supported) nodes.Add(Ui.Alert(ctx.T("docs.io.imagesUnsupported", import.Media.Count), UiTone.Warning));
+        var newImages = plan.Where(i => i.Status is "new" or "changed").SelectMany(i => i.NewImages).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+        if (newImages > 0) nodes.Add(Ui.Alert(ctx.T("docs.io.imagesNew", newImages), UiTone.Info));
         if (problems.Contains("zip")) nodes.Add(Ui.Alert(ctx.T("docs.io.notZip"), UiTone.Error));
         if (problems.Contains("tooBig")) nodes.Add(Ui.Alert(ctx.T("docs.io.tooBig"), UiTone.Error));
         if (problems.Contains("tooMany")) nodes.Add(Ui.Alert(ctx.T("docs.io.tooMany", MaxFiles), UiTone.Error));

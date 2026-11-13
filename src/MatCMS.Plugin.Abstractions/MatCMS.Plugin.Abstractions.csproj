@@ -7,7 +7,7 @@
     <RootNamespace>MatCMS.Plugin</RootNamespace>
     <!-- The API version, not the app version: a plugin declares the MAJOR it was built against
          (plugin.json "Api") and the host decides from that. Additive changes bump the minor only. -->
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <!-- The ASSEMBLY version stays at the major, for good: a plugin compiled against 2.2 references the assembly version, and .NET refuses
          to bind a reference to an OLDER loaded copy — a plugin built today would not load on a 2.1 host at all, which is exactly what
          the default interface members and the MissingMethodException fallbacks are there to allow. Additive minors change only Version. -->

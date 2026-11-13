@@ -298,7 +298,7 @@ internal static class DocsAdmin
     [
         "visual", "markdown", "preview", "previewEmpty", "paragraph", "h2", "h3", "h4", "bold", "italic", "strike", "code", "link", "docLink", "image",
         "ul", "ol", "task", "quote", "callout", "codeBlock", "table", "hr", "rowAdd", "colAdd", "rowDel", "colDel", "linkUrl", "imageUrl", "imageAlt",
-        "language", "failed", "busy", "undo", "redo", "clear"
+        "language", "failed", "busy", "undo", "redo", "clear", "uploading", "uploadFailed"
     ];
 
     /// <summary>The editor's own look. The text inside the visual area is drawn with the PUBLIC stylesheet (<see cref="DocsHtml.Css"/>), scoped under .docs.</summary>

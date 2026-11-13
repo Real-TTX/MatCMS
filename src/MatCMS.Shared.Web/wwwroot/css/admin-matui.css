@@ -384,6 +384,20 @@ body.login-matui { background: var(--mat-bg); font-family: var(--mat-font); font
 .admin--matui .alert { display: flex; align-items: flex-start; gap: var(--mat-space-2); }
 .admin--matui .alert > .alert-icon { font-size: 18px; line-height: 1.3; flex: none; }
 html[data-theme] .admin--matui .alert-neutral { background: var(--mat-surface-2); border-color: var(--mat-border); color: var(--mat-text); }
+/* The layout's flash on a page WITHOUT margins (the form editor's .live-editor fills the content area edge to edge): as a band above it, it stood
+   square against the menu's edge and pushed the 100vh editor down. There it floats in MatUi's toast place and look instead — bottom right (top
+   right covered the editor's own bar), taps go through it; a success note fades after 6 s, an error stays. The tints are see-through, so the
+   surface goes under them, or the form below shone through. */
+.admin--matui .admin-content:has(.live-editor) > .alert {
+  position: fixed; z-index: var(--mat-z-toast, 500); bottom: calc(var(--mat-space-4) + var(--mat-safe-bottom, 0px)); right: calc(var(--mat-space-4) + var(--mat-safe-right, 0px));
+  width: min(380px, calc(100vw - 2 * var(--mat-space-4))); margin: 0; border-radius: var(--mat-radius); box-shadow: var(--mat-shadow-2); pointer-events: none;
+  background-color: var(--mat-surface);
+}
+html[data-theme] .admin--matui .admin-content:has(.live-editor) > .alert-success { background-image: linear-gradient(var(--ok-bg), var(--ok-bg)); }
+html[data-theme] .admin--matui .admin-content:has(.live-editor) > .alert-error { background-image: linear-gradient(var(--err-bg), var(--err-bg)); }
+.admin--matui .admin-content:has(.live-editor) > .alert-success { animation: admin-flash-out .4s ease 6s forwards; }
+@keyframes admin-flash-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .admin--matui .admin-content:has(.live-editor) > .alert-success { animation-duration: 0s; } }
 /* a checkbox's label is the option, not a field label: normal weight, box on the content edge, its help under the text like the core's */
 .admin--matui :is(.form-field, .field) label.check { font-weight: 400; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 0; }
 .admin--matui .field:has(> label.check) > .help { margin-left: 26px; }

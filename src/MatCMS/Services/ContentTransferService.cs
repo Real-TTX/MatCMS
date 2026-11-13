@@ -1057,6 +1057,10 @@ public class ContentTransferService
             var keep = await _db.SiteSettings
                 .Where(s => SettingKeys.Protected.Contains(s.Key) || s.Key.StartsWith(SettingKeys.AiChatGptTokensPrefix))
                 .ToDictionaryAsync(s => s.Key, s => s.Value, StringComparer.OrdinalIgnoreCase);
+            var offeredHere = (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.SeedOffered))?.Value ?? "";
+            var offeredThere = dto.Settings.FirstOrDefault(s => s.Key == SettingKeys.SeedOffered)?.Value ?? "";
+            var offered = string.Join('\n', (offeredHere + "\n" + offeredThere)
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
 
             _db.SiteSettings.RemoveRange(_db.SiteSettings);
             await _db.SaveChangesAsync();
@@ -1066,8 +1070,10 @@ public class ContentTransferService
                 if (keep.ContainsKey(s.Key!)) continue;
                 // A backup from elsewhere (or an old one) may carry another site's AI keys or sign-ins: they are never taken over.
                 if (SettingKeys.IsProtected(s.Key)) continue;
+                if (s.Key == SettingKeys.SeedOffered) continue;
                 _db.SiteSettings.Add(new SiteSetting { Key = s.Key!, Value = s.Value ?? "" });
             }
+            if (offered.Length > 0) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.SeedOffered, Value = offered });
             foreach (var (key, value) in keep)
             {
                 // The applied profile revision is the one cloud key that must NOT survive as it was. The

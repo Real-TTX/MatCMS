@@ -293,6 +293,8 @@
   "cleanup.nothing": "Nothing to clean up – everything is in use.",
   "cleanup.media": "Unused media",
   "cleanup.mediaHelp": "Images whose file name appears in no block, page/template, post or setting. Conservative: kept when in doubt.",
+  "cleanup.files": "Stray files",
+  "cleanup.filesHelp": "Files in the upload folder that belong to no media library item and that nothing refers to – often left over from another site's backup.",
   "cleanup.mediaNone": "No unused media.",
   "cleanup.components": "Unused components",
   "cleanup.componentsHelp": "Custom components with no block of their type on any page.",

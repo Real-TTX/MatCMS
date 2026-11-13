@@ -39,6 +39,10 @@ public static class SettingKeys
     public const string TranslateApiKey = "translate.apiKey";
     public const string TranslateUrl = "translate.url";
 
+    // The starter content the seeder has already offered this site, one `kind:name` per line (DbSeeder). A restore
+    // MERGES it with the backup's: an older backup without it must not make the next start put deleted templates back.
+    public const string SeedOffered = "seed.offered";
+
     // Native plugins (compiled DLLs, loaded into the process with all of its rights — there is no sandbox):
     // "1" = allowed. OFF by default; the operator of the site decides, and a cloud profile can roll it out.
     public const string AllowNativePlugins = "plugins.allowNative";

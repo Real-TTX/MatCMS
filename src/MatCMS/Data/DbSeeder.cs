@@ -71,14 +71,22 @@ public static class DbSeeder
             });
         }
 
-        // A ready-made alternative template. Ensured on every startup (not only on a fresh DB) so
-        // it also reappears after importing a backup that only carried the previous theme.
+        // The starter content (alternative templates, the example component) is OFFERED ONCE per site,
+        // remembered in the setting `seed.offered` (one `kind:name` per line). It used to be "add when
+        // missing" on every start, so a site could never get rid of it: an operator deleted MatBusiness,
+        // MatTech, MatArt and the CTA-Box example and the next restart put them all back. A site from
+        // before writes its marks on the first start with this code (the items are there, nothing is added).
+        var offeredRow = await db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.SeedOffered);
+        var offered = new HashSet<string>((offeredRow?.Value ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), StringComparer.Ordinal);
+        var offeredBefore = offered.Count;
+        bool Offer(string mark) => offered.Add(mark);
+
         var modern = await db.Templates.FirstOrDefaultAsync(t => t.Name == ModernTemplateName);
-        if (modern is null)
+        if (Offer("template:" + ModernTemplateName) && modern is null)
         {
             db.Templates.Add(BuildModernTemplate());
         }
-        else if (string.IsNullOrWhiteSpace(modern.LayoutHtml))
+        else if (modern is not null && string.IsNullOrWhiteSpace(modern.LayoutHtml))
         {
             // Upgrade an older "Modern" row (colors/CSS only) to the new slot-based custom layout,
             // so the alternative template actually demonstrates {{menu:slot}} without a volume reset.
@@ -91,10 +99,10 @@ public static class DbSeeder
         // Note: instance-specific themes (FeuSys, Ferienwohnung) are NOT seeded into the base image —
         // they are delivered per instance via a backup import. The base image ships only generic themes.
 
-        // A few bundled starter themes (added to any DB that doesn't have them yet).
-        await EnsureThemeAsync(db, BusinessThemeName, BuildBusinessTemplate);
-        await EnsureThemeAsync(db, TechThemeName, BuildTechTemplate);
-        await EnsureThemeAsync(db, ArtThemeName, BuildArtTemplate);
+        // A few bundled starter themes (offered once, see above).
+        if (Offer("template:" + BusinessThemeName)) await EnsureThemeAsync(db, BusinessThemeName, BuildBusinessTemplate);
+        if (Offer("template:" + TechThemeName)) await EnsureThemeAsync(db, TechThemeName, BuildTechTemplate);
+        if (Offer("template:" + ArtThemeName)) await EnsureThemeAsync(db, ArtThemeName, BuildArtTemplate);
 
         // Every declared mail gets its row, so the editor has something to show and a site can
         // change the wording without a release. Existing rows are LEFT ALONE — this runs on every
@@ -110,9 +118,16 @@ public static class DbSeeder
         }
 
         // A ready-made example component so the component designer has something to look at.
-        if (!await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
+        if (Offer("component:" + ExampleComponentType) && !await db.Components.AnyAsync(c => c.Type == ExampleComponentType))
         {
             db.Components.Add(BuildExampleComponent());
+        }
+
+        if (offered.Count != offeredBefore)
+        {
+            var value = string.Join('\n', offered.OrderBy(x => x, StringComparer.Ordinal));
+            if (offeredRow is null) db.SiteSettings.Add(S(SettingKeys.SeedOffered, value));
+            else offeredRow.Value = value;
         }
 
         // Plugins are NOT seeded. They used to be (a todo demo, Bewertungen, Google Bewertungen), and
@@ -494,6 +509,7 @@ public static class DbSeeder
     }
 
     private const string ExampleComponentType = "cta-box";
+
 
     /// <summary>A ready-made demo component (a call-to-action box) for the component designer.</summary>
     private static Component BuildExampleComponent() => new()

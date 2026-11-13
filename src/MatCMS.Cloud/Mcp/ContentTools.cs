@@ -471,13 +471,14 @@ public class ContentTools
     }
 
     [McpServerTool(Name = "apply_cleanup"), Description(
-        "Delete the chosen UNUSED media/components/plugins on a connected site (from analyze_cleanup). Pass only what should be removed — the site re-checks each media/component is still unused before deleting (plugins are removed as given). DESTRUCTIVE and irreversible: only call after showing the exact list and getting the user's explicit go. QUEUED and applied on the next heartbeat; check get_content_op(opId). Requires a key with the restore right; if the site's profile has \"Backup vor KI-Änderung\", a backup is taken first automatically.")]
+        "Delete the chosen UNUSED media/stray files/components/plugins on a connected site (from analyze_cleanup). Pass only what should be removed — the site re-checks each media/component is still unused before deleting (plugins are removed as given). DESTRUCTIVE and irreversible: only call after showing the exact list and getting the user's explicit go. QUEUED and applied on the next heartbeat; check get_content_op(opId). Requires a key with the restore right; if the site's profile has \"Backup vor KI-Änderung\", a backup is taken first automatically.")]
     public static async Task<object> ApplyCleanup(
         McpContext me, InstanceService instances,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("Media ids to delete (from analyze_cleanup's unusedMedia[].id). Empty to delete none.")] int[]? mediaIds = null,
         [Description("Component types to delete (from unusedComponents[].type). Empty to delete none.")] string[]? componentTypes = null,
         [Description("Plugin keys to delete (from plugins[].key). Empty to delete none. No auto \"unused\" check — pass only deliberate choices.")] string[]? pluginKeys = null,
+        [Description("Stray files of the upload folder to delete (from strayFiles[].name: files no media item owns and nothing names). Empty to delete none.")] string[]? strayFiles = null,
         CancellationToken ct = default)
     {
         var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
@@ -486,6 +487,7 @@ public class ContentTools
             mediaIds = mediaIds ?? [],
             componentTypes = componentTypes ?? [],
             pluginKeys = pluginKeys ?? [],
+            strayFiles = strayFiles ?? [],
         });
         var op = await instances.EnqueueContentOpAsync(instance, "cleanup.apply", payload,
             overwrite: true, reason: "KI: Aufräumen anwenden", ct);

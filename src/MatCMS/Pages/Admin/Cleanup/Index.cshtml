@@ -43,6 +43,19 @@
                 </tbody>
             </table>
         }
+        @if (Model.SelFiles.Count > 0)
+        {
+            <h3>@T["cleanup.files"] <span class="muted">(@Model.SelFiles.Count · @Hsize(Model.SelFiles.Sum(f => f.SizeBytes)))</span></h3>
+            <table class="data cleanup-list">
+                <thead><tr><th class="cleanup-thumb"></th><th>@T["cleanup.name"]</th><th class="cleanup-info">@T["cleanup.info"]</th></tr></thead>
+                <tbody>
+                    @foreach (var f in Model.SelFiles)
+                    {
+                        <tr><td class="cleanup-thumb"><img src="/uploads/@f.Name" alt="" loading="lazy" /></td><td>@f.Name</td><td class="cleanup-info muted mono">@Hsize(f.SizeBytes)</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
         @if (Model.SelComponents.Count > 0)
         {
             <h3>@T["cleanup.components"] <span class="muted">(@Model.SelComponents.Count)</span></h3>
@@ -72,6 +85,7 @@
 
         <form method="post" asp-page-handler="Delete" data-confirm="@T["cleanup.confirmJs"]">
             @foreach (var m in Model.SelMedia) { <input type="hidden" name="mediaIds" value="@m.Id" /> }
+            @foreach (var f in Model.SelFiles) { <input type="hidden" name="strayFiles" value="@f.Name" /> }
             @foreach (var c in Model.SelComponents) { <input type="hidden" name="componentTypes" value="@c.Type" /> }
             @foreach (var p in Model.SelPlugins) { <input type="hidden" name="pluginKeys" value="@p.Key" /> }
             <div class="form-actions">
@@ -83,7 +97,7 @@
     return;
 }
 
-@if (r.UnusedMedia.Count == 0 && r.UnusedComponents.Count == 0 && r.Plugins.Count == 0)
+@if (r.UnusedMedia.Count == 0 && r.StrayFiles.Count == 0 && r.UnusedComponents.Count == 0 && r.Plugins.Count == 0)
 {
     <div class="card"><p>@T["cleanup.nothing"]</p></div>
     return;
@@ -124,6 +138,38 @@
             </tbody>
         </table>
     </div>
+
+    @* ---- Stray files: in the upload folder, owned by no media row, named by no text — pre-ticked like media ---- *@
+    @if (r.StrayFiles.Count > 0)
+    {
+        <div class="card">
+            <div class="form-section">
+                <h2>@T["cleanup.files"] <span class="muted">(@r.StrayFiles.Count · @Hsize(r.StrayBytes))</span></h2>
+                <div class="help">@T["cleanup.filesHelp"]</div>
+            </div>
+            <table class="data cleanup-list">
+                <thead>
+                    <tr>
+                        <th class="cleanup-check"><input type="checkbox" data-check-all="file" checked title="@T["cleanup.selectAll"]" aria-label="@T["cleanup.selectAll"]" /></th>
+                        <th class="cleanup-thumb"></th>
+                        <th>@T["cleanup.name"]</th>
+                        <th class="cleanup-info">@T["cleanup.info"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var f in r.StrayFiles)
+                    {
+                        <tr>
+                            <td class="cleanup-check"><input type="checkbox" name="strayFiles" value="@f.Name" data-check="file" checked /></td>
+                            <td class="cleanup-thumb"><img src="/uploads/@f.Name" alt="" loading="lazy" /></td>
+                            <td>@f.Name</td>
+                            <td class="cleanup-info muted mono">@Hsize(f.SizeBytes)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 
     @* ---- Components: unused (no block of this type), pre-ticked ---- *@
     <div class="card">
@@ -186,7 +232,7 @@
                         <td class="muted mono">@p.Key</td>
                         <td class="cleanup-info">
                             <span class="badge @(p.Enabled ? "badge-on" : "badge-off")">@(p.Enabled ? T["cleanup.enabled"] : T["cleanup.disabled"])</span>
-                            @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="muted">v@p.Version</span> }
+                            @if (!string.IsNullOrWhiteSpace(p.Version)) { <span class="muted">v@(p.Version)</span> }
                         </td>
                     </tr>
                 }

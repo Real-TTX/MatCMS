@@ -292,6 +292,8 @@
   "cleanup.nothing": "Nichts zum Aufräumen – alles wird verwendet.",
   "cleanup.media": "Unbenutzte Medien",
   "cleanup.mediaHelp": "Bilder, deren Dateiname in keinem Block, keiner Seite/Vorlage, keinem Beitrag und keiner Einstellung vorkommt. Konservativ: im Zweifel behalten.",
+  "cleanup.files": "Verwaiste Dateien",
+  "cleanup.filesHelp": "Dateien im Upload-Ordner, die zu keinem Eintrag der Mediathek gehören und auf die nichts verweist – oft Reste aus einem Backup einer anderen Website.",
   "cleanup.mediaNone": "Keine unbenutzten Medien.",
   "cleanup.components": "Unbenutzte Komponenten",
   "cleanup.componentsHelp": "Eigene Komponenten, von denen auf keiner Seite ein Block existiert.",

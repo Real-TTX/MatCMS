@@ -442,7 +442,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **SQLite under concurrency — two traps found by the shop's race tests.** (1) `UPDATE … RETURNING` through Microsoft.Data.Sqlite: the driver waits for a busy database only on a
   statement's FIRST step, the commit of a RETURNING statement happens on a later one and failed with "database is locked" — counters are `UPDATE` + `SELECT` inside a
   `Serializable` (= `BEGIN IMMEDIATE`) transaction. Plugin transactions (`InTransactionAsync`) are `Serializable` too, and a transaction that reads before it writes should start with a
-  write (`ShopStore.LockForWriteAsync`) so it queues instead of being refused. (2) `UseStatusCodePagesWithReExecute` re-runs every EMPTY error response as the status page; for a POST
+  write (`ShopStore.LockForWriteAsync`) so it queues instead of being refused. EF itself saves with `… RETURNING` too, so every connection of `AppDbContext` gets SQLite's NATIVE busy timeout (`Data/SqliteBusyTimeout.cs`, an interceptor added in `OnConfiguring`) — without it, an ordinary save that met another writer failed at once (the test suite failed a different 5–20 tests per run). (2) `UseStatusCodePagesWithReExecute` re-runs every EMPTY error response as the status page; for a POST
   that ends as a bare 400 — `PluginPage` therefore always gives an error answer to a POST a short body.
 - **The plugin machinery tests don't start the built-ins** (`new Harness()`); the shop tests do (`new Harness(builtIns: true)`); the blog tests
   import its signed package (`BlogFixture.InstallAsync`).

@@ -63,7 +63,8 @@ public sealed class StorePlugin : IPlugin
 
         // ---- the rest of the site ------------------------------------------------------------------------------------
         b.MenuElement(new MenuElementSpec("store", "store.menu") { Help = "store.menuHelp", Icon = "building-store", DefaultMenu = "header" },
-            (ctx, ct) => Task.FromResult<MenuEntry?>(new MenuEntry(ctx.T("store.menu"), StoreUrls.Home) { Icon = "building-store" }));
+            // The entry in the visitor's language (/de/store on a site whose default is English) — a bare /store led every other language into the default one.
+            (ctx, ct) => Task.FromResult<MenuEntry?>(new MenuEntry(ctx.T("store.menu"), StoreHtml.Prefix(ctx) + StoreUrls.Home) { Icon = "building-store" }));
         b.Sitemap(SitemapAsync);
         b.LinkTargets("store.links.group", LinksAsync);
         b.On("site.search", SiteSearchAsync);

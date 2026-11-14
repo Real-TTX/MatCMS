@@ -36,10 +36,17 @@ public class CleanupService
     /// their block types are only known at runtime), so they are offered for MANUAL selection, never
     /// pre-ticked. `UsedBlockTypes`/`ProvidesBlocks` is informational only.</summary>
     public record PluginItem(int Id, string Key, string Name, string Version, bool Enabled);
+    /// <summary>A file in the upload folder that no media row owns and no text names — what a backup from a shared
+    /// workbench left behind (another site's photos and logos riding along in every later backup). Pre-ticked like media.</summary>
+    public record FileItem(string Name, long SizeBytes);
     public record Report(
         List<MediaItem> UnusedMedia, long UnusedMediaBytes,
         List<ComponentItem> UnusedComponents,
-        List<PluginItem> Plugins);
+        List<PluginItem> Plugins)
+    {
+        public List<FileItem> StrayFiles { get; init; } = [];
+        public long StrayBytes => StrayFiles.Sum(f => f.SizeBytes);
+    }
 
     /// <summary>Read-only: computes what is currently unused. Called for the preview AND re-run just
     /// before a delete, so anything that became referenced in the meantime is never removed.</summary>
@@ -78,7 +85,24 @@ public class CleanupService
             .Select(p => new PluginItem(p.Id, p.Key, p.Name, p.Version, p.Enabled))
             .ToList();
 
-        return new Report(unusedMedia, unusedBytes, unusedComponents, plugins);
+        // Files in the upload folder that belong to no media row (as its file or as the original an edit set aside) and
+        // that no text names. Only the folder's own files: sub-folders are not ours to judge.
+        var owned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var m in await _db.Media.AsNoTracking().Select(m => new { m.Url, m.OriginalUrl }).ToListAsync(ct))
+        {
+            owned.Add(Path.GetFileName(m.Url ?? ""));
+            if (m.OriginalUrl is not null) owned.Add(Path.GetFileName(m.OriginalUrl));
+        }
+        var stray = new List<FileItem>();
+        var uploads = StoragePaths.Uploads(_env);
+        if (Directory.Exists(uploads))
+            foreach (var f in new DirectoryInfo(uploads).EnumerateFiles().OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                if (owned.Contains(f.Name) || text.Contains(f.Name, StringComparison.OrdinalIgnoreCase)) continue;
+                stray.Add(new FileItem(f.Name, f.Length));
+            }
+
+        return new Report(unusedMedia, unusedBytes, unusedComponents, plugins) { StrayFiles = stray };
     }
 
     /// <summary>Deletes exactly the given selections — but re-analyses first and drops any media/component
@@ -141,6 +165,20 @@ public class CleanupService
         }
 
         return (media, comps, plugins);
+    }
+
+    /// <summary>Deletes the chosen stray files of the upload folder — re-analysed first, so a file that a row or a text
+    /// took up since the preview stays. A name is only ever matched against the analysis, never used as a path as it came.</summary>
+    public async Task<int> DeleteStrayFilesAsync(IEnumerable<string> names, CancellationToken ct = default)
+    {
+        var allowed = (await AnalyzeAsync(ct)).StrayFiles.Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var n = 0;
+        foreach (var name in names.Where(allowed.Contains).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            DeleteMediaFiles("/uploads/" + name);
+            n++;
+        }
+        return n;
     }
 
     /// <summary>Removes a media file and its derived thumbnails. Mirrors the media admin's delete (which

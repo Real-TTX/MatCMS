@@ -220,7 +220,7 @@ public class ContentOpApplier
     {
         var report = await _cleanup.AnalyzeAsync(ct);
         return ReportResult(op, JsonSerializer.Serialize(report),
-            $"{report.UnusedMedia.Count} Medien unbenutzt ({report.UnusedComponents.Count} Komponenten), {report.Plugins.Count} Plugins.");
+            $"{report.UnusedMedia.Count} Medien unbenutzt, {report.StrayFiles.Count} verwaiste Dateien ({report.UnusedComponents.Count} Komponenten), {report.Plugins.Count} Plugins.");
     }
 
     /// <summary>Write op (restore-gated on the cloud side): deletes exactly the passed selections.
@@ -233,7 +233,8 @@ public class ContentOpApplier
         var compTypes = (payload["componentTypes"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [];
         var pluginKeys = (payload["pluginKeys"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [];
         var (media, comps, plugins) = await _cleanup.DeleteAsync(mediaIds, compTypes, pluginKeys, ct);
-        return Report(op, "applied", $"Aufgeräumt: {media} Medien, {comps} Komponenten, {plugins} Plugins gelöscht.");
+        var files = await _cleanup.DeleteStrayFilesAsync((payload["strayFiles"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToArray() ?? [], ct);
+        return Report(op, "applied", $"Aufgeräumt: {media} Medien, {files} verwaiste Dateien, {comps} Komponenten, {plugins} Plugins gelöscht.");
     }
 
     // --- Reads: the instance serializes its OWN content back (the cloud never parses the format) ----------

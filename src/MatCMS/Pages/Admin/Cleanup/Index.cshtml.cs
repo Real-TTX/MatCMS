@@ -24,6 +24,7 @@ public class IndexModel : PageModel
     public List<CleanupService.ComponentItem> SelComponents { get; private set; } = new();
     public List<CleanupService.PluginItem> SelPlugins { get; private set; } = new();
     public long SelMediaBytes { get; private set; }
+    public List<CleanupService.FileItem> SelFiles { get; private set; } = new();
 
     public async Task OnGetAsync()
     {
@@ -31,7 +32,7 @@ public class IndexModel : PageModel
     }
 
     // Step 1 → 2: the operator picked items; re-analyse and show exactly what they picked for a final look.
-    public async Task<IActionResult> OnPostReviewAsync(int[]? mediaIds, string[]? componentTypes, string[]? pluginKeys)
+    public async Task<IActionResult> OnPostReviewAsync(int[]? mediaIds, string[]? componentTypes, string[]? pluginKeys, string[]? strayFiles)
     {
         var report = await _cleanup.AnalyzeAsync(HttpContext.RequestAborted);
         var mIds = (mediaIds ?? []).ToHashSet();
@@ -42,8 +43,10 @@ public class IndexModel : PageModel
         SelComponents = report.UnusedComponents.Where(c => cTypes.Contains(c.Type)).ToList();
         SelPlugins = report.Plugins.Where(p => pKeys.Contains(p.Key)).ToList();
         SelMediaBytes = SelMedia.Sum(m => m.SizeBytes);
+        var fNames = (strayFiles ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SelFiles = report.StrayFiles.Where(f => fNames.Contains(f.Name)).ToList();
 
-        if (SelMedia.Count == 0 && SelComponents.Count == 0 && SelPlugins.Count == 0)
+        if (SelMedia.Count == 0 && SelComponents.Count == 0 && SelPlugins.Count == 0 && SelFiles.Count == 0)
         {
             TempData["FlashError"] = "Nichts ausgewählt.";
             return RedirectToPage();
@@ -54,11 +57,12 @@ public class IndexModel : PageModel
     }
 
     // Step 2: actually delete (CleanupService re-checks "still unused" one more time).
-    public async Task<IActionResult> OnPostDeleteAsync(int[]? mediaIds, string[]? componentTypes, string[]? pluginKeys)
+    public async Task<IActionResult> OnPostDeleteAsync(int[]? mediaIds, string[]? componentTypes, string[]? pluginKeys, string[]? strayFiles)
     {
         var (media, comps, plugins) = await _cleanup.DeleteAsync(
             mediaIds ?? [], componentTypes ?? [], pluginKeys ?? [], HttpContext.RequestAborted);
-        TempData["Flash"] = $"Aufgeräumt: {media} Medien, {comps} Komponenten, {plugins} Plugins gelöscht.";
+        var files = await _cleanup.DeleteStrayFilesAsync(strayFiles ?? [], HttpContext.RequestAborted);
+        TempData["Flash"] = $"Aufgeräumt: {media} Medien, {files} verwaiste Dateien, {comps} Komponenten, {plugins} Plugins gelöscht.";
         return RedirectToPage();
     }
 }

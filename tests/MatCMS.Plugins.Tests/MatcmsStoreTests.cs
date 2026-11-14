@@ -336,6 +336,9 @@ public class MatcmsStoreTests : IClassFixture<StoreServerApp>
         var en = WebUtility.HtmlDecode(await guest.GetStringAsync("/en/store"));
         Assert.Contains("Greeter", en);
         Assert.Contains("A greeting on every page.", en);
+        Assert.Contains("Plugins for MatCMS – reviewed and signed.", en);           // the unchanged default introduction follows the language
+        Assert.DoesNotContain("geprüft und signiert", en);
+        Assert.Contains("Plugins für MatCMS – geprüft und signiert.", de);
         Assert.Contains("href=\"/en/store/lingua-hello\"", en);                       // the visitor stays in English
         Assert.DoesNotContain("href=\"/en/store/api/", en);                          // packages and pictures keep one address
         var page = WebUtility.HtmlDecode(await guest.GetStringAsync("/en/store/lingua-hello"));

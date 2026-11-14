@@ -122,6 +122,19 @@ public static class SeShowcase
             ? u.GetLeftPart(UriPartial.Authority) : null;
     }
 
+    /// <summary>An entry in the page's language: the MatCMS Store sends its German texts plus <c>translations.{lang}</c> (name, summary, description —
+    /// each optional, an empty one keeps the German). A cloud's store sends no translations; its entries stay as they are. A copy, never the
+    /// cached catalogue itself.</summary>
+    private static JsonObject Localized(JsonObject e, string locale)
+    {
+        var lang = (locale ?? "").Split('-')[0].ToLowerInvariant();
+        if (lang is "" or "de" || e["translations"] is not JsonObject tr || tr[lang] is not JsonObject t) return e;
+        var copy = (JsonObject)e.DeepClone();
+        foreach (var f in new[] { "name", "summary", "description" })
+            if (S(t[f]) is { Length: > 0 } v) copy[f] = v;
+        return copy;
+    }
+
     private static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
     private static string E(string s) => WebUtility.HtmlEncode(s);
     private static string N(int n) => n.ToString(CultureInfo.InvariantCulture);
@@ -150,7 +163,7 @@ public static class SeShowcase
         }
 
         List<JsonObject> All(string name, bool wanted, Func<JsonObject, bool>? keep = null) => wanted
-            ? (data[name] as JsonArray ?? new JsonArray()).OfType<JsonObject>().Where(x => keep is null || keep(x)).ToList()
+            ? (data[name] as JsonArray ?? new JsonArray()).OfType<JsonObject>().Where(x => keep is null || keep(x)).Select(x => Localized(x, ctx.Locale)).ToList()
             : new List<JsonObject>();
         var allPlugins = All("plugins", show is "plugins" or "all", p => kind.Length == 0 || S(p["kind"]) == kind);
         var allTemplates = All("templates", show is "templates" or "all");

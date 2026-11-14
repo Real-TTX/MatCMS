@@ -339,6 +339,7 @@ internal static class StoreText
         ("store.set.title", "Name des Stores", "Store name"),
         ("store.set.groupGeneral", "Allgemein", "General"),
         ("store.set.intro", "Einleitung über dem Katalog", "Introduction above the catalogue"),
+        ("store.introDefault", StoreSettings.DefaultIntro, "Plugins for MatCMS – reviewed and signed. Install them in your own website under Plugins → “Browse more …”."),
         ("store.set.groupPublishers", "Herausgeber", "Publishers"),
         ("store.set.registration", "Registrieren erlauben", "Allow registration"),
         ("store.set.registrationHelp", "Aus = neue Herausgeber nur, wenn Sie ihnen ein Konto der Website anlegen.", "Off = new publishers only when you create a site account for them."),

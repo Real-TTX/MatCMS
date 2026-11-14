@@ -44,7 +44,7 @@ internal static class StorePages
             $"<a class=\"mst-tab{(kind == value ? " is-on" : "")}\" href=\"{E(StoreUrls.Home + Query(q, value, tag))}\">{E(label)}</a>";
         var sb = new StringBuilder();
         sb.Append("<div class=\"mst-head\"><div><h1>").Append(E(StoreSettings.StoreTitle(ctx))).Append("</h1>");
-        if (ctx.Settings.Get(StoreSettings.Intro) is { Length: > 0 } intro) sb.Append("<p class=\"mst-intro\">").Append(E(intro)).Append("</p>");
+        if (StoreSettings.StoreIntro(ctx) is { Length: > 0 } intro) sb.Append("<p class=\"mst-intro\">").Append(E(intro)).Append("</p>");
         sb.Append("</div><a class=\"btn btn-outline\" href=\"").Append(StoreUrls.Account).Append("\">").Append(E(ctx.T("store.submit"))).Append("</a></div>");
         sb.Append("<div class=\"mst-bar\"><div class=\"mst-tabs\">").Append(Tab("", ctx.T("store.all"))).Append(Tab("script", ctx.T("store.kind.script")))
           .Append(Tab("native", ctx.T("store.kind.native"))).Append(Tab(StorePackage.KindTemplate, ctx.T("store.kind.templates")))
@@ -62,7 +62,7 @@ internal static class StorePages
             foreach (var (item, pub, cover) in items) sb.Append(Card(ctx, item, pub, cover));
             sb.Append("</div>");
         }
-        return Page(ctx, StoreSettings.StoreTitle(ctx), sb.ToString(), ctx.Settings.Get(StoreSettings.Intro), noIndex: q.Length > 0);
+        return Page(ctx, StoreSettings.StoreTitle(ctx), sb.ToString(), StoreSettings.StoreIntro(ctx), noIndex: q.Length > 0);
     }
 
     private static string Query(string q, string kind, string tag)

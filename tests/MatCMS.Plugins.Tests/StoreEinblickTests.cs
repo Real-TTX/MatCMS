@@ -81,6 +81,8 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
             {
                 ["key"] = "leserstimmen", ["name"] = "Leserstimmen", ["version"] = "1.3", ["description"] = "Rezensionen mit Sternen.", ["kind"] = "script", ["updated"] = "2026-10-20",
                 ["publisher"] = "MATTHIX", ["publisherUrl"] = "https://matthix.de",
+                // the MatCMS Store sends English texts beside the German ones; an empty field keeps the German
+                ["translations"] = new JsonObject { ["en"] = new JsonObject { ["name"] = "Testimonials", ["summary"] = "", ["description"] = "Reviews with stars." } },
                 ["images"] = new JsonArray(
                     new JsonObject { ["id"] = 7, ["caption"] = "Karten <mit> Sternen", ["url"] = "/api/public/store/plugins/leserstimmen/image/7" },
                     new JsonObject { ["id"] = 8, ["caption"] = "Admin", ["url"] = "/api/public/store/plugins/leserstimmen/image/8" })
@@ -229,9 +231,14 @@ public class StoreEinblickTests : IClassFixture<AppFactory>
         Assert.Contains("20 Oct 2026", en);                                // a day as English writes it
         Assert.DoesNotContain("20.10.2026", en);
         Assert.DoesNotContain("Komponenten", en);
+        Assert.Contains("Testimonials", en);                              // the catalogue's English texts
+        Assert.Contains("Reviews with stars.", en);
+        Assert.DoesNotContain("Rezensionen mit Sternen.", en);
 
         var de = WebUtility.HtmlDecode(Section(await _app.Browser().GetStringAsync("/store-test-de")));
         Assert.Contains("20.10.2026", de);
+        Assert.Contains("Rezensionen mit Sternen.", de);
+        Assert.DoesNotContain("Testimonials", de);
     }
 
     [Fact]

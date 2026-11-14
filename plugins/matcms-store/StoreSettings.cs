@@ -20,7 +20,7 @@ internal static class StoreSettings
     public static void Declare(ISettingsBuilder s)
     {
         s.Add(new SettingSpec(Title, "store.set.title") { Default = "MatCMS Store", Required = true, Group = "store.set.groupGeneral" });
-        s.TextArea(Intro, "store.set.intro", "Plugins für MatCMS – geprüft und signiert. Installieren in der eigenen Website unter Plugins → „Weiter durchsuchen …“.");
+        s.TextArea(Intro, "store.set.intro", DefaultIntro);
         s.Add(new SettingSpec(Registration, "store.set.registration", SettingKind.Bool) { Default = "true", Help = "store.set.registrationHelp", Group = "store.set.groupPublishers" });
         s.Bool(RequireTwoFactor, "store.set.twoFactor", true, "store.set.twoFactorHelp");
         s.TextArea(Terms, "store.set.terms", "", "store.set.termsHelp");
@@ -30,6 +30,15 @@ internal static class StoreSettings
         s.Number(MaxPackageMb, "store.set.maxPackage", 90, 1, MaxPackageLimit);
         s.Add(new SettingSpec(Reviews, "store.set.reviews", SettingKind.Bool) { Default = "true", Help = "store.set.reviewsHelp", Group = "store.set.groupReviews" });
     }
+
+    /// <summary>The introduction's German default as it is stored when nobody changed it.</summary>
+    public const string DefaultIntro = "Plugins für MatCMS – geprüft und signiert. Installieren in der eigenen Website unter Plugins → „Weiter durchsuchen …“.";
+
+    /// <summary>The introduction above the catalogue: what the operator typed, as typed — an unchanged default follows the page's language
+    /// (the stored default is German, and an English visitor of /en/store read it in German).</summary>
+    public static string StoreIntro(IPluginContext ctx) => ctx.Settings.Get(Intro) is { Length: > 0 } t
+        ? (t.Trim() == DefaultIntro ? ctx.T("store.introDefault") : t)
+        : "";
 
     public static string StoreTitle(IPluginContext ctx) => ctx.Settings.Get(Title) is { Length: > 0 } t ? t : "MatCMS Store";
 

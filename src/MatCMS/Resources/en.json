@@ -941,6 +941,8 @@
   "settings.uploadFailed": "Upload failed.",
   "settings.faviconHelp": "Small icon in the browser tab. Optional — if unset, the logo is used.",
   "settings.footerText": "Footer text",
+  "settings.footerTextAllHelp": "Used for the default language and for every language without its own text.",
+  "settings.footerTextLangHelp": "Leave empty to use the footer text above.",
   "settings.contactEmail": "Contact email (recipient, informational)",
   "settings.contactEmailHelp": "Currently not used for sending — inquiries appear under “Inquiries”.",
   "settings.save": "Save",

@@ -80,6 +80,18 @@ public class IndexModel : PageModel
     public IReadOnlyList<string> RoutableLanguages => Localizer.SupportedCultures;
     public HashSet<string> CurrentActive { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The active languages other than the default one: each gets its own footer field (empty = the general text).</summary>
+    public List<string> FooterLanguages { get; private set; } = new();
+
+    // What the general form loads and saves: the general keys plus one footer per active language. A language switched off keeps
+    // its stored footer (not in this list, so not overwritten) and gets it back when switched on again.
+    private async Task<List<string>> GeneralKeysAsync()
+    {
+        var active = Localizer.ParseActive((await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.Languages))?.Value);
+        FooterLanguages = active.Where(l => !string.Equals(l, Localizer.DefaultCulture, StringComparison.OrdinalIgnoreCase)).ToList();
+        return SettingKeys.All.Concat(FooterLanguages.Select(SettingKeys.FooterTextFor)).ToList();
+    }
+
     /// <summary>
     /// Runs the preview on the GET rather than round-tripping its result through TempData. TempData
     /// here is cookie-backed (no session is registered), and a profile with a few dozen items
@@ -109,7 +121,7 @@ public class IndexModel : PageModel
         SmtpConfigured = !string.IsNullOrWhiteSpace(
             (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(x => x.Key == SettingKeys.SmtpHost))?.Value);
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
-        foreach (var key in SettingKeys.All.Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs).Concat(SettingKeys.Social))
+        foreach (var key in (await GeneralKeysAsync()).Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs).Concat(SettingKeys.Social))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -352,7 +364,7 @@ public class IndexModel : PageModel
         Values[SettingKeys.BehindHttpsProxy] = behindHttpsProxy ? "1" : "0";
         Values[SettingKeys.AdminBar] = adminBar ? "1" : "0";
         Values[SettingKeys.MembersSelfRegistration] = memberSignup ? "1" : "0";
-        await SaveKeysAsync(SettingKeys.All);
+        await SaveKeysAsync(await GeneralKeysAsync());
         TempData["Flash"] = "Einstellungen gespeichert.";
         return RedirectToPage();
     }

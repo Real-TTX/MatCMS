@@ -382,7 +382,19 @@
             <div class="form-field">
                 <label>@T["settings.footerText"]</label>
                 <input name="Values[@SettingKeys.FooterText]" value="@V(SettingKeys.FooterText)" />
+                @if (Model.FooterLanguages.Count > 0)
+                {
+                    <div class="help">@T["settings.footerTextAllHelp"]</div>
+                }
             </div>
+            @foreach (var loc in Model.FooterLanguages)
+            {
+                <div class="form-field">
+                    <label>@T["settings.footerText"] (@MatCMS.Services.Localizer.DisplayName(loc))</label>
+                    <input name="Values[@SettingKeys.FooterTextFor(loc)]" value="@V(SettingKeys.FooterTextFor(loc))" placeholder="@V(SettingKeys.FooterText)" />
+                    <div class="help">@T["settings.footerTextLangHelp"]</div>
+                </div>
+            }
             <div class="form-field">
                 <label>@T["settings.contactEmail"]</label>
                 <input name="Values[@SettingKeys.ContactRecipient]" value="@V(SettingKeys.ContactRecipient)" />

@@ -303,7 +303,8 @@ public class SiteContext
     // Without a favicon of its own a site used its LOGO — with MatCMS's logo that is the whole word mark, unreadable at 16 px.
     // MatCMS's mark alone is the favicon then; a site with a logo of its own keeps using that, as before.
     public string FaviconUrl => Get(SettingKeys.FaviconUrl, UsesDefaultLogo ? "/img/favicon.svg" : LogoUrl);
-    public string FooterText => Get(SettingKeys.FooterText, "© MatCMS");
+    // The language's own footer first ("FooterText.en"), else the one text for all languages — a site with one language is unchanged.
+    public string FooterText => Get(SettingKeys.FooterTextFor(CurrentLocale)) is { Length: > 0 } own ? own : Get(SettingKeys.FooterText, "© MatCMS");
 
     // --- Custom code / tracking (Settings → Code) ---
     /// <summary>Raw HTML injected right before &lt;/head&gt;.</summary>

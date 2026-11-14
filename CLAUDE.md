@@ -292,6 +292,12 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   blocks (`DocsMarkdown.ToEditor`, raw + HTML each), an untouched block goes back as its raw text, only a touched one is written from its HTML
   (`DocsVisual`, C#) — keep it that way, a JS Markdown library would normalise every page on the first switch. Preview and import/export (ZIP of
   `<locale>/[v/<version>/]<path>.md`, optional front matter, dry run first, written through `DocsOps.UpsertAsync`) are in `DocsAdmin`/`DocsTransfer`.
+  1.4: pictures — pasted/dropped into the editor go through `/admin/api/upload`; the ZIP carries them as `media/{name}` and an import puts them into
+  the library and re-points the references (`DocsMedia`).
+- **The media library for plugins** (API 2.3, `IPluginSite.ReadMediaAsync/FindMediaAsync/AddMediaAsync`, implemented in `PluginSiteFacade`): read a stored
+  `/uploads/{name}` file, find a byte-identical one, add one. ONE set of upload rules (`Services/MediaUpload.cs`: types, sizes, SafeSvg, random name, row,
+  warmed thumbs) for the admin's `/admin/api/upload` and plugins — a plugin can never bring what an upload could not. `AddMediaAsync` reuses an identical
+  file, so an import run twice does not copy.
 - **The club** (`plugins/verein`, native, key `verein`, see its README; 1.18): the member area `/mitglied` is two BLOCK PAGES like the shop's —
   roles `area` (the frame of every signed-in page) and `signin` — whose starting layout is ONE `verein_slot` with `page_html`, the exact markup of
   before, so an untouched site looks the same; `head_html`/`content_html`/`form_html` are the pieces to lay out, forms stay whole, and the calls sit in

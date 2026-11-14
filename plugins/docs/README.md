@@ -42,6 +42,17 @@ wäre ein zweiter Renderer. (2) Größe: Toast UI ~500 kB, Milkdown samt ProseMi
 was zurückkommt, läuft wieder durch den eigenen, sicheren Renderer; keine fremde Bibliothek im Plugin, die mitgepflegt werden muss. Preis: der visuelle
 Modus ist schlichter (contenteditable + `execCommand`), und ein Block, den man ändert, wird in einer einheitlichen Schreibweise neu geschrieben.
 
+## Bilder (1.4)
+- **Einfügen oder Hineinziehen**: ein Bild aus der Zwischenablage (Screenshot) oder aus dem Explorer landet über den Upload des Admins
+  (`/admin/api/upload`, dieselben Regeln: Typen, 8 MB, SVG bereinigt) in der Mediathek und steht an der Stelle – im visuellen Modus als Bild,
+  im Markdown-Modus als `![…](/uploads/…)` am Cursor. Der Knopf „Bild aus der Mediathek“ (Auswahl + Hochladen) bleibt.
+- **Im ZIP**: der Export legt jedes Bild, das eine Seite zeigt (`/uploads/…`), als `media/{name}` bei. Der Import nimmt Bilder aus einem Ordner
+  `media` (in beliebiger Tiefe, z. B. `content/media/`) und biegt die Verweise der Seiten (`/uploads/{name}` oder relativ `media/{name}`) auf ihre
+  Adresse in der Mediathek um. Ein identisches Bild, das schon da ist, wird wiederverwendet (Vergleich der Bytes) – ein zweiter Import kopiert nichts
+  und ändert nichts. Der Probelauf zeigt „n Bilder neu“ je Seite und „Bild fehlt: x“ für Verweise, die weder im ZIP noch in der Mediathek sind.
+- Dafür braucht es **MatCMS mit Plugin-API 2.3** (`IPluginSite.ReadMediaAsync/FindMediaAsync/AddMediaAsync`). Auf einem älteren Host läuft das
+  Plugin weiter: Export ohne Bilder, der Import sagt, dass er die Bilder nicht übernehmen kann (`DocsMedia`, Aufrufe in `NoInlining`-Helfern).
+
 ## Import / Export (1.3)
 - **Export** (Docs → Import / Export): ein ZIP mit einer `.md` je Seite, `<sprache>/<pfad>.md`, andere als die Standardversion unter
   `<sprache>/v/<version>/<pfad>.md`. Jede Datei beginnt mit YAML-Front-Matter: `title`, `summary`, `icon`, `sort`, `translationOf` (Pfad in der

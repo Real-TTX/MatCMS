@@ -251,6 +251,41 @@ internal sealed class PluginSiteFacade : IPluginSite
         catch (Exception ex) when (ex is not OperationCanceledException) { return null; }
     }
 
+    // ---- the media library for plugins (API 2.3): read a stored file, find an identical one, add one — the rules are MediaUpload's ----
+
+    public async Task<PluginMediaFile?> ReadMediaAsync(string url, CancellationToken ct = default)
+    {
+        if (_services.GetService(typeof(IWebHostEnvironment)) is not IWebHostEnvironment env || MediaUpload.PathOf(env, url) is not { } path) return null;
+        var info = new FileInfo(path);
+        if (!info.Exists || info.Length > MediaUpload.MaxDocumentMb * 1024L * 1024) return null;
+        var db = _services.GetService(typeof(AppDbContext)) as AppDbContext;
+        var row = db is null ? null : await db.Media.AsNoTracking().FirstOrDefaultAsync(m => m.Url == url.Trim(), ct);
+        return new PluginMediaFile(url.Trim(), row?.FileName is { Length: > 0 } n ? n : info.Name, row?.ContentType ?? "", await File.ReadAllBytesAsync(path, ct));
+    }
+
+    public async Task<string?> FindMediaAsync(string fileName, byte[] content, CancellationToken ct = default)
+    {
+        if (_services.GetService(typeof(IWebHostEnvironment)) is not IWebHostEnvironment env || _services.GetService(typeof(AppDbContext)) is not AppDbContext db) return null;
+        var (bytes, _) = MediaUpload.Prepare(fileName, content ?? Array.Empty<byte>());
+        return bytes is null ? null : await MediaUpload.FindIdenticalAsync(db, env, bytes, ct);
+    }
+
+    public async Task<PluginMediaResult> AddMediaAsync(string fileName, byte[] content, CancellationToken ct = default)
+    {
+        if (_services.GetService(typeof(IWebHostEnvironment)) is not IWebHostEnvironment env || _services.GetService(typeof(AppDbContext)) is not AppDbContext db
+            || _services.GetService(typeof(ThumbnailService)) is not ThumbnailService thumbs)
+            return new PluginMediaResult(false, null, "Die Mediathek ist in diesem Zusammenhang nicht verfügbar.");
+        var name = Path.GetFileName(fileName ?? "");
+        var r = await MediaUpload.SaveAsync(db, env, thumbs, name, content ?? Array.Empty<byte>(), ContentTypeOf(name), reuse: true, ct);
+        return new PluginMediaResult(r.Ok, r.Url, r.Error, r.Existing);
+    }
+
+    private static string ContentTypeOf(string name) => Path.GetExtension(name).ToLowerInvariant() switch
+    {
+        ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".gif" => "image/gif", ".webp" => "image/webp", ".svg" => "image/svg+xml",
+        ".pdf" => "application/pdf", ".txt" => "text/plain", ".csv" => "text/csv", ".zip" => "application/zip", _ => "application/octet-stream"
+    };
+
     public string TemplatePart(string part) => TemplateSchema.EffectivePart(Site.ActiveTemplate, part);
 
     public bool AiEnabled => (_services.GetService(typeof(AiService)) as AiService)?.Enabled == true;

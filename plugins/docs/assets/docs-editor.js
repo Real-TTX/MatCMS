@@ -508,12 +508,104 @@
         if (e.key === "Tab" && closest("li")) { e.preventDefault(); exec(e.shiftKey ? "outdent" : "indent"); return; }
         if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); link(); }
     });
+    // ---- pictures pasted or dropped: into the media library (the admin's own upload, same rules), then into the text --------
+    function imageFiles(list) {
+        return Array.prototype.filter.call(list || [], function (f) { return /^image\/(png|jpeg|gif|webp|svg\+xml)$/.test(f.type); });
+    }
+    function uploadImages(files) {
+        saveRange();
+        var queue = files.slice();
+        function next() {
+            var file = queue.shift();
+            if (!file) { status.textContent = ""; return; }
+            status.textContent = w("uploading");
+            var fd = new FormData();
+            // a pasted screenshot has no useful name ("image.png" from every browser): give it one of its own
+            var name = file.name && file.name !== "image.png" ? file.name : "bild-" + Date.now() + "." + (file.type.split("/")[1] || "png").replace("svg+xml", "svg").replace("jpeg", "jpg");
+            fd.append("file", file, name);
+            fetch("/admin/api/upload", { method: "POST", body: fd, credentials: "same-origin" })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (r) {
+                    if (!r.ok || !r.j.url) throw new Error((r.j && r.j.error) || "");
+                    restoreRange();
+                    var img = make("img", { src: r.j.url, alt: name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ") });
+                    var at = rootBlock();
+                    if (at && at.tagName === "P" && !at.textContent.trim() && !at.querySelector("img")) insertInline(img);   // an empty line: right there
+                    else {
+                        // otherwise a paragraph of its own below the block the caret is in (a screenshot is not a word in a sentence)
+                        var p = document.createElement("p");
+                        p.appendChild(img);
+                        if (at) surface.insertBefore(p, at.nextSibling); else surface.appendChild(p);
+                        caretInto(p, true);
+                        changed();
+                    }
+                    saveRange();
+                    next();
+                })
+                .catch(function (err) {
+                    status.textContent = "";
+                    var text = w("uploadFailed") + (err && err.message ? " " + err.message : "");
+                    if (window.MatDialog && window.MatDialog.alert) window.MatDialog.alert(text); else status.textContent = text;
+                });
+        }
+        next();
+    }
     surface.addEventListener("paste", function (e) {
-        // only text: what a web page or a word processor puts on the clipboard is not Markdown's business
+        var pics = imageFiles(e.clipboardData && e.clipboardData.files);
+        if (pics.length) { e.preventDefault(); uploadImages(pics); return; }
+        // otherwise only text: what a web page or a word processor puts on the clipboard is not Markdown's business
         var text = e.clipboardData && e.clipboardData.getData("text/plain");
         if (text == null) return;
         e.preventDefault();
         exec("insertText", text);
+    });
+    surface.addEventListener("dragover", function (e) {
+        if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (i) { return i.kind === "file"; })) e.preventDefault();
+    });
+    surface.addEventListener("drop", function (e) {
+        var pics = imageFiles(e.dataTransfer && e.dataTransfer.files);
+        if (!pics.length) { if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) e.preventDefault(); return; }   // another file: never open it in the tab
+        e.preventDefault();
+        // the caret goes where the picture was let go
+        var r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+        if (r && surface.contains(r.startContainer)) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+        uploadImages(pics);
+    });
+    // in the Markdown text area a pasted or dropped picture becomes ![…](/uploads/…) at the cursor
+    function uploadIntoText(files) {
+        var file = files[0];
+        if (!file) return;
+        status.textContent = w("uploading");
+        var fd = new FormData();
+        var name = file.name && file.name !== "image.png" ? file.name : "bild-" + Date.now() + ".png";
+        fd.append("file", file, name);
+        fetch("/admin/api/upload", { method: "POST", body: fd, credentials: "same-origin" })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (r) {
+                status.textContent = "";
+                if (!r.ok || !r.j.url) throw new Error((r.j && r.j.error) || "");
+                var md = "![" + name.replace(/\.[a-z0-9]+$/i, "").replace(/[-_\]\[]+/g, " ") + "](" + r.j.url + ")";
+                // a paragraph of its own: a blank line before and after unless one is there already
+                var before = ta.value.slice(0, ta.selectionStart), after = ta.value.slice(ta.selectionEnd);
+                if (before.length && !/\n\s*\n$/.test(before)) md = (/\n$/.test(before) ? "\n" : "\n\n") + md;
+                if (!/^\s*\n\s*\n/.test(after)) md += /^\n/.test(after) ? "\n" : "\n\n";
+                ta.setRangeText(md, ta.selectionStart, ta.selectionEnd, "end");
+                ta.dispatchEvent(new Event("input", { bubbles: true }));
+                if (files.length > 1) uploadIntoText(files.slice(1));
+            })
+            .catch(function (err) {
+                status.textContent = "";
+                var text = w("uploadFailed") + (err && err.message ? " " + err.message : "");
+                if (window.MatDialog && window.MatDialog.alert) window.MatDialog.alert(text);
+            });
+    }
+    ta.addEventListener("paste", function (e) {
+        var pics = imageFiles(e.clipboardData && e.clipboardData.files);
+        if (pics.length) { e.preventDefault(); uploadIntoText(pics); }
+    });
+    ta.addEventListener("drop", function (e) {
+        var pics = imageFiles(e.dataTransfer && e.dataTransfer.files);
+        if (pics.length) { e.preventDefault(); ta.focus(); uploadIntoText(pics); }
     });
     surface.addEventListener("input", changed);
     document.addEventListener("selectionchange", function () {

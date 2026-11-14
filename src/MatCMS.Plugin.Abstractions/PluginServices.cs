@@ -425,6 +425,26 @@ public interface IPluginSite
     Task<PluginImage?> LoadImageAsync(string url, int maxWidth = 600, CancellationToken ct = default);
 
     /// <summary>
+    /// A file of the media library as it is stored (a plain <c>/uploads/{name}</c> address; never a folder, a query or another place) — what a plugin
+    /// needs to put a site's pictures into an export. Null when there is no such file. API 2.3: an older host has no such member — call it in a
+    /// <c>NoInlining</c> helper and catch <see cref="MissingMethodException"/>.
+    /// </summary>
+    Task<PluginMediaFile?> ReadMediaAsync(string url, CancellationToken ct = default) => Task.FromResult<PluginMediaFile?>(null);
+
+    /// <summary>
+    /// The address of a file of the media library with exactly the bytes <paramref name="content"/> would be stored as (an SVG after its clean-up), or
+    /// null — so an import can tell "already here" from "new" without writing anything. API 2.3.
+    /// </summary>
+    Task<string?> FindMediaAsync(string fileName, byte[] content, CancellationToken ct = default) => Task.FromResult<string?>(null);
+
+    /// <summary>
+    /// Puts a file into the media library through the same rules as an upload in the back office (allowed types, size limits, SVG rebuilt, a fresh
+    /// file name) and returns its address; an identical file already in the library is reused instead of copied. API 2.3.
+    /// </summary>
+    Task<PluginMediaResult> AddMediaAsync(string fileName, byte[] content, CancellationToken ct = default) =>
+        Task.FromResult(new PluginMediaResult(false, null, "Diese MatCMS-Version kann keine Dateien für Plugins in die Mediathek legen."));
+
+    /// <summary>
     /// The address of a SMALLER copy of a media-library picture, for showing it at about <paramref name="width"/> pixels across (already
     /// doubled for a sharp screen: a 300&#160;px card asks for 600). Use it wherever a picture is shown smaller than it is — lists, cards,
     /// thumbnails — and keep the original address for links, the lightbox, share tags and structured data. The copy is made once and stored
@@ -506,3 +526,9 @@ public sealed record SiteSearchHit(string Title, string Url, string Text, double
 
 /// <summary>A picture ready for a document: JPEG bytes and the size in pixels.</summary>
 public sealed record PluginImage(byte[] Jpeg, int Width, int Height);
+
+/// <summary>A file of the media library as stored: its address, the name it was uploaded under, its type and its bytes.</summary>
+public sealed record PluginMediaFile(string Url, string FileName, string ContentType, byte[] Content);
+
+/// <summary>The answer to <see cref="IPluginSite.AddMediaAsync"/>: the file's address, or why it was refused; <c>Existing</c> = an identical file was there already.</summary>
+public sealed record PluginMediaResult(bool Ok, string? Url, string? Error, bool Existing = false);

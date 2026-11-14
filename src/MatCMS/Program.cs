@@ -1039,60 +1039,15 @@ app.MapPost("/admin/api/upload", async (HttpRequest request, IWebHostEnvironment
     var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
     if (file is null || file.Length == 0)
         return Results.BadRequest(new { error = "Keine Datei erhalten." });
-
+    // The rules (types, sizes, SVG rebuilt by SafeSvg) live in MediaUpload — plugins put files into the library through the same code.
     var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-    // SVG is a document that can carry script: it is accepted only REBUILT by SafeSvg (drawing elements only), and /uploads
-    // serves it with a CSP that forbids script on top (see the static-files options above).
-    string[] images = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
-    string[] docs = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"];
-    var isImage = images.Contains(ext);
-    if (!isImage && !docs.Contains(ext))
-        return Results.BadRequest(new { error = "Dateityp nicht erlaubt (Bilder: PNG/JPG/GIF/WEBP/SVG · Dateien: PDF, DOC(X), XLS(X), PPT(X), TXT, CSV, ZIP)." });
-    // Images stay small; documents may be larger.
-    var maxMb = isImage ? 8 : 25;
-    if (file.Length > maxMb * 1024 * 1024)
+    var maxMb = MatCMS.Services.MediaUpload.ImageExtensions.Contains(ext) ? MatCMS.Services.MediaUpload.MaxImageMb : MatCMS.Services.MediaUpload.MaxDocumentMb;
+    if (file.Length > maxMb * 1024L * 1024)
         return Results.BadRequest(new { error = $"Datei zu groß (max. {maxMb} MB)." });
-
-    var uploads = MatCMS.Services.StoragePaths.Uploads(env);
-    Directory.CreateDirectory(uploads);
-    var name = $"{Guid.NewGuid():N}{ext}";
-    long size = file.Length;
-    if (ext == ".svg")
-    {
-        string raw;
-        using (var reader = new StreamReader(file.OpenReadStream())) raw = await reader.ReadToEndAsync();
-        var safe = MatCMS.Services.SafeSvg.Sanitize(raw);
-        if (safe is null) return Results.BadRequest(new { error = "Die Datei ist kein gültiges SVG." });
-        await File.WriteAllTextAsync(Path.Combine(uploads, name), safe);
-        size = System.Text.Encoding.UTF8.GetByteCount(safe);
-    }
-    else
-        await using (var stream = File.Create(Path.Combine(uploads, name)))
-            await file.CopyToAsync(stream);
-
-    var url = $"/uploads/{name}";
-    (int? w, int? h) dims = (null, null);
-    if (ext == ".svg") dims = MatCMS.Services.MediaEditor.SvgSize(await File.ReadAllTextAsync(Path.Combine(uploads, name)));
-    else if (isImage) try { var info = Image.Identify(Path.Combine(uploads, name)); dims = (info.Width, info.Height); } catch { /* not readable: no size */ }
-    // Record it in the media library, appended after existing media (highest SortOrder).
-    var nextOrder = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
-        .MaxAsync(db.Media, m => (int?)m.SortOrder) ?? 0) + 1;
-    db.Media.Add(new MatCMS.Models.Media
-    {
-        Url = url,
-        FileName = file.FileName,
-        ContentType = ext == ".svg" ? "image/svg+xml" : file.ContentType ?? "",
-        SizeBytes = size,
-        SortOrder = nextOrder,
-        // The size the library shows and the image editor starts from (null for a document or an unreadable file).
-        Width = dims.w,
-        Height = dims.h
-    });
-    await db.SaveChangesAsync();
-    // The small copies lists and cards show are stored right away, beside the original (the original stays as it came).
-    if (isImage) thumbs.Warm(name);
-
-    return Results.Ok(new { url });
+    using var ms = new MemoryStream();
+    await file.CopyToAsync(ms);
+    var r = await MatCMS.Services.MediaUpload.SaveAsync(db, env, thumbs, file.FileName, ms.ToArray(), file.ContentType);
+    return r.Ok ? Results.Ok(new { url = r.Url }) : Results.BadRequest(new { error = r.Error });
 }).RequireAuthorization("Admin");
 
 // Cropping, rotating and resizing are the media library's image editor now (Pages/Admin/Media, Services/MediaEditor.cs).

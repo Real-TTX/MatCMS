@@ -893,3 +893,109 @@ public class DocsTransferTests : IClassFixture<DocsApp>
         Assert.Equal("## Kopf\n\nText [Link](doc:edit#kopf) **neu**\n\n> [!TIP]\n> Tipp\n", read["body"]!.GetValue<string>());
     }
 }
+
+/// <summary>Which addresses of a page are pictures an import may bring, and how they are pointed elsewhere (the rest stays byte for byte).</summary>
+public class DocsMediaTests
+{
+    [Fact]
+    public void Picture_references_are_found_named_and_rewritten()
+    {
+        const string md = "![A](/uploads/a.png) und ![B](media/b.PNG \"Titel\") [PDF](/uploads/c.pdf) ![x](https://x.y/d.png) ![e](/img/e.png) [Doku](doc:a/b)\n<img src=\"/uploads/f.webp\">";
+        var refs = DocsMedia.References(md);
+        Assert.Equal(new[] { "/uploads/a.png", "media/b.PNG", "/uploads/c.pdf", "https://x.y/d.png", "/img/e.png", "doc:a/b", "/uploads/f.webp" }, refs);
+        Assert.Equal(new[] { "a.png", "b.PNG", "f.webp" }, refs.Select(DocsMedia.NameOf).OfType<string>());
+        var rewritten = DocsMedia.Rewrite(md, r => DocsMedia.NameOf(r) is { } n ? "/uploads/neu-" + n.ToLowerInvariant() : null);
+        Assert.Equal("![A](/uploads/neu-a.png) und ![B](/uploads/neu-b.png \"Titel\") [PDF](/uploads/c.pdf) ![x](https://x.y/d.png) ![e](/img/e.png) [Doku](doc:a/b)\n<img src=\"/uploads/neu-f.webp\">", rewritten);
+        Assert.Equal(md, DocsMedia.Rewrite(md, _ => null));
+    }
+}
+
+/// <summary>Pictures through import and export: into the media library once, reused after, carried along by the export.</summary>
+public class DocsTransferMediaTests : IClassFixture<DocsApp>
+{
+    private readonly DocsApp _f;
+    public DocsTransferMediaTests(DocsApp f) => _f = f;
+
+    // a real 1×1 PNG
+    private static readonly byte[] Png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==");
+
+    private static byte[] Zip(params (string Name, byte[] Bytes)[] files)
+    {
+        using var ms = new MemoryStream();
+        using (var z = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, true))
+            foreach (var (name, bytes) in files)
+            {
+                using var s = z.CreateEntry(name).Open();
+                s.Write(bytes);
+            }
+        return ms.ToArray();
+    }
+
+    private static async Task<string> CheckAsync(HttpClient admin, byte[] zip)
+    {
+        var token = AppFactory.Token(await admin.GetStringAsync("/admin/p/docs/transfer"))!;
+        var file = new ByteArrayContent(zip);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/zip");
+        var form = new MultipartFormDataContent { { new StringContent(token), "__RequestVerificationToken" }, { new StringContent("check"), "action" }, { file, "zip", "docs.zip" } };
+        var res = await admin.PostAsync("/admin/p/docs/transfer", form);
+        var html = await res.Content.ReadAsStringAsync();
+        Assert.True(res.StatusCode == HttpStatusCode.OK, html);
+        return WebUtility.HtmlDecode(html);
+    }
+
+    private static async Task<string> ApplyAsync(HttpClient admin, string plan)
+    {
+        var hash = Regex.Match(plan, "name=\"hash\" value=\"([0-9a-f]+)\"").Groups[1].Value;
+        var res = await admin.PostAsync("/admin/p/docs/transfer", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = AppFactory.Token(plan)!, ["action"] = "apply", ["hash"] = hash
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        return WebUtility.HtmlDecode(await admin.GetStringAsync("/admin/p/docs/transfer"));
+    }
+
+    [Fact]
+    public async Task Pictures_of_an_import_go_into_the_library_once_and_travel_with_the_export()
+    {
+        var admin = await _f.AdminAsync();
+        await admin.PostAsync("/set-language?culture=de", new StringContent(""));
+        var md = "## Bild\n\n![Übersicht](/uploads/matmon-overview.png)\n\n![Fehlt](/uploads/nicht-da.png)\n";
+        var zip = Zip(("content/de/bilder.md", Encoding.UTF8.GetBytes(md)), ("content/media/matmon-overview.png", Png));
+
+        var plan = await CheckAsync(admin, zip);
+        Assert.Contains("1 neu · 0 geändert", plan);
+        Assert.Contains("1 Bilder aus dem ZIP kommen in die Mediathek", plan);
+        Assert.Contains("Bild fehlt: nicht-da.png", plan);
+        Assert.Contains("1 Bilder in die Mediathek gelegt", await ApplyAsync(admin, plan));
+
+        // the page points at the library's file, which is the one in the ZIP
+        var api = await _f.ApiAsync("docs:read");
+        var page = JsonNode.Parse(await api.GetStringAsync("/api/v1/docs/pages?locale=de"))!["pages"]!.AsArray().First(p => p!["path"]!.GetValue<string>() == "bilder")!;
+        var body = JsonNode.Parse(await api.GetStringAsync("/api/v1/docs/pages/" + page["id"]))!["body"]!.GetValue<string>();
+        var url = Regex.Match(body, @"!\[Übersicht\]\((/uploads/[0-9a-f]{32}\.png)\)").Groups[1].Value;
+        Assert.NotEqual("", url);
+        Assert.Contains("](/uploads/nicht-da.png)", body);                            // a picture nobody brought stays as it was written
+        Assert.Equal(Png, await _f.App.Browser().GetByteArrayAsync(url));
+        using (var scope = _f.App.Services.CreateScope())
+            Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<AppDbContext>().Media.CountAsync(m => m.Url == url));
+
+        // the same ZIP again: the picture is found in the library, nothing changes, nothing is copied
+        plan = await CheckAsync(admin, zip);
+        Assert.Contains("0 neu · 0 geändert", plan);
+        Assert.DoesNotContain("kommen in die Mediathek", plan);
+
+        // the export carries the picture under media/, and importing that export changes nothing either
+        var export = await (await admin.GetAsync("/admin/p/docs/transfer?export=1")).Content.ReadAsByteArrayAsync();
+        using (var z = new System.IO.Compression.ZipArchive(new MemoryStream(export)))
+        {
+            var entry = z.GetEntry("media/" + url["/uploads/".Length..]);
+            Assert.NotNull(entry);
+            using var ms = new MemoryStream();
+            entry!.Open().CopyTo(ms);
+            Assert.Equal(Png, ms.ToArray());
+        }
+        Assert.Matches(@"0 neu · 0 geändert · \d+ unverändert · 0 mit Fehler", await CheckAsync(admin, export));
+        using (var scope = _f.App.Services.CreateScope())
+            Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<AppDbContext>().Media.CountAsync(m => m.SizeBytes == Png.Length));
+    }
+}

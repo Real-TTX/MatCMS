@@ -940,6 +940,8 @@
   "settings.uploadFailed": "Upload fehlgeschlagen.",
   "settings.faviconHelp": "Kleines Icon im Browser-Tab. Optional – ohne Angabe wird das Logo genutzt.",
   "settings.footerText": "Footer-Text",
+  "settings.footerTextAllHelp": "Gilt für die Standardsprache und für jede Sprache ohne eigenen Text.",
+  "settings.footerTextLangHelp": "Leer lassen, um den Footer-Text oben zu verwenden.",
   "settings.contactEmail": "Kontakt-E-Mail (Empfänger, informativ)",
   "settings.contactEmailHelp": "Wird aktuell nicht zum Versand genutzt – Anfragen erscheinen unter „Anfragen“.",
   "settings.save": "Speichern",

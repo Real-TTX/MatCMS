@@ -12,6 +12,9 @@ public static class SettingKeys
     public const string TopBarLink2Text = "TopBarLink2Text";
     public const string TopBarLink2Url = "TopBarLink2Url";
     public const string FooterText = "FooterText";
+    /// <summary>The footer text of ONE content language ("FooterText.en"); empty or absent = <see cref="FooterText"/>, which stays the
+    /// text of the default language and of every language without its own. A plain row, so backups carry it like any setting.</summary>
+    public static string FooterTextFor(string locale) => FooterText + "." + locale;
     public const string ContactRecipient = "ContactRecipient";
 
     // Error handling: slug of the page shown for 404 / server errors (empty = built-in default).

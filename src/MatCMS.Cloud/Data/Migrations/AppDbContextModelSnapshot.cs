@@ -438,6 +438,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("RestartExpectedUntil")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime?>("ResyncRequestedAt")
                         .HasColumnType("TEXT");
 

@@ -75,6 +75,8 @@ public class HostingActionsService
     /// <summary>Start / stop / restart. <paramref name="item"/> must be tracked (events are logged on it).</summary>
     public async Task<ActionResult> PowerAsync(Instance item, DockerHostService.PowerAction action, CancellationToken ct = default)
     {
+        // A start or restart we do ourselves is not an outage while the site comes up (see Instance.RestartExpectedUntil).
+        if (action != DockerHostService.PowerAction.Stop) item.RestartExpectedUntil = DateTime.UtcNow + InstanceService.RestartGrace;
         ActionResult result;
         if (IsLocal(item))
         {
@@ -119,6 +121,7 @@ public class HostingActionsService
         var node = IsOnNode(item) ? await NodeOfAsync(item, ct) : null;
         if (IsOnNode(item) && node is null) return new(false, NotHere);
 
+        item.RestartExpectedUntil = DateTime.UtcNow + InstanceService.RestartGrace;   // recreated: silent while it starts, not offline
         _instances.Log(item, InstanceEventKind.UpdateStarted,
             node is null ? "Update über die Cloud gestartet." : $"Update über Node „{node.Name}“ gestartet.", notified: true);
         await _db.SaveChangesAsync(ct);

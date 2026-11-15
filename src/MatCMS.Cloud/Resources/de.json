@@ -997,6 +997,7 @@
   "instances.pending": "wartet auf Verbindung",
   "instances.pendingHint": "Instanz-ID und Token sind noch nicht in MatCMS eingetragen.",
   "instances.online": "online",
+  "instances.restarting": "startet neu",
   "instances.running": "läuft",
   "instances.stopped": "gestoppt",
   "instances.start": "Starten",

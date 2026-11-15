@@ -1126,4 +1126,5 @@ app.MapPost("/set-language", async (HttpContext ctx) =>
 // This app is admin-only — there is no public front end to land on.
 app.MapGet("/", () => Results.Redirect("/admin"));
 
+InstanceService.StartedUtc = DateTime.UtcNow;   // the grace after the cloud's own restart counts from here
 app.Run();

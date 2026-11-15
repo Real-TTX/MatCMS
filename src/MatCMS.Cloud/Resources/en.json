@@ -997,6 +997,7 @@
   "instances.pending": "waiting to connect",
   "instances.pendingHint": "Id and token have not been entered in MatCMS yet.",
   "instances.online": "online",
+  "instances.restarting": "restarting",
   "instances.running": "running",
   "instances.stopped": "stopped",
   "instances.start": "Start",

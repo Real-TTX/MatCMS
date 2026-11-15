@@ -122,6 +122,10 @@
                             @* Container not running → authoritative over the (150 s-lagging) heartbeat "online". *@
                             <span class="badge badge-off">@T["instances.stopped"]</span>
                         }
+                        else if (InstanceService.IsRestarting(i))
+                        {
+                            <span class="badge badge-new">@T["instances.restarting"]</span>
+                        }
                         else if (online)
                         {
                             <span class="badge badge-on">@T["instances.online"]</span>
@@ -230,6 +234,10 @@
                         {
                             @* Container not running → authoritative over the (150 s-lagging) heartbeat "online". *@
                             <span class="badge badge-off">@T["instances.stopped"]</span>
+                        }
+                        else if (InstanceService.IsRestarting(i))
+                        {
+                            <span class="badge badge-new">@T["instances.restarting"]</span>
                         }
                         else if (online)
                         {

@@ -790,6 +790,11 @@ login same-site; it is not used by this flow.
   opt-in auto-update. Both mails are idempotent — `Instance.OfflineNotified` fires once per outage,
   `Instance.UpdateNotifiedVersion` once per release. Mail goes out through `EmailService` (MailKit,
   same as MatCMS: implicit SSL on 465, STARTTLS otherwise).
+  **A restart the cloud does itself is not an outage:** `HostingActionsService.UpdateAsync`/`PowerAsync` (start, restart) set
+  `Instance.RestartExpectedUntil` (now + `InstanceService.RestartGrace`, 10 min, cleared by the next beat), and right after the cloud's
+  OWN start (`InstanceService.StartedUtc`) every site that beat in the 15 min before gets one window. Meanwhile `IsOnline` is true and the
+  badge says "startet neu" (`IsRestarting`). Before, every update reported the whole fleet offline: 41 containers recreated one after
+  another start slower than the 150 s window. Tests: `InstanceRestartGraceTests`.
 - **Who is told is the notification MATRIX** (`Services/NotificationService.cs`, page *Benachrichtigungen*,
   `/api/v1/notifications`, MCP `get_/set_notifications`; stored as `CloudSetting notify.matrix`): rows =
   `g:admins`, `g:operators`, `u:<id>`, `e:<address>`; columns = `NotifyEvents` (offline, update, updateFailed,

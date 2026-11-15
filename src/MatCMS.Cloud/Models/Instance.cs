@@ -252,6 +252,11 @@ public class Instance
     /// dead-man switch mails once per outage instead of once per check.</summary>
     public bool OfflineNotified { get; set; }
 
+    /// <summary>The cloud restarted this site's container itself (update, restart, start): until then a missing heartbeat is the
+    /// site starting up, not an outage — no offline alert, shown as "startet neu". Cleared by the next heartbeat. Every update used
+    /// to report the whole fleet offline: 41 containers recreated one after another start slower than the 150 s dead-man window.</summary>
+    public DateTime? RestartExpectedUntil { get; set; }
+
     /// <summary>The version an update mail was last sent for - stops one mail per check for the
     /// same available release.</summary>
     public string? UpdateNotifiedVersion { get; set; }

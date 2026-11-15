@@ -51,8 +51,28 @@ public class InstanceService
         _backups = backups;
     }
 
-    public static bool IsOnline(Instance i) =>
+    public static bool IsOnline(Instance i) => IsBeating(i) || IsRestarting(i);
+
+    /// <summary>A heartbeat arrived within <see cref="OfflineAfter"/>.</summary>
+    public static bool IsBeating(Instance i) =>
         i.LastHeartbeatUtc is not null && DateTime.UtcNow - i.LastHeartbeatUtc.Value <= OfflineAfter;
+
+    /// <summary>How long a site the cloud restarted itself may stay silent before it counts as offline.</summary>
+    public static readonly TimeSpan RestartGrace = TimeSpan.FromMinutes(10);
+
+    /// <summary>When this cloud process started. While the cloud itself was down (its own update) no site could beat, so right after
+    /// a start every site that beat shortly before is given one window to beat again instead of being reported offline.</summary>
+    public static DateTime StartedUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Silent, but expected to be: the cloud restarted its container (<see cref="Instance.RestartExpectedUntil"/>), or the
+    /// cloud itself has only just started and the site beat in the quarter of an hour before.</summary>
+    public static bool IsRestarting(Instance i)
+    {
+        if (i.LastHeartbeatUtc is not DateTime hb || IsBeating(i)) return false;
+        var now = DateTime.UtcNow;
+        if (i.RestartExpectedUntil is DateTime until && now < until) return true;
+        return now - StartedUtc <= OfflineAfter + TimeSpan.FromSeconds(60) && hb >= StartedUtc - TimeSpan.FromMinutes(15);
+    }
 
     /// <summary>An instance that has connected but speaks an older contract than this build.</summary>
     public static bool IsOutdatedProtocol(Instance i) =>
@@ -290,6 +310,7 @@ public class InstanceService
 
         // A new beat ends the outage, so the dead-man switch may fire again next time.
         instance.OfflineNotified = false;
+        instance.RestartExpectedUntil = null;
 
         await _db.SaveChangesAsync(ct);
 

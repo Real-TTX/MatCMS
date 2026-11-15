@@ -135,9 +135,9 @@ import; rows already on existing instances are left untouched. Do not add a plug
 seeder. `plugins/` is not in any workflow's `paths:` — it is not compiled into an image. Since Release B that includes the
 shop and the AI bot (`plugins/shop`, `plugins/bot`): they reach a site as the MatCMS Store's signed native packages; only the blog is still built in.
 
-**The seeder's starter content is offered ONCE per site** (the templates MatCMS Modern/MatBusiness/MatTech/MatArt and the
+**The seeder's starter content is offered ONCE per site** (the templates MatCMS Modern/MatBusiness/MatTech/MatArt/MatHandwerk and the
 example component `cta-box`): remembered in the setting `seed.offered` (`SettingKeys.SeedOffered`, one `kind:name` per line). It
-used to be "add when missing" on every start, so a site that deleted them got them back at the next restart. A restore MERGES the
+used to be "add when missing" on every start, so a site that deleted them got them back at the next restart. MatHandwerk (`Data/HandwerkTemplate.cs`) is GENERATED from `matcms-websites/_kit/modern.mjs` — regenerate, do not edit by hand; its menu style (Unterstrich/Schlicht/Pillen) is the template parameter `menuStyle`, carried as the header's `data-menu`. A restore MERGES the
 marks of the site and of the backup (an old backup must not bring the deletions back). A new starter item gets a new mark.
 **Aufräumen also lists stray files** of `appdata/uploads` (no media row owns them, no text names them — another site's pictures
 that rode along in a backup from a shared workbench); a restore only ADDS files, so this is the way to get rid of them

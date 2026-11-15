@@ -103,6 +103,7 @@ public static class DbSeeder
         if (Offer("template:" + BusinessThemeName)) await EnsureThemeAsync(db, BusinessThemeName, BuildBusinessTemplate);
         if (Offer("template:" + TechThemeName)) await EnsureThemeAsync(db, TechThemeName, BuildTechTemplate);
         if (Offer("template:" + ArtThemeName)) await EnsureThemeAsync(db, ArtThemeName, BuildArtTemplate);
+        if (Offer("template:" + HandwerkThemeName)) await EnsureThemeAsync(db, HandwerkThemeName, BuildHandwerkTemplate);
 
         // Every declared mail gets its row, so the editor has something to show and a site can
         // change the wording without a release. Existing rows are LEFT ALONE — this runs on every
@@ -541,6 +542,7 @@ public static class DbSeeder
     private const string BusinessThemeName = "MatBusiness";
     private const string TechThemeName = "MatTech";
     private const string ArtThemeName = "MatArt";
+    private const string HandwerkThemeName = "MatHandwerk";
 
     /// <summary>Adds a bundled theme to any database that doesn't already have it (idempotent).</summary>
     private static async Task EnsureThemeAsync(AppDbContext db, string name, Func<Template> build)
@@ -548,6 +550,35 @@ public static class DbSeeder
         if (!await db.Templates.AnyAsync(t => t.Name == name))
             db.Templates.Add(build());
     }
+
+    // The look of the 2026-11 refresh of three craftsmen's sites (matcms-websites/_kit): phone, WhatsApp and a call-to-action in the
+    // header, cards, a dark footer. Content is in HandwerkTemplate (generated from the kit); the menu style is a parameter.
+    private static Template BuildHandwerkTemplate() => new()
+    {
+        Name = HandwerkThemeName, IsActive = false,
+        AccentColor = "#1d5fd1", SecondaryColor = "#f59e0b",
+        HeadingColor = "#0f1b2d", TextColor = "#3b4a5c",
+        BackgroundColor = "#ffffff", AltBackground = "#f3f6fa",
+        HeadingFont = "Plus Jakarta Sans", BodyFont = "Inter", ButtonStyle = "solid",
+        ButtonRadius = "10", ContainerWidth = "1200", HeaderPadding = "0",
+        LayoutHtml = HandwerkTemplate.Layout,
+        MenuMapJson = """{"primary":"header","secondary":"footer"}""",
+        CustomCss = HandwerkTemplate.Css,
+        CustomJs = HandwerkTemplate.Js,
+        ParametersJson = """
+            [
+              {"id":"menuStyle","label":"Menüstil","type":"select","options":"Unterstrich,Schlicht,Pillen","default":"Unterstrich"},
+              {"id":"phone","label":"Telefon (leer = ausblenden)","type":"text","default":""},
+              {"id":"whatsapp","label":"WhatsApp-Nummer, international ohne + (leer = ausblenden)","type":"text","default":""},
+              {"id":"email","label":"E-Mail in der Fußzeile (leer = ausblenden)","type":"text","default":""},
+              {"id":"ctaLabel","label":"Knopf im Kopf: Text (leer = ausblenden)","type":"text","default":"Anfrage"},
+              {"id":"ctaUrl","label":"Knopf im Kopf: Adresse","type":"text","default":"/kontakt"},
+              {"id":"contactHeading","label":"Fußzeile: Überschrift Kontakt","type":"text","default":"Kontakt"},
+              {"id":"pagesHeading","label":"Fußzeile: Überschrift Seiten","type":"text","default":"Seiten"},
+              {"id":"legalHeading","label":"Fußzeile: Überschrift Rechtliches","type":"text","default":"Rechtliches"}
+            ]
+            """,
+    };
 
     // Bundled starter themes. Each rides on the default (var-driven) site layout, so a distinct
     // palette + font pairing + radius + header treatment re-skins the whole site — corporate, dark

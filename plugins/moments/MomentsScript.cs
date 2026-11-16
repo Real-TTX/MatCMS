@@ -25,7 +25,7 @@ function next(){if(busy||!queue.length){say();return;}busy=true;var it=queue.shi
 prepare(it.file).then(function(p){send(it,p);},function(){if(plain.test(it.file.type)&&(!max||it.file.size<=max))send(it,null);else fail(it,w('format'));});}
 function send(it,p){if(p){var img=new Image();img.alt='';img.src=URL.createObjectURL(p.thumb.blob);it.tile.insertBefore(img,it.tile.firstChild);}
 var fd=new FormData(),tok=f.querySelector('input[name=__RequestVerificationToken]');if(tok)fd.append(tok.name,tok.value);
-fd.append('action','upload');fd.append('ajax','1');var al=f.querySelector('[data-mo-album]');if(al)fd.append('album',al.value);fd.append('modified',String(it.file.lastModified||0));fd.append('name',it.file.name||'');
+fd.append('action','upload');fd.append('ajax','1');var al=f.querySelector('[data-mo-album]');if(al)fd.append('album',al.value);var tg=f.querySelector('[data-mo-tag]');if(tg)fd.append('tag',tg.value);fd.append('modified',String(it.file.lastModified||0));fd.append('name',it.file.name||'');
 var orig=plain.test(it.file.type)&&(!max||it.file.size<=max);if(orig)fd.append('file',it.file,it.file.name||'foto.jpg');
 if(p){fd.append('view',p.view.blob,'view.jpg');fd.append('thumb',p.thumb.blob,'thumb.jpg');fd.append('w',String(p.view.w));fd.append('h',String(p.view.h));}
 var x=new XMLHttpRequest();x.open('POST',f.getAttribute('action'));

@@ -44,5 +44,5 @@ Plugin.Route("/narrenfigur/config", ctx => PluginResult.Json(new JsonObject
 }).WithHeader("Cache-Control", "no-cache"));
 
 // The version in the address makes a browser fetch the files again after an update.
-Plugin.Body("<link rel=\"stylesheet\" href=\"/plugin-assets/narrenfigur/figur.css?v=1.0\">"
-    + "<script src=\"/plugin-assets/narrenfigur/figur.js?v=1.0\" defer></script>");
+Plugin.Body("<link rel=\"stylesheet\" href=\"/plugin-assets/narrenfigur/figur.css?v=1.1\">"
+    + "<script src=\"/plugin-assets/narrenfigur/figur.js?v=1.1\" defer></script>");

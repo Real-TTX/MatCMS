@@ -31,17 +31,18 @@
 .nf__fig.is-riding .nf-ride { display: block; }
 .nf__fig.is-riding .nf-item, .nf__fig.is-riding .nf-legs { display: none; }
 
-/* the two small buttons at her side */
+/* the two small buttons above her: equip (left) and send away (right) – shown while the pointer is over her, always on a touch screen */
 .nf__gear, .nf__close { position: absolute; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
   box-shadow: 0 6px 16px rgba(0, 0, 0, .24); transition: transform .18s ease, opacity .18s ease; }
-.nf__gear { top: 16px; left: -12px; background: #f4b400; color: #2a1418; }
-.nf--left .nf__gear { left: auto; right: -12px; }
-.nf__gear svg { width: 18px; height: 18px; }
+.nf__gear, .nf__close { top: -8px; width: 26px; height: 26px; opacity: 0; }
+.nf__gear { right: 26px; background: #f4b400; color: #2a1418; }
+.nf--left .nf__gear { right: auto; left: 26px; }
+.nf__gear svg { width: 15px; height: 15px; }
 .nf__gear:hover { transform: scale(1.12) rotate(-8deg); }
-.nf__close { top: -8px; right: -4px; width: 24px; height: 24px; background: #fff; color: #2a1418; font: 700 16px/1 system-ui, sans-serif; opacity: 0; }
+.nf__close { right: -4px; background: #fff; color: #2a1418; font: 700 16px/1 system-ui, sans-serif; }
 .nf--left .nf__close { right: auto; left: -4px; }
-.nf:hover .nf__close, .nf__close:focus-visible { opacity: 1; }
-@media (hover: none) { .nf__close { opacity: .85; } }
+.nf:hover .nf__gear, .nf:hover .nf__close, .nf__gear:focus-visible, .nf__close:focus-visible, .nf__gear[aria-expanded="true"] { opacity: 1; }
+@media (hover: none) { .nf__gear, .nf__close { opacity: .9; } }
 
 /* her speech bubble */
 .nf__say { position: absolute; bottom: 100%; right: 26px; margin-bottom: 2px; padding: 9px 16px; border-radius: 20px 20px 6px 20px; background: #fff; color: #2a1418; white-space: nowrap;
@@ -79,7 +80,6 @@
 @media (max-width: 700px) {
   .nf { width: 84px; right: 8px; bottom: 4px; }
   .nf--left { left: 8px; }
-  .nf__gear { width: 28px; height: 28px; top: 8px; left: -10px; }
   .nf__menu { width: 216px; }
   .nf__say { font-size: 1rem; right: 12px; }
 }

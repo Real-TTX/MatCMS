@@ -11,7 +11,7 @@ Besucher klicken sie an und rüsten sie aus:
 | Schellen | sie läutet (Ton aus dem Browser, keine Datei) |
 | Glühwein | sie prostet |
 
-Mit leerer Hand öffnet der Klick das Menü „Hexe ausrüsten“; der gelbe Knopf an ihrer Schulter tut das immer. Das × schickt sie weg
+Mit leerer Hand öffnet der Klick das Menü „Hexe ausrüsten“; der gelbe Knopf über ihr (links neben dem ×) tut das immer; beide Knöpfe erscheinen, wenn die Maus über der Figur ist (auf dem Handy sind sie immer da). Das × schickt sie weg
 (nur ihr Kopf schaut dann über den Rand und holt sie zurück). Die Wahl merkt sich der Browser (`localStorage`), der Server speichert nichts.
 
 ## Aufbau

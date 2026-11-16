@@ -38,6 +38,7 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
 - **Hochladen vom Handy** `/moments/hochladen`: ein großer Knopf, beliebig viele Fotos, jede Kachel füllt sich beim Hochladen.
   Das Handy rechnet Ansicht (2048 px) und Kachel (640 px) selbst aus – das Plugin hat keine Bildbibliothek; das Original geht mit
   (Download), es sei denn, es ist zu groß oder HEIC.
+- **Stichwort beim Hochladen** (1.7): Einstellungen → Dateien → „Stichworte zur Auswahl beim Hochladen“ (eine Zeile je Stichwort, z. B. die Tische einer Hochzeit) und die Frage darüber. Wer hochlädt, wählt eines (oder keins); es hängt an jedem Foto dieses Hochladens, die Galerie filtert danach wie nach jedem Stichwort. Angenommen wird nur ein angebotenes Stichwort, nie ein freier Text aus dem Formular.
 - **Freigabe**: Fotos der Gäste sehen die anderen erst nach Freigabe (Admin → Moments → Freigabe, Zähler im Menü und Hinweis auf dem
   Dashboard). Kommentare optional ebenfalls.
 - **Moderation** im Admin: Fotos ausblenden/löschen/als Highlight, Markierungen und Kommentare ausblenden/löschen, Personen &

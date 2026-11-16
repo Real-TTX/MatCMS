@@ -592,4 +592,59 @@ public class MomentsTests : IClassFixture<MomentsApp>
         }
         finally { await SignInSettingsAsync("code"); }
     }
+
+    [Fact]
+    public async Task A_guest_picks_one_of_the_offered_keywords_while_uploading_and_every_photo_carries_it()
+    {
+        var admin = await _app.AdminAsync();
+        // the hosts offer the tables (Einstellungen → Dateien → Stichworte zur Auswahl beim Hochladen)
+        var res = await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupFiles", new Dictionary<string, string>
+        {
+            ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_downloads"] = "original",
+            ["s_uploadTags.count"] = "3", ["s_uploadTags.0.v"] = "Startlinie", ["s_uploadTags.1.v"] = "Zieleinlauf", ["s_uploadTags.2.v"] = "Kids-Staffel",
+            ["s_uploadTagsLabel"] = "An welchem Tisch habt ihr gesessen?"
+        });
+        Assert.Equal(HttpStatusCode.Redirect, res.StatusCode);
+        try
+        {
+            var (_, code) = await GuestAsync("Tisch-Test", "Tina");
+            var guest = await SignedInAsync(code);
+            var page = await guest.GetStringAsync("/moments/hochladen");
+            Assert.Contains("An welchem Tisch habt ihr gesessen?", page);
+            Assert.Contains("<option>Zieleinlauf</option>", page);
+            Assert.Contains("data-mo-tag", page);
+
+            // a chosen table marks the photo (compared without case, stored as the hosts wrote it)
+            await UploadTaggedAsync(guest, "zieleinlauf");
+            var photo = LastPhoto();
+            Assert.Equal("Zieleinlauf", _app.Db(db => db.Database.SqlQueryRaw<string>(
+                "select t.name as Value from p_moments_photo_tags pt join p_moments_tags t on t.id = pt.tag_id where pt.photo_id = {0}", photo).AsEnumerable().Single()));
+
+            // something the hosts did not offer is no keyword at all
+            await UploadTaggedAsync(guest, "Erfunden");
+            var other = LastPhoto();
+            Assert.Equal(0, _app.Db(db => db.Database.SqlQueryRaw<int>("select count(*) as Value from p_moments_photo_tags where photo_id = {0}", other).AsEnumerable().Single()));
+            Assert.Equal(0, _app.Db(db => db.Database.SqlQueryRaw<int>("select count(*) as Value from p_moments_tags where name = 'Erfunden'").AsEnumerable().Single()));
+        }
+        finally
+        {
+            await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupFiles", new Dictionary<string, string>
+            {
+                ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_downloads"] = "original", ["s_uploadTags.count"] = "0", ["s_uploadTagsLabel"] = ""
+            });
+        }
+    }
+
+    private static async Task UploadTaggedAsync(HttpClient c, string tag)
+    {
+        var page = await c.GetStringAsync("/moments/hochladen");
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(AppFactory.Token(page)!), "__RequestVerificationToken" }, { new StringContent("upload"), "action" }, { new StringContent("1"), "ajax" },
+            { new StringContent(tag), "tag" }, { new ByteArrayContent(Jpeg()), "file", "tisch.jpg" }
+        };
+        var res = await c.PostAsync("/moments/hochladen", form);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.True(JsonNode.Parse(await res.Content.ReadAsStringAsync())!["ok"]!.GetValue<bool>());
+    }
 }

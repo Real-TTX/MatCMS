@@ -30,6 +30,14 @@ public static class MomentsUpload
             foreach (var a in albums) sb.Append("<option value=\"").Append(a.Id).Append('"').Append(a.Id == pick ? " selected" : "").Append('>').Append(M.H(a.Name)).Append(a.Guests ? " (" + ctx.T("moments.guests") + ")" : "").Append("</option>");
             sb.Append("<option value=\"0\"").Append(pick == 0 ? " selected" : "").Append('>').Append(ctx.T("moments.noAlbum")).Append("</option></select></label>");
         }
+        var tags = MomentsSettings.UploadTagList(ctx);
+        if (tags.Count > 0)
+        {
+            var q = ctx.Settings.Get(MomentsSettings.UploadTagsLabel) is { Length: > 0 } l ? l.Trim() : ctx.T("moments.upload.whichTag");
+            sb.Append("<label class=\"mo-album-pick\"><span>").Append(M.H(q)).Append("</span><select name=\"tag\" data-mo-tag><option value=\"\">").Append(ctx.T("moments.upload.noTag")).Append("</option>");
+            foreach (var t in tags) sb.Append("<option>").Append(M.H(t)).Append("</option>");
+            sb.Append("</select></label>");
+        }
         sb
             .Append("<label class=\"mo-drop\"><input type=\"file\" name=\"file\" multiple accept=\"image/*\"><span class=\"mo-big\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload.choose")).Append("</span>")
             .Append("<small>").Append(ctx.T("moments.upload.chooseHint")).Append("</small></label>")
@@ -67,18 +75,21 @@ public static class MomentsUpload
         var albumId = v.Admin
             ? (long.TryParse(r.F("album"), NumberStyles.None, CultureInfo.InvariantCulture, out var chosen) && albums.Any(a => a.Id == chosen) ? chosen : 0)
             : albums.FirstOrDefault(a => a.Guests)?.Id ?? 0;
+        // the keyword: only one the hosts offer (never a free text from the form), compared without case, stored as they wrote it
+        var tagName = MomentsSettings.UploadTagList(ctx).FirstOrDefault(t => string.Equals(t, (r.F("tag") ?? "").Trim(), StringComparison.OrdinalIgnoreCase));
+        var tagId = tagName is null ? 0 : (await store.EnsureTagAsync(tagName, MomentsStore.Topic, ct)).Id;
 
         // the script's case: at most one original, plus the browser's view and tile
         if (view is not null)
         {
             if (originals.Count > 1) return new Result(ctx.T("moments.upload.onePerRequest"), pending, 0);
-            var err = await SaveOneAsync(ctx, store, v, originals.FirstOrDefault(), view, thumb, r.F("name"), pending, max, albumId, ct);
+            var err = await SaveOneAsync(ctx, store, v, originals.FirstOrDefault(), view, thumb, r.F("name"), pending, max, albumId, tagId, ct);
             return new Result(err, pending, err is null ? 1 : 0);
         }
         var saved = 0;
         foreach (var f in originals)
         {
-            var err = await SaveOneAsync(ctx, store, v, f, null, null, f.FileName, pending, max, albumId, ct);
+            var err = await SaveOneAsync(ctx, store, v, f, null, null, f.FileName, pending, max, albumId, tagId, ct);
             if (err is not null) return new Result(err, pending, saved);
             saved++;
         }
@@ -94,7 +105,7 @@ public static class MomentsUpload
     }
 
     private static async Task<string?> SaveOneAsync(IPluginContext ctx, MomentsStore store, Viewer v, UploadedFile? original, UploadedFile? view, UploadedFile? thumb,
-        string name, bool pending, long max, long albumId, CancellationToken ct)
+        string name, bool pending, long max, long albumId, long tagId, CancellationToken ct)
     {
         var label = M.Line(Path.GetFileName(original?.FileName ?? name ?? ""), 120);
         if (original is not null && original.Length > max) return ctx.T("moments.upload.tooBig", label, M.Size(ctx, max));
@@ -142,13 +153,14 @@ public static class MomentsUpload
             int.TryParse(ctx.Request.F("w"), out w);
             int.TryParse(ctx.Request.F("h"), out h);
         }
-        await store.Photos.InsertAsync(new Dictionary<string, object?>
+        var photoId = await store.Photos.InsertAsync(new Dictionary<string, object?>
         {
             ["guest_id"] = v.Id, ["file"] = fileName, ["view"] = viewName, ["thumb"] = thumbName, ["file_name"] = label,
             ["size"] = (orig ?? viewBytes!).LongLength, ["width"] = Math.Clamp(w, 0, 20000), ["height"] = Math.Clamp(h, 0, 20000), ["taken"] = taken, ["caption"] = "",
             ["status"] = pending ? MomentsStore.Pending : MomentsStore.Approved, ["featured"] = false, ["created"] = DateTime.UtcNow,
             ["approved_at"] = pending ? null : DateTime.UtcNow, ["album_id"] = albumId
         }, ct);
+        if (tagId > 0) await store.AddTagAsync(photoId, tagId, v.Id, ct);
         return null;
     }
 }

@@ -10,7 +10,8 @@ public static class MomentsSettings
 {
     public const string Title = "title", EventName = "eventName", HostName = "hostName", Welcome = "welcome", LoginIntro = "loginIntro", MenuLabel = "menuLabel",
         UploadApproval = "uploadApproval", CommentApproval = "commentApproval", GuestTags = "guestTags", NewTags = "newTags", GuestUpload = "guestUpload",
-        MaxUploadMb = "maxUploadMb", Downloads = "downloads", ShowTable = "showTable", LoginMode = "loginMode", CodeChars = "codeChars", CodeLength = "codeLength";
+        MaxUploadMb = "maxUploadMb", Downloads = "downloads", ShowTable = "showTable", LoginMode = "loginMode", CodeChars = "codeChars", CodeLength = "codeLength",
+        UploadTags = "uploadTags", UploadTagsLabel = "uploadTagsLabel";
 
     public const string DownloadOriginal = "original", DownloadView = "view", DownloadOff = "off";
     public const string ModeCode = "code", ModePassword = "password", ModeBoth = "both";
@@ -53,6 +54,9 @@ public static class MomentsSettings
         .Bool(ShowTable, "moments.set.showTable", false, "moments.set.showTableHelp")
         .Add(new SettingSpec(GuestUpload, "moments.set.guestUpload", SettingKind.Bool) { Group = "moments.set.groupFiles", Default = "true", Help = "moments.set.guestUploadHelp" })
         .Number(MaxUploadMb, "moments.set.maxUpload", 25, 1, 25, "moments.set.maxUploadHelp")
+        // 1.7: keywords a guest may pick while uploading (the tables of a wedding, the stations of a party) – each chosen one marks every photo of that upload
+        .List(UploadTags, "moments.set.uploadTags", "", "moments.set.uploadTagsHelp", "moments.set.uploadTagsAdd")
+        .Text(UploadTagsLabel, "moments.set.uploadTagsLabel", "", "moments.set.uploadTagsLabelHelp")
         .Choice(Downloads, "moments.set.downloads", DownloadOriginal, new[]
         {
             new FieldOption(DownloadOriginal, "moments.set.dlOriginal"),
@@ -65,6 +69,9 @@ public static class MomentsSettings
     public static string GalleryTitle(IPluginContext ctx) => ctx.Settings.Get(Title) is { Length: > 0 } n ? n.Trim() : ctx.T("moments.galleryTitle");
     public static string Menu(IPluginContext ctx) => ctx.Settings.Get(MenuLabel) is { Length: > 0 } n ? n.Trim() : ctx.T("moments.photos");
     public static long MaxBytes(IPluginContext ctx) => (long)Math.Clamp(ctx.Settings.GetNumber(MaxUploadMb, 25), 1, 25) * 1024 * 1024;
+    /// <summary>The keywords offered while uploading, as the hosts wrote them (one per line), without blanks and repeats.</summary>
+    public static IReadOnlyList<string> UploadTagList(IPluginContext ctx) =>
+        (ctx.Settings.Get(UploadTags) ?? "").Split('\n').Select(l => M.Line(l, 60)).Where(l => l.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(40).ToList();
     public static string DownloadMode(IPluginContext ctx) => ctx.Settings.Get(Downloads) is DownloadView or DownloadOff ? ctx.Settings.Get(Downloads) : DownloadOriginal;
 
     /// <summary>How households sign in: <see cref="ModeCode"/> (the default, and what every site had before 1.1), <see cref="ModePassword"/> or <see cref="ModeBoth"/>.</summary>

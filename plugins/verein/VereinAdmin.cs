@@ -148,7 +148,7 @@ public static class VereinAdmin
                 var mail = !p.Child && p.Email.Length > 0 && !VereinMail.Parkable(p.Email) ? p.Email : "";
                 var cells = new List<object?>
                 {
-                    Ui.Stack(Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge(ctx.T("verein.admin.badge.child"), UiTone.Info) : null, p.Passive ? Ui.Badge(ctx.T("verein.admin.badge.passive")) : null),
+                    Ui.Stack(Ui.Inline(Ui.Link(p.Name.Length > 0 ? p.Name : p.Email, Root + (p.Child ? "children/" : "members/") + p.Id), p.Child ? Ui.Badge(ctx.T("verein.admin.badge.child"), UiTone.Info) : null, p.Passive ? Ui.Badge(ctx.T("verein.admin.badge.passive"), UiTone.Warning) : null),
                         mail.Length > 0 ? Ui.Muted(mail) : null),
                     string.Join(", ", p.Roles)
                 };

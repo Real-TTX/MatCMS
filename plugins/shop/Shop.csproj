@@ -15,6 +15,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The EU notice on the legal guarantee: the European Commission's own files (Implementing Regulation (EU) 2025/1960), unchanged — served by ShopGuarantee. -->
+    <EmbeddedResource Include="Resources/guarantee-notice-*.svg" LogicalName="MatCMS.Plugin.Shop.Resources.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The tests use the shop's own types (store, model, pure rules) next to the copy the application loads. -->
     <InternalsVisibleTo Include="MatCMS.Plugins.Tests" />
   </ItemGroup>

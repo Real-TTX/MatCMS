@@ -175,6 +175,13 @@ internal static class ShopMail
         if (string.IsNullOrWhiteSpace(recipient)) return false;
         var values = Values(ctx, order, items, ctx.Site.Name);
         extra?.Invoke(values);
+        // The EU notice belongs into the confirmation mail too (the Commission's guidelines). It rides on a placeholder every site's template already has —
+        // a new placeholder would reach only sites whose mail templates were never stored (templates are rows, never overwritten).
+        if (key == Placed || key == Paid)
+        {
+            var g = ShopGuarantee.MailText(ctx, ShopConfig.From(ctx.Settings), order, items);
+            if (g.Length > 0) { var slot = key == Placed ? "payment_info" : "downloads"; values[slot] = (values.TryGetValue(slot, out var v) ? v : "") + g; }
+        }
         var result = await ctx.Mail.SendAsync(key, new[] { recipient }, values, Lists(order, items), ct: ct);
         var label = Specs.FirstOrDefault(s => s.Key == key)?.Name ?? key;
         await store.AddEventAsync(order.Id, result.Ok ? "mail" : "mail-failed",

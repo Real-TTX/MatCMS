@@ -23,6 +23,7 @@ internal static partial class ShopPublic
     private const string LockIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"5\" y=\"11\" width=\"14\" height=\"9\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 018 0v3\"/></svg>";
     private const string BackIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M9 14L4 9l5-5\"/><path d=\"M4 9h10a6 6 0 010 12h-3\"/></svg>";
     private const string StoreIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 10h16M5 10l1-5h12l1 5M6 10v10h12V10M10 20v-5h4v5\"/></svg>";
+    private const string ShieldIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z\"/><path d=\"M9 12l2 2 4-4\"/></svg>";
     private const string DownloadIcon = "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 4v11M7 11l5 5 5-5M5 20h14\"/></svg>";
 
     /// <summary>
@@ -45,6 +46,7 @@ internal static partial class ShopPublic
         }
         if (cfg.StripeReady || cfg.PayPalReady || cfg.BankEnabled) items.Add((LockIcon, E(ctx.T("shop.trust.secure"))));
         if (cfg.WithdrawalUrl.Length > 0 && SafeUrl(cfg.WithdrawalUrl).Length > 0) items.Add((BackIcon, $"<a href=\"{E(SafeUrl(cfg.WithdrawalUrl))}\">{E(ctx.T("shop.trust.withdrawal"))}</a>"));
+        if (!p.IsDigital && ShopGuarantee.Html(ctx, cfg, compact: true) is { Length: > 0 } g) items.Add((ShieldIcon, g));
         return items.Count == 0 ? "" : "<ul class=\"shop-trust\">" + string.Concat(items.Select(i => $"<li>{i.Icon}<span>{i.Html}</span></li>")) + "</ul>";
     }
 

@@ -550,3 +550,22 @@ What `docs/shop-vs-shopify.md` listed as missing, built and tested; the rules th
   (credit note, provider) — never from this page. Settings "Widerruf und Rücksendung": text above the form, return address (empty = the seller's), return
   instructions (empty = a standard text with that address). Template part `withdraw` (`shop-withdraw.html`); the form is always the shop's.
 - Not legal advice: the wording of the page, the receipt and the instructions is the operator's to check.
+
+## EU notice on the legal guarantee (since 27 September 2026, shop 2.2)
+
+- **Required of every seller of GOODS to consumers** (Directive (EU) 2024/825, Implementing Regulation (EU) 2025/1960; the Commission's practical guidelines
+  of April 2026): the harmonised notice "Gesetzliche Gewährleistung", shown prominently, in full, in colour, unaltered, legible at default size, with a
+  clickable link to the QR code's Your Europe page beside it, and also in the confirmation mail. `ShopGuarantee` does exactly the guidelines' online example:
+  the sentence "Ihre gesetzlichen Gewährleistungsrechte" opens the full notice on the first click (a script-free `<details>` overlay).
+- **Where**: the product page of a PHYSICAL product (trust list under the buy button), the checkout when the cart holds goods (above the terms checkbox),
+  the order mails Placed/Paid of an order with goods (two lines: link to the notice page + Your Europe), a footer link (menu element `shop.guarantee`,
+  seeded once into the footer) and its page `/shop/gewaehrleistung` (`gewaehrleistung` is a reserved product slug). A download-only product/order gets none.
+- **The file is the Commission's own** (`plugins/shop/Resources/guarantee-notice-{de,en}.svg`, from
+  commission.europa.eu "high resolution vector files", unchanged — the notice may not be redrawn, recoloured or edited), embedded in the DLL and served at
+  `/shop/gewaehrleistung/notice/{de|en}` with `Content-Security-Policy: …; sandbox` (an SVG from the site's origin is code; plugin assets may not carry SVG).
+  Only German and English are shipped (the PNG set has no English file); every other page language gets the English notice and its own Your Europe link.
+- **Mails**: the two lines ride on placeholders every site's template already has (`{{payment_info}}` in "Bestellbestätigung", `{{downloads}}` in
+  "Zahlung erhalten") — a new placeholder would reach only sites whose mail templates were never stored.
+- **Switch** `legal.guaranteeNotice` (Rechtstexte, default ON): off only for a shop that does not sell to consumers. Shop → Bedingungen → Rechtstexte shows it.
+- Not done: the EU **GARAN label** (a producer's free durability guarantee of more than two years, per product, with years/brand/model filled into the
+  label) — it needs per-product fields and the label rendered with the Inter font.

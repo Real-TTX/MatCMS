@@ -679,6 +679,10 @@ Settings → Wartung may set a PIN/password (`maintenance.pinHash`, PBKDF2 hash 
 `{{maint_unlock}}` — a template's own `maintenance.html` without it gets the form before `</body>`) gets a 12-hour DataProtection pass
 cookie `matcms.maint` bound to a fingerprint of the hash (a new PIN ends all passes); 3 wrong entries lock that address for 15 minutes,
 the right PIN included (`Services/MaintenanceAccess.cs`, in memory). Tests: `MaintenanceAccessTests`.
+The operator picks a password OR a PIN of 4, 6 or 8 digits; the kind is stored IN the value (`pin6:` + hash, a bare hash = password,
+`MaintenanceAccess.PinDigits`), so the page can never draw boxes for a password, and changing the kind needs a new value. A PIN is entered
+in code boxes (MatUi FORM-19 look, drawn by the page's own small script in `MaintenancePage` — the public site never loads matui.js;
+the real field stays the posted one and works without the script).
 
 ## License and pricing
 

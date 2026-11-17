@@ -784,7 +784,7 @@ app.Use(async (ctx, next) =>
             }
         }
         var token = antiforgery.GetAndStoreTokens(ctx);
-        unlock = MaintenancePage.UnlockForm(t, token.FormFieldName, token.RequestToken ?? "", notice);
+        unlock = MaintenancePage.UnlockForm(t, token.FormFieldName, token.RequestToken ?? "", notice, digits: MaintenanceAccess.PinDigits(pinHash));
     }
 
     var html = MaintenancePage.Render(site, t, unlock);
@@ -830,7 +830,7 @@ app.MapGet("/template-assets/{templateId:int}/{name}", async (
 // Admin-only preview of the maintenance page (admins bypass the middleware, so this lets them see it).
 app.MapGet("/admin/maintenance/preview", (SiteContext site, Localizer t) =>
     Results.Content(MaintenancePage.Render(site, t, site.Get(SettingKeys.MaintenancePin).Length == 0 ? ""
-        : MaintenancePage.UnlockForm(t, "", "", null, disabled: true)), "text/html; charset=utf-8"))
+        : MaintenancePage.UnlockForm(t, "", "", null, disabled: true, digits: MaintenanceAccess.PinDigits(site.Get(SettingKeys.MaintenancePin)))), "text/html; charset=utf-8"))
     .RequireAuthorization("Admin");
 
 // Language switcher: sets the culture cookie and redirects back to a safe, local URL.

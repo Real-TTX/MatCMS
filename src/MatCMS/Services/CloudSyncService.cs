@@ -833,6 +833,10 @@ public class CloudSyncService
                 throw new InvalidOperationException($"Plugin '{key}': {error ?? "Import fehlgeschlagen."}");
             }
             Report("plugin", key, updated ? "updated" : "installed", $"Version {plugin.Version}");
+            // The running plugin is still the OLD version until it is loaded again — without this an update took effect only at the next
+            // restart (Shop 2.2 reported "applied" on two live sites and kept serving 2.1). Right after its import, so a later plugin that
+            // breaks the run does not leave this one half-applied. A new plugin is off, so this only clears what the registry had.
+            if (_services?.GetService<PluginRunner>() is { } runner) await runner.ReloadAsync(plugin.Id);
             count++;
         }
 

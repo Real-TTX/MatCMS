@@ -203,6 +203,17 @@ public class MaintenanceAccessTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public async Task Signing_in_with_the_cloud_is_not_answered_with_the_maintenance_page()
+    {
+        await WithMaintenanceAsync(null, async () =>
+        {
+            var res = await _app.Browser().GetAsync("/sso/start?returnUrl=%2Fadmin");
+            Assert.NotEqual(HttpStatusCode.ServiceUnavailable, res.StatusCode);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await _app.Browser().GetAsync("/")).StatusCode);
+        });
+    }
+
+    [Fact]
     public async Task A_template_of_its_own_without_the_token_still_gets_the_form()
     {
         using (var scope = _app.Services.CreateScope())

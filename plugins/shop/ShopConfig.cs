@@ -42,6 +42,7 @@ internal static class Keys
     public const string WithdrawalUrl = "legal.withdrawalUrl";
     public const string PrivacyUrl = "legal.privacyUrl";
     public const string TermsVersion = "legal.version";
+    public const string GuaranteeNotice = "legal.guaranteeNotice";
     public const string BankEnabled = "bank.enabled";
     public const string BankDetails = "bank.details";
     public const string BankHoldDays = "bank.holdDays";
@@ -126,6 +127,8 @@ internal sealed record ShopConfig
     public string WithdrawalUrl { get; init; } = "";
     public string PrivacyUrl { get; init; } = "";
     public string TermsVersion { get; init; } = "1";
+    /// <summary>The EU notice on the legal guarantee is shown (product pages of goods, checkout, order mails, a footer link) — <see cref="ShopGuarantee"/>.</summary>
+    public bool GuaranteeNotice { get; init; } = true;
     public bool BankEnabled { get; init; }
     public string BankDetails { get; init; } = "";
     public int BankHoldDays { get; init; } = 14;
@@ -191,6 +194,7 @@ internal sealed record ShopConfig
             TaxRateOverrides = s.Get(Keys.TaxRates), TaxRates = ShopTax.ParseOverrides(s.Get(Keys.TaxRates)),
             TermsUrl = LocalOrHttp(s.Get(Keys.TermsUrl)), WithdrawalUrl = LocalOrHttp(s.Get(Keys.WithdrawalUrl)), PrivacyUrl = LocalOrHttp(s.Get(Keys.PrivacyUrl)),
             TermsVersion = string.IsNullOrWhiteSpace(s.Get(Keys.TermsVersion)) ? "1" : s.Get(Keys.TermsVersion).Trim(),
+            GuaranteeNotice = s.Get(Keys.GuaranteeNotice) != "false",
             BankEnabled = s.GetBool(Keys.BankEnabled), BankDetails = s.Get(Keys.BankDetails).Trim(), BankHoldDays = (int)Math.Clamp(s.GetInt(Keys.BankHoldDays, 14), 1, 90),
             PayPalEnabled = s.GetBool(Keys.PayPalEnabled), PayPalClientId = s.Get(Keys.PayPalClientId).Trim(), PayPalSecret = s.Get(Keys.PayPalSecret).Trim(),
             PayPalWebhookId = s.Get(Keys.PayPalWebhookId).Trim(), PayPalSandbox = s.GetBool(Keys.PayPalSandbox),
@@ -261,6 +265,7 @@ internal sealed record ShopConfig
         s.Add(new SettingSpec(Keys.WithdrawalUrl, "set.withdrawalUrl"));
         s.Add(new SettingSpec(Keys.PrivacyUrl, "set.privacyUrl"));
         s.Add(new SettingSpec(Keys.TermsVersion, "set.termsVersion") { Default = "1", Help = "set.termsVersionHelp" });
+        s.Add(new SettingSpec(Keys.GuaranteeNotice, "set.guaranteeNotice", SettingKind.Bool) { Default = "true", Help = "set.guaranteeNoticeHelp" });
         s.Add(new SettingSpec(Keys.OrderStart, "set.orderStart", SettingKind.Number) { Group = "set.groupNumbers", Default = "1000", Min = 1, Help = "set.orderStartHelp" });
         s.Add(new SettingSpec(Keys.OrderPrefix, "set.orderPrefix") { Help = "set.orderPrefixHelp" });
         s.Add(new SettingSpec(Keys.InvoicePrefix, "set.invoicePrefix") { Default = "RE-", Help = "set.invoicePrefixHelp" });

@@ -41,6 +41,8 @@ public sealed class ShopPlugin : IPlugin
         ShopBrands.Register(b);
         // "Vertrag widerrufen" (§ 356a BGB): the page, the dialog's order list, the footer link, its template part and mails.
         ShopWithdrawals.Register(b);
+        // The EU notice on the legal guarantee (since 27.09.2026): its page, the Commission's file, the footer link.
+        ShopGuarantee.Register(b);
         b.Route("/shop/cart", ShopPublic.CartAsync, form);
         b.Route("/shop/checkout", ShopPublic.CheckoutAsync, form);
         b.Route("/shop/order/{number}", ShopPublic.OrderAsync, form);

@@ -10,7 +10,7 @@ namespace MatCMS.Plugin.Shop;
 internal static partial class ShopPublic
 {
     /// <summary>Words a product's address cannot be: they are the shop's own pages.</summary>
-    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters", "widerrufen" };
+    public static readonly string[] ReservedSlugs = { "categories", "brands", "tags", "cart", "checkout", "order", "download", "invoice", "webhook", "pay", "account", "suggest", "filters", "widerrufen", "gewaehrleistung" };
 
     internal static string M(IPluginContext ctx, ShopConfig cfg, long cents) => Money.Format(cents, cfg.Currency, ctx.Locale);
     private static string Csrf(IPluginContext ctx) => ctx.Antiforgery;
@@ -940,6 +940,7 @@ internal static partial class ShopPublic
         var termsLink = cfg.TermsUrl.Length > 0 ? $"<a href=\"{E(cfg.TermsUrl)}\" target=\"_blank\" rel=\"noopener\">{E(ctx.T("shop.terms"))}</a>" : E(ctx.T("shop.terms"));
         var withdrawalLink = cfg.WithdrawalUrl.Length > 0 ? $"<a href=\"{E(cfg.WithdrawalUrl)}\" target=\"_blank\" rel=\"noopener\">{E(ctx.T("shop.withdrawal"))}</a>" : E(ctx.T("shop.withdrawal"));
         var privacyLink = cfg.PrivacyUrl.Length > 0 ? $"<a href=\"{E(cfg.PrivacyUrl)}\" target=\"_blank\" rel=\"noopener\">{E(ctx.T("shop.privacy"))}</a>" : E(ctx.T("shop.privacy"));
+        if (priced.Lines.Any(l => !l.Product.IsDigital)) sb.Append(ShopGuarantee.Html(ctx, cfg));
         sb.Append($"<label class=\"shop-check shop-confirm\"><input type=\"checkbox\" name=\"terms\" value=\"1\"{(ctx.Request.Form.ContainsKey("terms") ? " checked" : "")}> <span>{string.Format(CultureInfo.InvariantCulture, E(ctx.T("shop.termsAccept")).Replace("{0}", "{0}").Replace("{1}", "{1}").Replace("{2}", "{2}"), termsLink, withdrawalLink, privacyLink)}</span></label>");
         if (priced.HasDigital)
             sb.Append($"<label class=\"shop-check shop-confirm\"><input type=\"checkbox\" name=\"waiver\" value=\"1\"{(ctx.Request.Form.ContainsKey("waiver") ? " checked" : "")}> <span>{E(ctx.T("shop.waiver"))}</span></label>");

@@ -121,6 +121,12 @@ internal static class ShopHtml
         .shop-carousel button{position:absolute;top:38%;z-index:2;width:42px;height:42px;border-radius:50%;border:1px solid var(--shop-line,var(--line,rgba(0,0,0,.2)));background:var(--shop-bg,var(--bg,#fff));color:inherit;font-size:26px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15)}
         .shop-carousel button[hidden]{display:none}.shop-carousel .prev{left:-10px}.shop-carousel .next{right:-10px}
         .shop-trust{list-style:none;margin:18px 0 0;padding:14px 0 0;border-top:1px solid var(--shop-line,var(--line,rgba(0,0,0,.12)));display:grid;gap:9px;font-size:.92em}
+        .shop-guarantee{margin:12px 0}.shop-guarantee.compact{margin:0}.shop-guarantee>summary{cursor:pointer;list-style:none;text-decoration:underline;text-underline-offset:3px}.shop-guarantee>summary::-webkit-details-marker{display:none}
+        .shop-guarantee>summary .close{display:none}.shop-guarantee[open]>summary{position:fixed;top:14px;right:16px;z-index:9991;width:44px;height:44px;border-radius:50%;background:#fff;color:#111;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:28px;line-height:1;box-shadow:0 2px 12px rgba(0,0,0,.35)}
+        .shop-guarantee[open]>summary .open{display:none}.shop-guarantee[open]>summary .close{display:block}
+        .shop-guarantee-body{position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,.92);overflow:auto;padding:64px 16px 32px;display:flex;justify-content:center;align-items:flex-start}
+        .shop-guarantee-sheet{width:min(595px,100%)}.shop-guarantee-sheet img,.shop-guarantee-page img{display:block;width:100%;height:auto;background:#fff}.shop-guarantee-sheet p{margin:10px 0 0;text-align:center}.shop-guarantee-sheet p a{color:#fff}
+        .shop-guarantee-page{max-width:595px}.shop-guarantee-page p{margin:10px 0 0}
         .shop-trust li{display:flex;align-items:center;gap:10px}.shop-trust svg{flex:none;width:20px;height:20px;fill:none;stroke:var(--shop-accent,var(--accent,currentColor));stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
         .shop input[type=radio],.shop input[type=checkbox],.shop-form input[type=radio],.shop-form input[type=checkbox]{accent-color:var(--shop-accent,var(--accent,currentColor))}
         .shop-more{margin-top:16px}.shop-was{font-weight:400;opacity:.6;margin-left:4px}.shop-coupon{margin-top:18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}

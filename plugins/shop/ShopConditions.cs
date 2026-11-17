@@ -104,7 +104,8 @@ internal static class ShopConditions
             new[]
             {
                 Row(ctx.T("shop.terms"), cfg.TermsUrl), Row(ctx.T("shop.withdrawal"), cfg.WithdrawalUrl), Row(ctx.T("shop.privacy"), cfg.PrivacyUrl),
-                Ui.Row(Name(ctx.T("shop.cond.version")), cfg.TermsVersion, Ui.Badge(ctx.T("shop.cond.versionKept"), UiTone.Info), Edit(ctx, "set.groupLegal"))
+                Ui.Row(Name(ctx.T("shop.cond.version")), cfg.TermsVersion, Ui.Badge(ctx.T("shop.cond.versionKept"), UiTone.Info), Edit(ctx, "set.groupLegal")),
+                Ui.Row(Name(ctx.T("shop.cond.guarantee")), ShopGuarantee.PagePath, cfg.GuaranteeNotice ? Ui.Badge(ctx.T("shop.cond.shown"), UiTone.Success) : Ui.Badge(ctx.T("shop.cond.off"), UiTone.Warning), Edit(ctx, "set.groupLegal"))
             }, emptyText: "—");
         return Task.FromResult(Page(ctx, "legal", ctx.T("shop.tab.legal"), null, table));
     }

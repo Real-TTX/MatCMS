@@ -512,6 +512,10 @@ know it. Read `docs/shop-plugin.md` before touching `plugins/shop/`. The rules t
   whose dialog fetches `/shop/filters?group=…` (one group's entries, `CatalogViewAsync(group:)`) only when opened; `?more=group` is the no-script fallback.
   What the search looks at is `catalog.searchFields` (`ShopSearchFields`: sku/GTIN, summary, description, tags, category, brand, attributes — the last three by NAME);
   the name always.
+- **EU notice on the legal guarantee (mandatory since 27.09.2026, shop 2.2)**: `ShopGuarantee` — the Commission's own SVG (`plugins/shop/Resources/`,
+  unchanged, served sandboxed at `/shop/gewaehrleistung/notice/{de|en}`), opened by "Ihre gesetzlichen Gewährleistungsrechte" on product pages of goods, at the
+  checkout with goods, in the Placed/Paid mails (on `{{payment_info}}`/`{{downloads}}`) and as a footer element; switch `legal.guaranteeNotice` (on). Never
+  redraw or edit the notice. See docs "EU notice on the legal guarantee".
 - **"Vertrag widerrufen" (§ 356a BGB, mandatory since 19.06.2026)**: `/shop/widerrufen` (`ShopWithdrawals`): form → review → "Widerruf bestätigen" → stored in `withdrawals`
   (every declaration, matched or not) + the receipt mail at once (content, date, time). A member picks HIS order in a dialog (`/shop/widerrufen/orders`, RequireMember);
   a guest sees items only with the order's key. Footer menu element seeded once; Shop → Widerrufe follows the return, the refund stays the order's. See docs "Withdrawal".

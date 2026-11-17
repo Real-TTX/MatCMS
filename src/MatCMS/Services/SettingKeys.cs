@@ -133,6 +133,10 @@ public static class SettingKeys
     public const string MaintenanceEnabled = "maintenance.enabled"; // "1" = on
     public const string MaintenanceTitle = "maintenance.title";
     public const string MaintenanceMessage = "maintenance.message";
+    /// <summary>PBKDF2 hash of the PIN/password that lets a visitor past the maintenance page (<see cref="MaintenanceAccess"/>);
+    /// empty = no way past. Set on this site only: protected from every outside writer and in no backup — a short PIN's hash
+    /// is guessed offline in seconds, and a backup travels.</summary>
+    public const string MaintenancePin = "maintenance.pinHash";
 
     // Custom code / tracking (own tab under Settings). Raw HTML injected site-wide.
     public const string CodeHead = "code.head";           // before </head>
@@ -206,6 +210,9 @@ public static class SettingKeys
     public static string AiChatGptTokensOf(string profileId) => AiChatGptTokensPrefix + profileId;
 
     /// <summary>One of the site's own AI keys (the fixed ones or a profile's sign-in) — never in a backup.</summary>
+    /// <summary>Keys a backup never carries: the site's own AI keys and the maintenance PIN's hash.</summary>
+    public static bool NotInBackup(string? key) => IsAiOwn(key) || string.Equals(key, MaintenancePin, StringComparison.OrdinalIgnoreCase);
+
     public static bool IsAiOwn(string? key) => key is not null
         && (AiOwn.Contains(key, StringComparer.OrdinalIgnoreCase) || key.StartsWith(AiChatGptTokensPrefix, StringComparison.OrdinalIgnoreCase));
 
@@ -331,5 +338,5 @@ public static class SettingKeys
     /// operator through the ONE dedicated profile/instance switch (<c>InstanceConfig.NativePlugins</c>, applied by
     /// <c>CloudSyncService.ApplyNativePluginsAsync</c>), never through a generic path.
     /// </summary>
-    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, MatcmsStore, MatcmsStoreCloud, .. AiOwn];
+    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, MatcmsStore, MatcmsStoreCloud, MaintenancePin, .. AiOwn];
 }

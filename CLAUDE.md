@@ -672,6 +672,14 @@ and maintenance pages) goes through `LocalFonts.Rewrite` when rendered. If Googl
 empty, uncached stylesheet (system fonts) — never a link to Google. A new place that emits template/user HTML must call `Rewrite` too.
 Trap: a minimal-API lambda taking ONLY `HttpContext` and returning a Task binds to `RequestDelegate` and drops its IResult (empty 200).
 
+## Maintenance mode and its PIN
+
+Settings → Wartung may set a PIN/password (`maintenance.pinHash`, PBKDF2 hash only, in `SettingKeys.Protected` and in no backup —
+`SettingKeys.NotInBackup`): whoever enters it on the maintenance page (form posted to the address shown, antiforgery, token
+`{{maint_unlock}}` — a template's own `maintenance.html` without it gets the form before `</body>`) gets a 12-hour DataProtection pass
+cookie `matcms.maint` bound to a fingerprint of the hash (a new PIN ends all passes); 3 wrong entries lock that address for 15 minutes,
+the right PIN included (`Services/MaintenanceAccess.cs`, in memory). Tests: `MaintenanceAccessTests`.
+
 ## License and pricing
 
 The repository is **source-available under `LICENSE.md` (MatCMS License)**, not open source: personal and non-profit use free, commercial use

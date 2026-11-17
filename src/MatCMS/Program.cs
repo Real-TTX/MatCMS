@@ -223,6 +223,7 @@ builder.Services.AddScoped<EmailService>();
 // per-IP rate-limit counter it keeps in the shared memory cache, so one instance for the whole app.
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<FormGuard>();
+builder.Services.AddSingleton<MaintenanceAccess>();
 builder.Services.AddScoped<TranslationService>();
 // AI: the site's own connection (API key or ChatGPT account, Einstellungen → KI) or the cloud relay. The ChatGPT login state is
 // ONE per process: a refresh token may be used by one caller at a time.
@@ -735,8 +736,58 @@ app.Use(async (ctx, next) =>
     }
 
     var t = ctx.RequestServices.GetRequiredService<Localizer>();
-    var html = MaintenancePage.Render(site, t);
-    ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+
+    // The way past for people the operator gave a PIN (MaintenanceAccess): a valid pass cookie lets the request through; the
+    // page's form posts the PIN to the address the visitor is on, so the answer is in that address's language and leads back there.
+    var pinHash = site.Get(SettingKeys.MaintenancePin);
+    var unlock = "";
+    var status = StatusCodes.Status503ServiceUnavailable;
+    if (pinHash.Length > 0)
+    {
+        var access = ctx.RequestServices.GetRequiredService<MaintenanceAccess>();
+        if (access.HasPass(ctx, pinHash))
+        {
+            await next();
+            return;
+        }
+        var antiforgery = ctx.RequestServices.GetRequiredService<Microsoft.AspNetCore.Antiforgery.IAntiforgery>();
+        string? notice = null;
+        if (HttpMethods.IsPost(ctx.Request.Method) && ctx.Request.HasFormContentType)
+        {
+            var form = await ctx.Request.ReadFormAsync();
+            if (form.ContainsKey(MaintenanceAccess.PinField))
+            {
+                var client = MaintenanceAccess.ClientKey(ctx);
+                if (access.IsLocked(client))
+                {
+                    notice = t["maintenance.unlock.locked"];
+                    status = StatusCodes.Status429TooManyRequests;
+                }
+                else if (!await antiforgery.IsRequestValidAsync(ctx))
+                    notice = t["maintenance.unlock.expired"];
+                else if (MaintenanceAccess.Verify(form[MaintenanceAccess.PinField].ToString(), pinHash))
+                {
+                    access.Succeeded(client);
+                    access.Grant(ctx, pinHash);
+                    // 303: the browser fetches the same address again with GET, now carrying the pass.
+                    ctx.Response.StatusCode = StatusCodes.Status303SeeOther;
+                    ctx.Response.Headers.Location = (ctx.Request.PathBase + ctx.Request.Path + ctx.Request.QueryString).ToString();
+                    return;
+                }
+                else if (access.Fail(client))
+                {
+                    notice = t["maintenance.unlock.locked"];
+                    status = StatusCodes.Status429TooManyRequests;
+                }
+                else notice = t["maintenance.unlock.wrong"];
+            }
+        }
+        var token = antiforgery.GetAndStoreTokens(ctx);
+        unlock = MaintenancePage.UnlockForm(t, token.FormFieldName, token.RequestToken ?? "", notice);
+    }
+
+    var html = MaintenancePage.Render(site, t, unlock);
+    ctx.Response.StatusCode = status;
     ctx.Response.Headers["Retry-After"] = "3600";
     // Setting Content-Type here also stops the earlier StatusCodePages re-execute from hijacking the 503.
     ctx.Response.ContentType = "text/html; charset=utf-8";
@@ -777,7 +828,8 @@ app.MapGet("/template-assets/{templateId:int}/{name}", async (
 
 // Admin-only preview of the maintenance page (admins bypass the middleware, so this lets them see it).
 app.MapGet("/admin/maintenance/preview", (SiteContext site, Localizer t) =>
-    Results.Content(MaintenancePage.Render(site, t), "text/html; charset=utf-8"))
+    Results.Content(MaintenancePage.Render(site, t, site.Get(SettingKeys.MaintenancePin).Length == 0 ? ""
+        : MaintenancePage.UnlockForm(t, "", "", null, disabled: true)), "text/html; charset=utf-8"))
     .RequireAuthorization("Admin");
 
 // Language switcher: sets the culture cookie and redirects back to a safe, local URL.

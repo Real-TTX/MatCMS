@@ -12,7 +12,51 @@ namespace MatCMS.Services;
 /// </summary>
 public static class MaintenancePage
 {
-    public static string Render(SiteContext site, Localizer t)
+    /// <summary>The PIN form (<see cref="MaintenanceAccess"/>): folded away behind one line so the page looks as before to
+    /// everybody else, open when it carries an answer. Posts to the address it is shown on (no action), so the reply comes
+    /// in that address's language. <paramref name="disabled"/> = the admin's preview, where there is nothing to post to.</summary>
+    public static string UnlockForm(Localizer t, string tokenField, string token, string? notice, bool disabled = false)
+    {
+        var off = disabled ? " disabled" : "";
+        var hidden = tokenField.Length == 0 ? "" : $"<input type=\"hidden\" name=\"{Enc(tokenField)}\" value=\"{Enc(token)}\" />";
+        var msg = string.IsNullOrEmpty(notice) ? "" : $"<p class=\"m-unlock-msg\" role=\"alert\">{Enc(notice)}</p>";
+        return $"""
+            <details class="m-unlock"{(string.IsNullOrEmpty(notice) ? "" : " open")}>
+              <summary>{Enc(t["maintenance.unlock.summary"])}</summary>
+              <form method="post" autocomplete="off">
+                {hidden}
+                <label for="m-unlock-pin">{Enc(t["maintenance.unlock.label"])}</label>
+                <div class="m-unlock-row">
+                  <input id="m-unlock-pin" name="{MaintenanceAccess.PinField}" type="password" required maxlength="{MaintenanceAccess.MaxLength}" autocomplete="current-password"{off} />
+                  <button type="submit"{off}>{Enc(t["maintenance.unlock.submit"])}</button>
+                </div>
+                {msg}
+              </form>
+            </details>
+            """;
+    }
+
+    /// <summary>The form's own look, with the theme's colours written in — a template's own maintenance.html need not
+    /// define the default page's CSS variables.</summary>
+    private static string UnlockCss(string accent, string ink, string bg, string hairline) => $$"""
+        <style>
+          .m-unlock{margin:26px auto 0;max-width:340px;text-align:left;font-size:14px}
+          .m-unlock summary{cursor:pointer;text-align:center;opacity:.6;list-style:none}
+          .m-unlock summary::-webkit-details-marker{display:none}
+          .m-unlock summary:hover,.m-unlock[open] summary{opacity:1}
+          .m-unlock form{margin-top:12px}
+          .m-unlock label{display:block;font-weight:600;margin-bottom:6px;color:{{ink}}}
+          .m-unlock-row{display:flex;gap:8px}
+          .m-unlock input{flex:1;min-width:0;font:inherit;font-size:16px;padding:9px 12px;border:1px solid {{hairline}};
+            border-radius:10px;background:{{bg}};color:{{ink}}}
+          .m-unlock button{font:inherit;font-weight:600;padding:9px 16px;border:0;border-radius:10px;cursor:pointer;
+            background:{{accent}};color:#fff}
+          .m-unlock button[disabled]{opacity:.5;cursor:default}
+          .m-unlock-msg{margin:10px 0 0;font-size:14px;opacity:1;color:#b42318}
+        </style>
+        """;
+
+    public static string Render(SiteContext site, Localizer t, string unlockForm = "")
     {
         var tpl = site.ActiveTemplate;
 
@@ -64,9 +108,18 @@ public static class MaintenancePage
             ["heading_font"] = headFont,
             ["body_font"] = bodyFont,
             ["fonts_href"] = Enc(fontsHref),
+            ["maint_unlock"] = unlockForm.Length == 0 ? "" : UnlockCss(accent, ink, bg, hairline) + unlockForm,
         };
 
         var part = TemplateSchema.EffectivePart(tpl, TemplateSchema.PartMaintenance);
+        // A template's own maintenance.html from before the form existed has no {{maint_unlock}}: the form goes in before
+        // </body> there, or the PIN the operator handed out could not be entered on that site.
+        if (unlockForm.Length > 0 && !part.Contains("{{maint_unlock}}", StringComparison.Ordinal))
+        {
+            var end = part.LastIndexOf("</body>", StringComparison.OrdinalIgnoreCase);
+            const string box = "<div style=\"position:fixed;left:0;right:0;bottom:16px;display:flex;justify-content:center;padding:0 16px\"><div style=\"max-width:360px;width:100%\">{{maint_unlock}}</div></div>";
+            part = end >= 0 ? part.Insert(end, box) : part + box;
+        }
         return MatCMS.Shared.Web.LocalFonts.Rewrite(TemplateSchema.RenderTokens(part, tokens));
     }
 

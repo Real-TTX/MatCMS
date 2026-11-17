@@ -221,6 +221,9 @@ public class IndexModel : PageModel
     public async Task<IActionResult> OnPostInstallFromCloudAsync(string key)
     {
         var (ok, message) = await _catalog.InstallPluginAsync(key, HttpContext.RequestAborted);
+        // An update keeps its on/off — and must then run the new version at once, not after the next restart.
+        if (ok && await _db.Plugins.AsNoTracking().Where(p => p.Key == key).Select(p => (int?)p.Id).FirstOrDefaultAsync() is int pid)
+            await _runner.ReloadAsync(pid);
         TempData[ok ? "Flash" : "FlashError"] = message;
         return RedirectToPage(new { browse = true });
     }

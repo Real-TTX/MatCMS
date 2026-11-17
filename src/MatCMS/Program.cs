@@ -716,6 +716,7 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/login", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/logout", StringComparison.OrdinalIgnoreCase) ||
+        p.StartsWith("/sso/", StringComparison.OrdinalIgnoreCase) ||     // "Mit der Cloud anmelden" on the sign-in page — was answered with the maintenance page
         p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) ||   // the maintenance page itself uses them

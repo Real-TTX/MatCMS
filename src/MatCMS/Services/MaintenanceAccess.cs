@@ -22,8 +22,11 @@ public sealed class MaintenanceAccess
     public const int MaxFailures = 3;
     public static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan PassLifetime = TimeSpan.FromHours(12);
+    /// <summary>Shortest password; a PIN is exactly one of <see cref="PinLengths"/> digits instead.</summary>
     public const int MinLength = 4;
     public const int MaxLength = 128;
+    /// <summary>The lengths a PIN may have; the maintenance page draws one box per digit.</summary>
+    public static readonly int[] PinLengths = [4, 6, 8];
 
     private const int Iterations = 100_000;
     private const string Scheme = "pbkdf2-sha256";
@@ -39,17 +42,43 @@ public sealed class MaintenanceAccess
 
     // --- the stored PIN ------------------------------------------------------
 
-    public static string Hash(string pin)
+    // A PIN is stored as "pin{n}:" + the hash, a password as the bare hash: the kind travels WITH the hash in one row, so the
+    // page can never draw boxes for a password (and both are equally protected and kept out of every backup).
+
+    /// <summary>The digits of the stored PIN, or 0 for a password (and for nothing stored).</summary>
+    public static int PinDigits(string? stored)
     {
+        var s = (stored ?? "").Trim();
+        if (!s.StartsWith("pin", StringComparison.Ordinal)) return 0;
+        var colon = s.IndexOf(':');
+        return colon > 3 && int.TryParse(s.AsSpan(3, colon - 3), out var n) && PinLengths.Contains(n) ? n : 0;
+    }
+
+    /// <summary>Whether <paramref name="secret"/> is a valid new value: exactly <paramref name="digits"/> digits, or a
+    /// password of <see cref="MinLength"/>…<see cref="MaxLength"/> characters when <paramref name="digits"/> is 0.</summary>
+    public static bool IsValid(string secret, int digits) =>
+        digits > 0 ? PinLengths.Contains(digits) && secret.Length == digits && secret.All(char.IsAsciiDigit)
+                   : secret.Length >= MinLength && secret.Length <= MaxLength;
+
+    public static string Hash(string pin, int digits = 0)
+    {
+        if (digits > 0 && !PinLengths.Contains(digits)) throw new ArgumentOutOfRangeException(nameof(digits));
         var salt = RandomNumberGenerator.GetBytes(16);
         var hash = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(pin), salt, Iterations, HashAlgorithmName.SHA256, 32);
-        return $"{Scheme}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
+        return (digits > 0 ? $"pin{digits}:" : "") + $"{Scheme}${Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
 
     public static bool Verify(string pin, string? stored)
     {
         if (string.IsNullOrEmpty(pin) || string.IsNullOrWhiteSpace(stored)) return false;
-        var parts = stored.Trim().Split('$');
+        var body = stored.Trim();
+        var digits = PinDigits(body);
+        if (digits > 0)
+        {
+            if (!IsValid(pin, digits)) return false;   // not even the shape of the PIN
+            body = body[(body.IndexOf(':') + 1)..];
+        }
+        var parts = body.Split('$');
         if (parts.Length != 4 || parts[0] != Scheme || !int.TryParse(parts[1], out var iterations) || iterations < 1) return false;
         try
         {

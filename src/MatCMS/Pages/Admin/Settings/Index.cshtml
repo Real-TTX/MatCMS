@@ -851,11 +851,47 @@
                 <textarea name="Values[@SettingKeys.MaintenanceMessage]" rows="3" placeholder="@T["maintenance.defaultMessage"]">@V(SettingKeys.MaintenanceMessage)</textarea>
             </div>
 
+            @{
+                // Preselected: the stored kind; with nothing stored a 6-digit PIN.
+                var pinKind = Model.MaintenanceHasPin ? (Model.MaintenancePinDigits > 0 ? Model.MaintenancePinDigits.ToString() : "password") : "6";
+            }
+            <div class="form-field">
+                <label for="maint-pin-kind">@T["settings.maint.pinKindLabel"]</label>
+                <select id="maint-pin-kind" name="MaintenancePinKind">
+                    @foreach (var n in MatCMS.Services.MaintenanceAccess.PinLengths)
+                    {
+                        <option value="@n" selected="@(pinKind == n.ToString())">@T["settings.maint.pinKindPin", n]</option>
+                    }
+                    <option value="password" selected="@(pinKind == "password")">@T["settings.maint.pinKindPassword"]</option>
+                </select>
+            </div>
+
             <div class="form-field">
                 <label for="maint-pin">@T["settings.maint.pinLabel"]</label>
                 <input id="maint-pin" name="MaintenancePin" type="password" autocomplete="new-password" maxlength="@MatCMS.Services.MaintenanceAccess.MaxLength"
+                       data-stored-kind="@(Model.MaintenanceHasPin ? pinKind : "")"
+                       data-ph-set="@T["settings.maint.pinSet"]" data-ph-none="@T["settings.maint.pinNone"]" data-ph-new="@T["settings.maint.pinNew"]"
                        placeholder="@(Model.MaintenanceHasPin ? T["settings.maint.pinSet"] : T["settings.maint.pinNone"])" />
                 <div class="help">@T["settings.maint.pinHelp", MatCMS.Services.MaintenanceAccess.MaxFailures]</div>
+                <script>
+                    // A PIN field gets the number keyboard and its length; a changed kind asks for a new value.
+                    (function () {
+                        var kind = document.getElementById("maint-pin-kind"), pin = document.getElementById("maint-pin");
+                        function apply() {
+                            var n = parseInt(kind.value, 10);
+                            if (n > 0) { pin.setAttribute("inputmode", "numeric"); pin.maxLength = n; pin.pattern = "[0-9]{" + n + "}"; }
+                            else { pin.removeAttribute("inputmode"); pin.maxLength = @MatCMS.Services.MaintenanceAccess.MaxLength; pin.removeAttribute("pattern"); }
+                            var stored = pin.getAttribute("data-stored-kind");
+                            pin.placeholder = stored === "" ? pin.getAttribute("data-ph-none")
+                                : stored === kind.value ? pin.getAttribute("data-ph-set") : pin.getAttribute("data-ph-new");
+                            var clear = document.querySelector("input[name=MaintenancePinClear]");
+                            pin.required = stored !== "" && stored !== kind.value && !(clear && clear.checked);
+                        }
+                        kind.addEventListener("change", apply);
+                        document.addEventListener("change", function (e) { if (e.target && e.target.name === "MaintenancePinClear") apply(); });
+                        apply();
+                    })();
+                </script>
                 @if (Model.MaintenanceHasPin)
                 {
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:8px;">

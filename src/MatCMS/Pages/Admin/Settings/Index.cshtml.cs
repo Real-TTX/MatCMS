@@ -64,7 +64,11 @@ public class IndexModel : PageModel
     /// <summary>A new maintenance PIN (Wartung tab); never rendered back — only <see cref="MaintenanceHasPin"/> is shown.</summary>
     [BindProperty] public string? MaintenancePin { get; set; }
     [BindProperty] public bool MaintenancePinClear { get; set; }
+    /// <summary>"password" or the digits of a PIN ("4", "6", "8"); not posted = keep the stored kind.</summary>
+    [BindProperty] public string? MaintenancePinKind { get; set; }
     public bool MaintenanceHasPin { get; private set; }
+    /// <summary>Digits of the stored PIN, 0 for a password or none.</summary>
+    public int MaintenancePinDigits { get; private set; }
 
     /// <summary>Checked non-default language codes (Sprachen tab).</summary>
     [BindProperty] public List<string> ActiveLanguages { get; set; } = new();
@@ -129,6 +133,7 @@ public class IndexModel : PageModel
         foreach (var key in (await GeneralKeysAsync()).Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs).Concat(SettingKeys.Social))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
         MaintenanceHasPin = existing.TryGetValue(SettingKeys.MaintenancePin, out var pinHash) && !string.IsNullOrWhiteSpace(pinHash);
+        MaintenancePinDigits = MaintenanceAccess.PinDigits(pinHash);
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         CurrentDefaultLanguage = existing.TryGetValue(SettingKeys.DefaultLanguage, out var dl) && !string.IsNullOrWhiteSpace(dl)
@@ -440,11 +445,22 @@ public class IndexModel : PageModel
     public async Task<IActionResult> OnPostMaintenanceAsync()
     {
         // The PIN is written only when one is typed (an empty field keeps it) or removal is ticked, and only as its hash.
+        // The kind (password or a PIN of 4/6/8 digits) is part of the stored value, so changing it needs a new value.
         var pin = (MaintenancePin ?? "").Trim();
-        if (!MaintenancePinClear && pin.Length > 0 && (pin.Length < MaintenanceAccess.MinLength || pin.Length > MaintenanceAccess.MaxLength))
+        var t = HttpContext.RequestServices.GetRequiredService<Localizer>();
+        var stored = (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.MaintenancePin))?.Value ?? "";
+        var digits = MaintenancePinKind is null ? MaintenanceAccess.PinDigits(stored)
+            : int.TryParse(MaintenancePinKind, out var d) && MaintenanceAccess.PinLengths.Contains(d) ? d : 0;
+        if (!MaintenancePinClear && pin.Length > 0 && !MaintenanceAccess.IsValid(pin, digits))
         {
-            TempData["FlashError"] = string.Format(HttpContext.RequestServices.GetRequiredService<Localizer>()["settings.maint.pinTooShort"],
-                MaintenanceAccess.MinLength);
+            TempData["FlashError"] = digits > 0
+                ? string.Format(t["settings.maint.pinDigits"], digits)
+                : string.Format(t["settings.maint.pinTooShort"], MaintenanceAccess.MinLength);
+            return RedirectToPage(new { tab = "maintenance" });
+        }
+        if (!MaintenancePinClear && pin.Length == 0 && stored.Trim().Length > 0 && digits != MaintenanceAccess.PinDigits(stored))
+        {
+            TempData["FlashError"] = t["settings.maint.pinKindChanged"];
             return RedirectToPage(new { tab = "maintenance" });
         }
         // The checkbox only posts a value when ticked → SaveKeysAsync writes "" for the unticked case.
@@ -452,7 +468,7 @@ public class IndexModel : PageModel
         if (MaintenancePinClear || pin.Length > 0)
         {
             var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.MaintenancePin);
-            var value = MaintenancePinClear ? "" : MaintenanceAccess.Hash(pin);
+            var value = MaintenancePinClear ? "" : MaintenanceAccess.Hash(pin, digits);
             if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.MaintenancePin, Value = value });
             else row.Value = value;
             await _db.SaveChangesAsync();

@@ -203,6 +203,102 @@ public class MaintenanceAccessTests : IClassFixture<AppFactory>
     }
 
     [Fact]
+    public void A_pin_carries_its_length_and_only_digits_of_that_length_match()
+    {
+        var stored = MaintenanceAccess.Hash("011110", 6);
+        Assert.StartsWith("pin6:", stored);
+        Assert.Equal(6, MaintenanceAccess.PinDigits(stored));
+        Assert.True(MaintenanceAccess.Verify("011110", stored));
+        Assert.False(MaintenanceAccess.Verify("11110", stored));
+        Assert.False(MaintenanceAccess.Verify("0111100", stored));
+        Assert.False(MaintenanceAccess.Verify("011111", stored));
+
+        Assert.Equal(0, MaintenanceAccess.PinDigits(MaintenanceAccess.Hash("geheim-1")));   // a password (and every hash from before)
+        Assert.Equal(0, MaintenanceAccess.PinDigits(""));
+        Assert.True(MaintenanceAccess.IsValid("1234", 4));
+        Assert.True(MaintenanceAccess.IsValid("12345678", 8));
+        Assert.False(MaintenanceAccess.IsValid("12a4", 4));
+        Assert.False(MaintenanceAccess.IsValid("12345", 6));
+        Assert.False(MaintenanceAccess.IsValid("12345", 5));                              // 5 is not one of the lengths
+        Assert.False(MaintenanceAccess.IsValid("abc", 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => MaintenanceAccess.Hash("12345", 5));
+    }
+
+    [Fact]
+    public async Task A_pin_page_draws_code_boxes_and_the_pin_opens_the_site()
+    {
+        await WithMaintenanceAsync(null, async () =>
+        {
+            await SetAsync(SettingKeys.MaintenancePin, MaintenanceAccess.Hash("011110", 6));
+            var c = _app.Browser();
+            var html = await (await c.GetAsync("/")).Content.ReadAsStringAsync();
+            Assert.Contains("data-digits=\"6\"", html);
+            Assert.Contains("inputmode=\"numeric\"", html);
+            Assert.Contains("pattern=\"[0-9]{6}\"", html);
+            Assert.Contains("m-otp-box", html);   // the script that draws them
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, (await EnterAsync(c, "01111")).StatusCode);
+            Assert.Equal(HttpStatusCode.SeeOther, (await EnterAsync(c, "011110")).StatusCode);
+
+            // A password draws no boxes.
+            await SetAsync(SettingKeys.MaintenancePin, MaintenanceAccess.Hash(Pin));
+            html = await (await _app.Browser().GetAsync("/")).Content.ReadAsStringAsync();
+            Assert.Contains(MaintenanceAccess.PinField, html);
+            Assert.DoesNotContain("data-digits", html);
+        });
+    }
+
+    [Fact]
+    public async Task The_admin_chooses_a_pin_of_4_6_or_8_digits_or_a_password()
+    {
+        await WithMaintenanceAsync(null, async () =>
+        {
+            var admin = _app.Browser();
+            await AppFactory.LoginAsync(admin);
+            async Task<HttpResponseMessage> Save(string kind, string pin, bool clear = false)
+            {
+                var page = await admin.GetStringAsync("/admin/settings");
+                var form = new Dictionary<string, string>
+                {
+                    [$"Values[{SettingKeys.MaintenanceEnabled}]"] = "1", ["MaintenancePinKind"] = kind, ["MaintenancePin"] = pin,
+                    ["__RequestVerificationToken"] = AppFactory.Token(page) ?? ""
+                };
+                if (clear) form["MaintenancePinClear"] = "true";
+                return await AppFactory.PostAsync(admin, "/admin/settings?handler=Maintenance", form);
+            }
+
+            var settings = await admin.GetStringAsync("/admin/settings");
+            Assert.Contains("name=\"MaintenancePinKind\"", settings);
+
+            await Save("6", "12345");                                   // not six digits
+            Assert.Equal("", await GetAsync(SettingKeys.MaintenancePin) ?? "");
+            await Save("6", "12a456");
+            Assert.Equal("", await GetAsync(SettingKeys.MaintenancePin) ?? "");
+
+            await Save("6", "011110");
+            var stored = await GetAsync(SettingKeys.MaintenancePin);
+            Assert.Equal(6, MaintenanceAccess.PinDigits(stored));
+            Assert.True(MaintenanceAccess.Verify("011110", stored));
+
+            // Another kind without a new value is refused: the page would draw boxes for something else.
+            await Save("password", "");
+            Assert.Equal(stored, await GetAsync(SettingKeys.MaintenancePin));
+            await Save("6", "");                                        // same kind, empty field: kept
+            Assert.Equal(stored, await GetAsync(SettingKeys.MaintenancePin));
+
+            await Save("8", "12345678");
+            Assert.Equal(8, MaintenanceAccess.PinDigits(await GetAsync(SettingKeys.MaintenancePin)));
+            await Save("password", "ein-Kennwort");
+            stored = await GetAsync(SettingKeys.MaintenancePin);
+            Assert.Equal(0, MaintenanceAccess.PinDigits(stored));
+            Assert.True(MaintenanceAccess.Verify("ein-Kennwort", stored));
+
+            await Save("4", "", clear: true);                           // removing needs no new value
+            Assert.Equal("", await GetAsync(SettingKeys.MaintenancePin) ?? "");
+        });
+    }
+
+    [Fact]
     public async Task Signing_in_with_the_cloud_is_not_answered_with_the_maintenance_page()
     {
         await WithMaintenanceAsync(null, async () =>

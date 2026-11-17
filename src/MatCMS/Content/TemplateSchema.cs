@@ -78,7 +78,8 @@ public static class TemplateSchema
     /// override it per template (file "maintenance.html"); the title/badge/message tokens come from the
     /// Settings → Wartung fields, so the text is editable without touching the template.
     /// Available tokens: {{lang}} {{site_name}} {{favicon}} {{logo}} {{maint_badge}} {{maint_title}}
-    /// {{maint_message}} {{year}} and the theme tokens {{accent}} {{accent_dark}} {{accent_soft}}
+    /// {{maint_message}} {{maint_unlock}} (the PIN form, empty unless a PIN is set; a layout without it gets the form
+    /// before &lt;/body&gt;) {{year}} and the theme tokens {{accent}} {{accent_dark}} {{accent_soft}}
     /// {{bg}} {{ink}} {{heading_color}} {{hairline}} {{heading_font}} {{body_font}} {{fonts_href}}.
     /// </summary>
     public const string DefaultMaintenancePart =
@@ -125,6 +126,7 @@ public static class TemplateSchema
             <span class="m-badge">{{maint_badge}}</span>
             <h1>{{maint_title}}</h1>
             <p>{{maint_message}}</p>
+            {{maint_unlock}}
             <div class="m-rule"></div>
             <p class="m-foot">© {{year}} {{site_name}}</p>
           </main>

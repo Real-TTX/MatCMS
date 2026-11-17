@@ -61,6 +61,11 @@ public class IndexModel : PageModel
 
     [BindProperty] public Dictionary<string, string> Values { get; set; } = new();
 
+    /// <summary>A new maintenance PIN (Wartung tab); never rendered back — only <see cref="MaintenanceHasPin"/> is shown.</summary>
+    [BindProperty] public string? MaintenancePin { get; set; }
+    [BindProperty] public bool MaintenancePinClear { get; set; }
+    public bool MaintenanceHasPin { get; private set; }
+
     /// <summary>Checked non-default language codes (Sprachen tab).</summary>
     [BindProperty] public List<string> ActiveLanguages { get; set; } = new();
 
@@ -123,6 +128,7 @@ public class IndexModel : PageModel
         var existing = await _db.SiteSettings.ToDictionaryAsync(s => s.Key, s => s.Value);
         foreach (var key in (await GeneralKeysAsync()).Concat(SettingKeys.Smtp).Concat(SettingKeys.Errors).Concat(SettingKeys.Code).Concat(SettingKeys.Maintenance).Concat(SettingKeys.Translate).Concat(SettingKeys.Security).Concat(SettingKeys.Logs).Concat(SettingKeys.Social))
             Values[key] = existing.TryGetValue(key, out var v) ? v : "";
+        MaintenanceHasPin = existing.TryGetValue(SettingKeys.MaintenancePin, out var pinHash) && !string.IsNullOrWhiteSpace(pinHash);
         CurrentActive = Localizer.ParseActive(existing.TryGetValue(SettingKeys.Languages, out var lv) ? lv : "")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         CurrentDefaultLanguage = existing.TryGetValue(SettingKeys.DefaultLanguage, out var dl) && !string.IsNullOrWhiteSpace(dl)
@@ -433,8 +439,24 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostMaintenanceAsync()
     {
+        // The PIN is written only when one is typed (an empty field keeps it) or removal is ticked, and only as its hash.
+        var pin = (MaintenancePin ?? "").Trim();
+        if (!MaintenancePinClear && pin.Length > 0 && (pin.Length < MaintenanceAccess.MinLength || pin.Length > MaintenanceAccess.MaxLength))
+        {
+            TempData["FlashError"] = string.Format(HttpContext.RequestServices.GetRequiredService<Localizer>()["settings.maint.pinTooShort"],
+                MaintenanceAccess.MinLength);
+            return RedirectToPage(new { tab = "maintenance" });
+        }
         // The checkbox only posts a value when ticked → SaveKeysAsync writes "" for the unticked case.
         await SaveKeysAsync(SettingKeys.Maintenance);
+        if (MaintenancePinClear || pin.Length > 0)
+        {
+            var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == SettingKeys.MaintenancePin);
+            var value = MaintenancePinClear ? "" : MaintenanceAccess.Hash(pin);
+            if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = SettingKeys.MaintenancePin, Value = value });
+            else row.Value = value;
+            await _db.SaveChangesAsync();
+        }
         TempData["Flash"] = Values.TryGetValue(SettingKeys.MaintenanceEnabled, out var on) && on == "1"
             ? "Wartungsmodus ist AKTIV — Besucher sehen die Wartungsseite."
             : "Wartungsmodus gespeichert (aus).";

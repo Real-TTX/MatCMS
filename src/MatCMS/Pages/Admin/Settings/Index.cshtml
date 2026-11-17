@@ -851,6 +851,20 @@
                 <textarea name="Values[@SettingKeys.MaintenanceMessage]" rows="3" placeholder="@T["maintenance.defaultMessage"]">@V(SettingKeys.MaintenanceMessage)</textarea>
             </div>
 
+            <div class="form-field">
+                <label for="maint-pin">@T["settings.maint.pinLabel"]</label>
+                <input id="maint-pin" name="MaintenancePin" type="password" autocomplete="new-password" maxlength="@MatCMS.Services.MaintenanceAccess.MaxLength"
+                       placeholder="@(Model.MaintenanceHasPin ? T["settings.maint.pinSet"] : T["settings.maint.pinNone"])" />
+                <div class="help">@T["settings.maint.pinHelp", MatCMS.Services.MaintenanceAccess.MaxFailures]</div>
+                @if (Model.MaintenanceHasPin)
+                {
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-top:8px;">
+                        <input type="checkbox" name="MaintenancePinClear" value="true" />
+                        <span>@T["settings.maint.pinClear"]</span>
+                    </label>
+                }
+            </div>
+
             <div class="help">@Html.Raw(T["settings.maint.overrideHelp"])</div>
 
             <div class="form-actions" style="margin-top:14px;">

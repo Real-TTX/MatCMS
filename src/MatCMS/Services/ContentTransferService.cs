@@ -347,7 +347,7 @@ public class ContentTransferService
             // The site's own AI connection (API key, ChatGPT sign-in) stays with this installation: encrypted with its keys, and a
             // ChatGPT refresh token copied elsewhere would kill the sign-in here on its first renewal.
             dto.Settings = (await _db.SiteSettings.AsNoTracking().OrderBy(s => s.Key).ToListAsync())
-                .Where(s => !SettingKeys.IsAiOwn(s.Key))
+                .Where(s => !SettingKeys.NotInBackup(s.Key))   // nor the maintenance PIN's hash (a short PIN is guessed offline)
                 .Select(s => new SettingDto { Key = s.Key, Value = s.Value }).ToList();
         }
 

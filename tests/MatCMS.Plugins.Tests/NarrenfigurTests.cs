@@ -41,6 +41,15 @@ public class NarrenfigurTests : IClassFixture<AppFactory>
         Assert.Equal(Keys(tables.Groups["de"].Value), Keys(tables.Groups["en"].Value));
         Assert.Contains("Hexe ausrüsten", tables.Groups["de"].Value);
         Assert.Contains("Equip the witch", tables.Groups["en"].Value);
+        Assert.Contains("Narr ausrüsten", tables.Groups["de"].Value);     // the second figure (1.2) is named in both
+        Assert.Contains("Equip the jester", tables.Groups["en"].Value);
+        // every figure that can be drawn has its words, and every option of the setting "figure" can be drawn
+        var figures = Regex.Match(js, @"var FIGURES = {([^}]*)}").Groups[1].Value;
+        foreach (var k in new[] { "hexe", "narr" })
+        {
+            Assert.Contains(k + ":", figures);
+            Assert.Contains("FieldOption(\"" + k + "\"", code);
+        }
     }
 
     [Fact]
@@ -56,6 +65,7 @@ public class NarrenfigurTests : IClassFixture<AppFactory>
 
         var cfg = JsonNode.Parse(await c.GetStringAsync("/narrenfigur/config"))!;
         Assert.Equal("hexe", (string?)cfg["figure"]);
+        Assert.True((bool)cfg["choose"]!);                  // visitors may switch unless the operator says no
         Assert.Equal("right", (string?)cfg["side"]);      // the declared defaults while nothing was saved
         Assert.False((bool)cfg["homeOnly"]!);
         Assert.True((bool)cfg["phone"]!);

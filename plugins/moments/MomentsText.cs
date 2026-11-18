@@ -11,7 +11,7 @@ public static class MomentsSettings
     public const string Title = "title", EventName = "eventName", HostName = "hostName", Welcome = "welcome", LoginIntro = "loginIntro", MenuLabel = "menuLabel",
         UploadApproval = "uploadApproval", CommentApproval = "commentApproval", GuestTags = "guestTags", NewTags = "newTags", GuestUpload = "guestUpload",
         MaxUploadMb = "maxUploadMb", Downloads = "downloads", ShowTable = "showTable", LoginMode = "loginMode", CodeChars = "codeChars", CodeLength = "codeLength",
-        UploadTags = "uploadTags", UploadTagsLabel = "uploadTagsLabel";
+        UploadTags = "uploadTags", UploadTagsLabel = "uploadTagsLabel", Videos = "videos", MaxVideoMb = "maxVideoMb";
 
     public const string DownloadOriginal = "original", DownloadView = "view", DownloadOff = "off";
     public const string ModeCode = "code", ModePassword = "password", ModeBoth = "both";
@@ -54,6 +54,9 @@ public static class MomentsSettings
         .Bool(ShowTable, "moments.set.showTable", false, "moments.set.showTableHelp")
         .Add(new SettingSpec(GuestUpload, "moments.set.guestUpload", SettingKind.Bool) { Group = "moments.set.groupFiles", Default = "true", Help = "moments.set.guestUploadHelp" })
         .Number(MaxUploadMb, "moments.set.maxUpload", 25, 1, 25, "moments.set.maxUploadHelp")
+        // 1.8: videos, uploaded in pieces (MomentsVideo)
+        .Bool(Videos, "moments.set.videos", true, "moments.set.videosHelp")
+        .Number(MaxVideoMb, "moments.set.maxVideo", 500, 10, 2000, "moments.set.maxVideoHelp")
         // 1.7: keywords a guest may pick while uploading (the tables of a wedding, the stations of a party) – each chosen one marks every photo of that upload
         .List(UploadTags, "moments.set.uploadTags", "", "moments.set.uploadTagsHelp", "moments.set.uploadTagsAdd")
         .Text(UploadTagsLabel, "moments.set.uploadTagsLabel", "", "moments.set.uploadTagsLabelHelp")

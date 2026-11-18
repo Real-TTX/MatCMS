@@ -225,12 +225,30 @@ internal static class MomentsStrings
         ("moments.upload.viewNotImage", "Die Ansicht von „{0}“ ist kein Bild.", "The view of “{0}” is not an image."),
         ("moments.upload.unreadable", "„{0}“ konnte nicht gelesen werden.", "“{0}” could not be read."),
         // the upload script's words (MomentsUpload.ScriptWords); {0} = a number
-        ("moments.upjs.left1", "Lädt hoch … noch {0} Foto", "Uploading … {0} photo to go"), ("moments.upjs.leftN", "Lädt hoch … noch {0} Fotos", "Uploading … {0} photos to go"),
-        ("moments.upjs.done1", "{0} Foto hochgeladen", "{0} photo uploaded"), ("moments.upjs.doneN", "{0} Fotos hochgeladen", "{0} photos uploaded"),
+        ("moments.upjs.left1", "Lädt hoch … noch {0} Datei", "Uploading … {0} file to go"), ("moments.upjs.leftN", "Lädt hoch … noch {0} Dateien", "Uploading … {0} files to go"),
+        ("moments.upjs.done1", "{0} Datei hochgeladen", "{0} file uploaded"), ("moments.upjs.doneN", "{0} Dateien hochgeladen", "{0} files uploaded"),
         ("moments.upjs.pending", "– die anderen sehen sie nach der Freigabe.", "– the others will see them once approved."), ("moments.upjs.thanks", "Danke!", "Thank you!"),
         ("moments.upjs.bad1", "{0} ging nicht.", "{0} failed."), ("moments.upjs.badN", "{0} gingen nicht.", "{0} failed."),
         ("moments.upjs.format", "Format geht nicht", "Format not supported"), ("moments.upjs.tooBig", "zu groß", "too large"),
         ("moments.upjs.error", "Fehler beim Hochladen", "Upload error"), ("moments.upjs.failed", "ging nicht", "failed"), ("moments.upjs.offline", "Verbindung unterbrochen", "Connection lost"),
+        ("moments.upjs.vtooBig", "Video zu groß", "video too large"), ("moments.upjs.vformat", "Videos sind ausgeschaltet", "videos are switched off"),
+
+        // ---- videos (1.8) ----
+        ("moments.video", "Video", "Video"),
+        ("moments.video.open", "Video öffnen", "Open the video"),
+        ("moments.video.off", "Videos sind hier ausgeschaltet.", "Videos are switched off here."),
+        ("moments.video.format", "„{0}“ ist kein Video, das wir annehmen können (MP4, MOV oder WebM).", "“{0}” is not a video we can take (MP4, MOV or WebM)."),
+        ("moments.video.tooBig", "„{0}“ ist zu groß – höchstens {1} pro Video.", "“{0}” is too large – at most {1} per video."),
+        ("moments.video.lost", "Das Hochladen wurde unterbrochen – bitte das Video noch einmal wählen.", "The upload was interrupted – please choose the video again."),
+        ("moments.upload.chooseMedia", "Fotos und Videos auswählen", "Choose photos and videos"),
+        ("moments.upload.chooseMediaHint", "gern viele auf einmal – sie laden sofort hoch, Videos in Stücken", "as many as you like – they upload right away, videos in pieces"),
+        ("moments.upload.videoLimits", "Videos höchstens {0}; auch aus ihnen wird der Standort entfernt.", "Videos at most {0}; their location is removed too."),
+        ("moments.set.videos", "Videos erlauben", "Allow videos"),
+        ("moments.set.videosHelp", "Gäste und Gastgeber können auch Videos hochladen; sie werden im Browser abgespielt und lassen sich herunterladen.",
+            "Guests and hosts can upload videos as well; they play in the browser and can be downloaded."),
+        ("moments.set.maxVideo", "Größtes Video beim Hochladen (MB)", "Largest video to upload (MB)"),
+        ("moments.set.maxVideoHelp", "Ein Handyvideo von einer Minute hat rund 100–400 MB. Videos brauchen Speicherplatz auf dem Server und im Backup.",
+            "A one-minute phone video is about 100–400 MB. Videos take space on the server and in the backup."),
 
         // ---- codes ----
         ("moments.code.onlyLetters", "Ein Code besteht nur aus Buchstaben A–Z und Ziffern (Leerzeichen und Bindestriche werden ignoriert).", "A code consists only of letters A–Z and digits (spaces and dashes are ignored)."),

@@ -39,6 +39,12 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
   Das Handy rechnet Ansicht (2048 px) und Kachel (640 px) selbst aus – das Plugin hat keine Bildbibliothek; das Original geht mit
   (Download), es sei denn, es ist zu groß oder HEIC.
 - **Stichwort beim Hochladen** (1.7): Einstellungen → Dateien → „Stichworte zur Auswahl beim Hochladen“ (eine Zeile je Stichwort, z. B. die Tische einer Hochzeit) und die Frage darüber. Wer hochlädt, wählt eines (oder keins); es hängt an jedem Foto dieses Hochladens, die Galerie filtert danach wie nach jedem Stichwort. Angenommen wird nur ein angebotenes Stichwort, nie ein freier Text aus dem Formular.
+- **Videos** (1.8): Gäste und Gastgeber laden auch Videos hoch (MP4, MOV, WebM; Einstellungen → Dateien: „Videos erlauben“, „Größtes Video“, Standard 500 MB).
+  Der Browser schickt ein Video in Stücken von 6 MB (eine Anfrage an ein Plugin darf nicht beliebig groß sein), der Server setzt sie beim Schreiben
+  zusammen und überschreibt dabei jeden Standort im Kopf des Films (ISO 6709, wo Handys ihn ablegen) mit Nullen; Aufnahmezeit und Länge liest er von dort.
+  Das Vorschaubild malt der Browser aus dem Video; kann er das nicht, steht ein Platzhalter da. Abgespielt wird über `/moments/video/{id}` mit Spulen
+  (Range), eine MOV-Datei als `video/mp4` (Chrome spielt QuickTime nur unter diesem Namen). Ein Video ist eine Zeile der Fototabelle mit `kind = video` –
+  Alben, Stichworte, Herzen, Kommentare und Freigabe gelten wie für Fotos. Was ein geschlossener Browser an Stücken liegen lässt, räumt ein stündlicher Job ab.
 - **Freigabe**: Fotos der Gäste sehen die anderen erst nach Freigabe (Admin → Moments → Freigabe, Zähler im Menü und Hinweis auf dem
   Dashboard). Kommentare optional ebenfalls.
 - **Moderation** im Admin: Fotos ausblenden/löschen/als Highlight, Markierungen und Kommentare ausblenden/löschen, Personen &

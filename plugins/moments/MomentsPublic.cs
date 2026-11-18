@@ -40,6 +40,7 @@ public static class MomentsPublic
         b.Route(Base + "/meine", MineAsync, read);
         b.Route(Base + "/bild/{id}/{size}", ImageAsync, read);
         b.Route(Base + "/download/{id}", DownloadAsync, read);
+        b.Route(Base + "/video/{id}", VideoAsync, read);
         b.Route(Base + "/karten", MomentsCards.PageAsync, read);
     }
 
@@ -309,9 +310,10 @@ public static class MomentsPublic
     {
         var hearts = listing is not null && listing.Hearts.TryGetValue(p.Id, out var h) ? h.Count : 0;
         var comments = listing is not null && listing.Comments.TryGetValue(p.Id, out var c) ? c : 0;
-        var alt = p.Caption.Length > 0 ? p.Caption : ctx.T("moments.photo");
+        var alt = p.Caption.Length > 0 ? p.Caption : ctx.T(p.IsVideo ? "moments.video" : "moments.photo");
         var sb = new StringBuilder("<a class=\"mo-tile").Append(large ? " large" : "").Append("\" href=\"").Append(Base).Append("/foto/").Append(p.Id).Append(M.H(query)).Append("\">")
             .Append("<img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/t\" alt=\"").Append(M.H(alt)).Append("\" loading=\"lazy\" decoding=\"async\">");
+        if (p.IsVideo) sb.Append("<span class=\"mo-tile-play\"><i class=\"ti ti-player-play-filled\" aria-hidden=\"true\"></i> ").Append(MomentsVideo.Duration(p.Duration)).Append("</span>");
         if (badge is not null) sb.Append("<span class=\"mo-tile-badge\">").Append(M.H(badge)).Append("</span>");
         if (hearts + comments > 0)
         {
@@ -672,9 +674,20 @@ public static class MomentsPublic
         if (p.Status == MomentsStore.Hidden) sb.Append("<p class=\"mo-alert\"><i class=\"ti ti-eye-off\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.photo.hiddenNote")).Append("</p>");
 
         var alt = p.Caption.Length > 0 ? p.Caption : ctx.T("moments.photo.by", author);
-        sb.Append("<figure class=\"mo-stage\" data-mo-stage><img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/v\" alt=\"").Append(M.H(alt)).Append("\"");
-        if (p.Width > 0 && p.Height > 0) sb.Append(" width=\"").Append(p.Width).Append("\" height=\"").Append(p.Height).Append("\"");
-        sb.Append(">");
+        if (p.IsVideo)
+        {
+            // the film itself, streamed with range requests; the poster is the browser's picture of it (or the placeholder)
+            sb.Append("<figure class=\"mo-stage\" data-mo-stage><video controls playsinline preload=\"metadata\" poster=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/v\" src=\"")
+              .Append(Base).Append("/video/").Append(p.Id).Append("\" aria-label=\"").Append(M.H(alt)).Append("\"");
+            if (p.Width > 0 && p.Height > 0) sb.Append(" width=\"").Append(p.Width).Append("\" height=\"").Append(p.Height).Append("\"");
+            sb.Append("><a href=\"").Append(Base).Append("/video/").Append(p.Id).Append("\">").Append(ctx.T("moments.video.open")).Append("</a></video>");
+        }
+        else
+        {
+            sb.Append("<figure class=\"mo-stage\" data-mo-stage><img src=\"").Append(Base).Append("/bild/").Append(p.Id).Append("/v\" alt=\"").Append(M.H(alt)).Append("\"");
+            if (p.Width > 0 && p.Height > 0) sb.Append(" width=\"").Append(p.Width).Append("\" height=\"").Append(p.Height).Append("\"");
+            sb.Append(">");
+        }
         if (prev is not null) sb.Append("<a class=\"mo-nav prev\" rel=\"prev\" href=\"").Append(Base).Append("/foto/").Append(prev.Id).Append(M.H(query)).Append("\" aria-label=\"").Append(ctx.T("moments.photo.prev")).Append("\"><i class=\"ti ti-chevron-left\"></i></a>");
         if (next is not null) sb.Append("<a class=\"mo-nav next\" rel=\"next\" href=\"").Append(Base).Append("/foto/").Append(next.Id).Append(M.H(query)).Append("\" aria-label=\"").Append(ctx.T("moments.photo.next")).Append("\"><i class=\"ti ti-chevron-right\"></i></a>");
         sb.Append("</figure>");
@@ -823,6 +836,15 @@ public static class MomentsPublic
             var result = await MomentsUpload.SaveAsync(ctx, store, v, ct);
             return Answer(ctx, ajax, result.Error, result.Pending);
         }
+        // a video, in pieces (only from the script)
+        if (ctx.Request.IsPost && ctx.Request.Action is "vstart" or "vpart" or "vdone")
+        {
+            if (!open) return PluginResult.Json(new JsonObject { ["ok"] = false, ["error"] = ctx.T("moments.upload.closed") });
+            if (ctx.Request.Action == "vstart") return PluginResult.Json(await MomentsVideo.StartAsync(ctx, store, v, ct));
+            if (ctx.Request.Action == "vpart") return PluginResult.Json(await MomentsVideo.PartAsync(ctx, store, v, ct));
+            var (error, pending) = await MomentsVideo.DoneAsync(ctx, store, v, ct);
+            return Answer(ctx, true, error, pending);
+        }
         var sb = new StringBuilder(Head(ctx, v, ctx.T("moments.uploadPhotos"), crumb: ""));
         if (!open) sb.Append("<div class=\"mo-empty\"><i class=\"ti ti-lock\" aria-hidden=\"true\"></i><p>").Append(ctx.T("moments.upload.closedThanks")).Append("</p></div>");
         else sb.Append(MomentsUpload.Panel(ctx, v, await store.AlbumsAsync(ct),
@@ -847,6 +869,15 @@ public static class MomentsPublic
         if (v is null) return PluginResult.Status(403);
         if (!long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || await store.PhotoAsync(id, ct) is not Photo p || !v.CanSee(p))
             return PluginResult.NotFound();
+        if (p.IsVideo)
+        {
+            // the poster — never the film under a picture's name; without one the placeholder
+            if (ctx.Request.R("size") is not ("t" or "v")) return PluginResult.NotFound();
+            var poster = ctx.Request.R("size") == "t" ? (p.Thumb.Length > 0 ? p.Thumb : p.View) : (p.View.Length > 0 ? p.View : p.Thumb);
+            if (poster.Length > 0) return await ServeAsync(ctx, poster, null, ct);
+            return PluginResult.File(MomentsVideo.Placeholder, "image/svg+xml").WithHeader("X-Content-Type-Options", "nosniff")
+                .WithHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox").WithHeader("Cache-Control", "private, max-age=3600");
+        }
         var file = ctx.Request.R("size") switch
         {
             "t" => p.Thumb.Length > 0 ? p.Thumb : p.View.Length > 0 ? p.View : p.File,
@@ -865,10 +896,23 @@ public static class MomentsPublic
         if (!long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || await store.PhotoAsync(id, ct) is not Photo p || !v.CanSee(p))
             return PluginResult.NotFound();
         var mode = v.Owns(p) ? MomentsSettings.DownloadOriginal : MomentsSettings.DownloadMode(ctx);
+        // a film has no smaller copy: "view" gives the film too (only "off" holds it back)
+        if (p.IsVideo && mode == MomentsSettings.DownloadView) mode = MomentsSettings.DownloadOriginal;
         var file = mode switch { MomentsSettings.DownloadOriginal => p.File, MomentsSettings.DownloadView => p.View.Length > 0 ? p.View : p.File, _ => "" };
         if (file.Length == 0) return PluginResult.NotFound();
-        var name = DownloadName(MomentsSettings.Event(ctx), ctx.T("moments.photo")) + "-" + M.N(p.Id) + Path.GetExtension(file);
+        var name = DownloadName(MomentsSettings.Event(ctx), ctx.T(p.IsVideo ? "moments.video" : "moments.photo")) + "-" + M.N(p.Id) + Path.GetExtension(file);
         return await ServeAsync(ctx, file, name, ct);
+    }
+
+    /// <summary>The film for the player: range requests (the host answers them), seen only by who may see the entry.</summary>
+    private static async Task<PluginResult> VideoAsync(IPluginContext ctx, CancellationToken ct)
+    {
+        var store = new MomentsStore(ctx.Data);
+        var v = await ViewerAsync(ctx, store, ct);
+        if (v is null) return PluginResult.Status(403);
+        if (!long.TryParse(ctx.Request.R("id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || await store.PhotoAsync(id, ct) is not Photo p || !p.IsVideo || !v.CanSee(p))
+            return PluginResult.NotFound();
+        return await ServeAsync(ctx, p.File, null, ct);
     }
 
     private static string DownloadName(string s, string fallback)
@@ -886,7 +930,8 @@ public static class MomentsPublic
     {
         var stream = await ctx.Files.OpenAsync(file, ct);
         if (stream is null) return PluginResult.NotFound();
-        return PluginResult.FromStream(stream, MomentsImage.ContentType(Path.GetExtension(file).ToLowerInvariant()), downloadName)
+        var type = file.StartsWith("v/", StringComparison.Ordinal) ? MomentsVideo.ContentType(file) : MomentsImage.ContentType(Path.GetExtension(file).ToLowerInvariant());
+        return PluginResult.FromStream(stream, type, downloadName)
             .WithHeader("X-Content-Type-Options", "nosniff").WithHeader("Cache-Control", "private, max-age=604800");
     }
 }

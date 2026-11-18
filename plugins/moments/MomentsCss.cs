@@ -92,6 +92,7 @@ public static class MomentsCss
 .mo .mo-tile:hover img{transform:scale(1.04)}
 .mo .mo-tile-meta{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:18px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.55));color:#fff;font-size:12.5px;font-weight:600}
 .mo .mo-tile-meta span{display:inline-flex;align-items:center;gap:3px}
+.mo .mo-tile-play{position:absolute;right:6px;top:6px;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
 .mo .mo-tile-badge{position:absolute;left:6px;top:6px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.92);color:var(--mo-ink);font-size:11.5px;font-weight:600}
 .mo .mo-empty{display:grid;justify-items:center;gap:10px;padding:50px 20px;border:2px dashed var(--mo-line);border-radius:18px;text-align:center;color:var(--mo-muted)}
 .mo .mo-empty > .ti{font-size:42px;color:var(--mo-accent)}.mo .mo-empty p{margin:0}
@@ -102,6 +103,7 @@ public static class MomentsCss
 .mo .mo-back a{color:var(--mo-accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:4px}
 .mo .mo-pos{color:var(--mo-muted);font-size:14px}
 .mo .mo-stage{position:relative;margin:0 0 22px;background:#16120f;border-radius:16px;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;min-height:240px;overflow:hidden;touch-action:pan-y}
+.mo .mo-stage video{display:block;min-width:0;max-width:100%;max-height:78vh;width:auto;height:auto;background:#000}
 .mo .mo-stage img{display:block;min-width:0;max-width:100%;max-height:78vh;width:auto;height:auto;object-fit:contain}
 .mo .mo-nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.88);color:#222;display:grid;place-items:center;text-decoration:none;font-size:24px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .mo .mo-nav.prev{left:12px}.mo .mo-nav.next{right:12px}

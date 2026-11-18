@@ -19,8 +19,10 @@ public sealed record Guest(long Id, string Name, string People, string Code, lon
 /// library. <see cref="GuestId"/> 0 = the hosts (uploaded in the back office or by an administrator on the site).
 /// </summary>
 public sealed record Photo(long Id, long GuestId, string File, string View, string Thumb, string FileName, long Size, int Width, int Height, string Taken,
-    string Caption, string Status, bool Featured, DateTime? Created, DateTime? ApprovedAt, long AlbumId = 0)
+    string Caption, string Status, bool Featured, DateTime? Created, DateTime? ApprovedAt, long AlbumId = 0, string Kind = "", int Duration = 0)
 {
+    /// <summary>A film (1.8): <see cref="File"/> is the video, <see cref="View"/>/<see cref="Thumb"/> its poster (empty when the browser could not draw one).</summary>
+    public bool IsVideo => Kind == MomentsVideo.Kind;
     public bool Approved => Status == MomentsStore.Approved;
     public bool Pending => Status == MomentsStore.Pending;
 }
@@ -66,7 +68,9 @@ public sealed class MomentsStore(IPluginData data)
             .Int("width", def: "0").Int("height", def: "0").Text("taken").Text("caption").Text("status", required: true).Bool("featured", def: "0")
             .Timestamp("created").Timestamp("approved_at")
             // 1.1: the album (0 = none)
-            .Int("album_id", def: "0").Index("status").Index("guest_id").Index("taken").Index("album_id"));
+            .Int("album_id", def: "0")
+            // 1.8: videos — "video" ("" = a photo) and the length in seconds
+            .Text("kind").Int("duration", def: "0").Index("status").Index("guest_id").Index("taken").Index("album_id"));
         b.Table(TTags, t => t.Text("name", required: true).Text("kind", required: true).Timestamp("created").Index("name"));
         b.Table(TPhotoTags, t => t.Int("photo_id", required: true).Int("tag_id", required: true).Int("by", def: "0").Timestamp("created")
             .UniqueIndex("photo_id", "tag_id").Index("tag_id"));
@@ -97,7 +101,8 @@ public sealed class MomentsStore(IPluginData data)
     private static Guest G(DataRow r) => new(r.Id, r.Text("name"), r.Text("people"), r.Text("code"), r.Int("member_id"), r.Text("table_name"), r.Text("note"),
         r.Bool("active"), r.Timestamp("created"), r.Timestamp("last_seen"), r.Int("visits"), r.Text("account"), r.Text("login"), r.Text("password"));
     private static Photo P(DataRow r) => new(r.Id, r.Int("guest_id"), r.Text("file"), r.Text("view"), r.Text("thumb"), r.Text("file_name"), r.Int("size"),
-        (int)r.Int("width"), (int)r.Int("height"), r.Text("taken"), r.Text("caption"), r.Text("status"), r.Bool("featured"), r.Timestamp("created"), r.Timestamp("approved_at"), r.Int("album_id"));
+        (int)r.Int("width"), (int)r.Int("height"), r.Text("taken"), r.Text("caption"), r.Text("status"), r.Bool("featured"), r.Timestamp("created"), r.Timestamp("approved_at"), r.Int("album_id"),
+        r.Text("kind"), (int)r.Int("duration"));
     private static Tag T(DataRow r) => new(r.Id, r.Text("name"), r.Text("kind"));
     private static PhotoTag PT(DataRow r) => new(r.Id, r.Int("photo_id"), r.Int("tag_id"), r.Int("by"));
     private static Comment C(DataRow r) => new(r.Id, r.Int("photo_id"), r.Int("guest_id"), r.Text("text"), r.Text("status"), r.Timestamp("created"));

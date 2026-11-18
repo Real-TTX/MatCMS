@@ -600,7 +600,7 @@ public class MomentsTests : IClassFixture<MomentsApp>
         // the hosts offer the tables (Einstellungen → Dateien → Stichworte zur Auswahl beim Hochladen)
         var res = await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupFiles", new Dictionary<string, string>
         {
-            ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_downloads"] = "original",
+            ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_videos"] = "true", ["s_maxVideoMb"] = "500", ["s_downloads"] = "original",
             ["s_uploadTags.count"] = "3", ["s_uploadTags.0.v"] = "Startlinie", ["s_uploadTags.1.v"] = "Zieleinlauf", ["s_uploadTags.2.v"] = "Kids-Staffel",
             ["s_uploadTagsLabel"] = "An welchem Tisch habt ihr gesessen?"
         });
@@ -630,9 +630,136 @@ public class MomentsTests : IClassFixture<MomentsApp>
         {
             await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupFiles", new Dictionary<string, string>
             {
-                ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_downloads"] = "original", ["s_uploadTags.count"] = "0", ["s_uploadTagsLabel"] = ""
+                ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_videos"] = "true", ["s_maxVideoMb"] = "500", ["s_downloads"] = "original", ["s_uploadTags.count"] = "0", ["s_uploadTagsLabel"] = ""
             });
         }
+    }
+
+    /// <summary>
+    /// A small ISO film: ftyp, a moov with mvhd (recorded 2026-10-09 18:30 UTC, 42 s) and a phone's location (©xyz), then <paramref name="body"/> bytes of
+    /// "picture" — enough for the server, which never decodes a film.
+    /// </summary>
+    internal static byte[] Film(int body)
+    {
+        static byte[] Box(string type, params byte[][] content)
+        {
+            var len = 8 + content.Sum(c => c.Length);
+            var b = new List<byte> { (byte)(len >> 24), (byte)(len >> 16), (byte)(len >> 8), (byte)len };
+            b.AddRange(Encoding.Latin1.GetBytes(type));
+            foreach (var c in content) b.AddRange(c);
+            return b.ToArray();
+        }
+        static byte[] U32(long v) => new[] { (byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v };
+        var created = (long)(new DateTime(2026, 10, 9, 18, 30, 0, DateTimeKind.Utc) - new DateTime(1904, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+        var mvhd = Box("mvhd", new byte[4], U32(created), U32(created), U32(1000), U32(42_000), new byte[80]);
+        var xyz = Box("©xyz", new byte[] { 0, 18, 0x15, 0xC7 }, Encoding.ASCII.GetBytes("+48.8577+002.2950/"));
+        var moov = Box("moov", mvhd, Box("udta", xyz));
+        var data = new byte[body];
+        for (var i = 0; i < body; i++) data[i] = (byte)(i * 7 + 3);
+        return [.. Box("ftyp", Encoding.ASCII.GetBytes("isom"), U32(512), Encoding.ASCII.GetBytes("isomiso2mp41")), .. moov, .. Box("mdat", data)];
+    }
+
+    private static async Task<JsonObject> PostVideoAsync(HttpClient c, string token, string action, Action<MultipartFormDataContent> fill)
+    {
+        using var form = new MultipartFormDataContent { { new StringContent(token), "__RequestVerificationToken" }, { new StringContent(action), "action" }, { new StringContent("1"), "ajax" } };
+        fill(form);
+        var res = await c.PostAsync("/moments/hochladen", form);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        return JsonNode.Parse(await res.Content.ReadAsStringAsync())!.AsObject();
+    }
+
+    /// <summary>Uploads a film the way the page's script does: start, pieces in order, done with the poster. Answers the last answer.</summary>
+    private static async Task<JsonObject> UploadVideoAsync(HttpClient c, byte[] film, string name = "VID_0001.mp4", byte[]? poster = null)
+    {
+        var token = AppFactory.Token(await c.GetStringAsync("/moments/hochladen"))!;
+        var start = await PostVideoAsync(c, token, "vstart", f => { f.Add(new StringContent(name), "name"); f.Add(new StringContent(film.Length.ToString()), "size"); });
+        if (start["ok"]!.GetValue<bool>() != true) return start;
+        var id = start["id"]!.GetValue<string>();
+        var chunk = start["chunk"]!.GetValue<int>();
+        for (var n = 0; n * chunk < film.Length; n++)
+        {
+            var piece = film.AsSpan(n * chunk, Math.Min(chunk, film.Length - n * chunk)).ToArray();
+            var r = await PostVideoAsync(c, token, "vpart", f => { f.Add(new StringContent(id), "id"); f.Add(new StringContent(n.ToString()), "n"); f.Add(new ByteArrayContent(piece), "part", "part"); });
+            Assert.True(r["ok"]!.GetValue<bool>(), r.ToJsonString());
+        }
+        return await PostVideoAsync(c, token, "vdone", f =>
+        {
+            f.Add(new StringContent(id), "id");
+            f.Add(new StringContent("1920"), "w"); f.Add(new StringContent("1080"), "h");
+            if (poster is not null) { f.Add(new ByteArrayContent(poster), "view", "view.jpg"); f.Add(new ByteArrayContent(poster), "thumb", "thumb.jpg"); }
+        });
+    }
+
+    [Fact]
+    public async Task A_video_goes_up_in_pieces_loses_its_location_plays_with_seeking_and_stays_private_until_released()
+    {
+        var admin = await _app.AdminAsync();
+        await PostFormAsync(admin, "/admin/p/moments/_settings?group=moments.set.groupFiles", new Dictionary<string, string>
+        {
+            ["action"] = "save-settings", ["s_guestUpload"] = "true", ["s_maxUploadMb"] = "25", ["s_videos"] = "true", ["s_maxVideoMb"] = "500", ["s_downloads"] = "original",
+            ["s_uploadTags.count"] = "0", ["s_uploadTagsLabel"] = ""
+        });
+        var (_, code) = await GuestAsync("Video Familie", "Ina");
+        var (_, otherCode) = await GuestAsync("Video Nachbarn", "Olaf");
+        var guest = await SignedInAsync(code);
+        var other = await SignedInAsync(otherCode);
+        Assert.Contains("accept=\"image/*,video/*\"", await guest.GetStringAsync("/moments/hochladen"));
+
+        // 13 MB: three pieces
+        var film = Film(13 * 1024 * 1024);
+        var done = await UploadVideoAsync(guest, film, poster: Jpeg(gps: false));
+        Assert.True(done["ok"]!.GetValue<bool>(), done.ToJsonString());
+        Assert.True(done["pending"]!.GetValue<bool>());
+        var id = LastPhoto();
+        Assert.Equal("video", _app.Db(db => db.Database.SqlQueryRaw<string>("select kind as Value from p_moments_photos where id = {0}", id).AsEnumerable().Single()));
+        Assert.Equal(42, _app.Db(db => db.Database.SqlQueryRaw<int>("select duration as Value from p_moments_photos where id = {0}", id).AsEnumerable().Single()));
+        Assert.StartsWith("2026-10-09T20:30", _app.Db(db => db.Database.SqlQueryRaw<string>("select taken as Value from p_moments_photos where id = {0}", id).AsEnumerable().Single()));
+        Assert.Equal(0, _app.Db(db => db.Database.SqlQueryRaw<int>("select count(*) as Value from p_moments_meta where name like 'up:%'").AsEnumerable().Single()));   // the pieces are gone
+
+        // the owner plays it: whole, the location zeroed, everything else byte for byte; and with seeking (range)
+        var whole = await guest.GetByteArrayAsync("/moments/video/" + id);
+        Assert.Equal(film.Length, whole.Length);
+        Assert.False(Contains(whole, Encoding.ASCII.GetBytes("48.8577")));
+        Assert.True(Contains(whole, Encoding.ASCII.GetBytes("+00.0000+000.0000/")));
+        var differ = Enumerable.Range(0, film.Length).Count(i => film[i] != whole[i]);
+        Assert.Equal(10, differ);   // the ten digits of the location, nothing else
+        using (var req = new HttpRequestMessage(HttpMethod.Get, "/moments/video/" + id))
+        {
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(film.Length - 100, film.Length - 1);
+            var res = await guest.SendAsync(req);
+            Assert.Equal(HttpStatusCode.PartialContent, res.StatusCode);
+            Assert.Equal("video/mp4", res.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(film[^100..], await res.Content.ReadAsByteArrayAsync());
+        }
+        var page = await guest.GetStringAsync("/moments/foto/" + id);
+        Assert.Contains("<video controls playsinline", page);
+        Assert.Contains("src=\"/moments/video/" + id + "\"", page);
+
+        // another household sees nothing of it before the release, then the player and a tile with the length
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync("/moments/video/" + id)).StatusCode);
+        await PostFormAsync(admin, "/moments/foto/" + id, new Dictionary<string, string> { ["action"] = "approve", ["q"] = "" });
+        Assert.Equal(HttpStatusCode.OK, (await other.GetAsync("/moments/video/" + id)).StatusCode);
+        Assert.Contains("0:42", await other.GetStringAsync("/moments?alle=1"));
+        var download = await other.GetAsync("/moments/download/" + id);
+        Assert.Equal(".mp4", Path.GetExtension(download.Content.Headers.ContentDisposition?.FileNameStar ?? download.Content.Headers.ContentDisposition?.FileName?.Trim('"')));
+
+        // a video without a poster shows the placeholder picture, never the film under a picture's name
+        Assert.True((await UploadVideoAsync(guest, Film(1000), "ohne.mov"))["ok"]!.GetValue<bool>());
+        var bare = LastPhoto();
+        var thumb = await guest.GetAsync($"/moments/bild/{bare}/t");
+        Assert.Equal("image/svg+xml", thumb.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.NotFound, (await guest.GetAsync($"/moments/bild/{bare}/o")).StatusCode);
+
+        // refused: something that is no film, a film too large, and pieces sent into another household's upload
+        var fake = await UploadVideoAsync(guest, Encoding.ASCII.GetBytes("this is no film at all, just text"), "fake.mp4");
+        Assert.False(fake["ok"]!.GetValue<bool>());
+        var token = AppFactory.Token(await guest.GetStringAsync("/moments/hochladen"))!;
+        var big = await PostVideoAsync(guest, token, "vstart", f => { f.Add(new StringContent("riesig.mp4"), "name"); f.Add(new StringContent((600L * 1024 * 1024).ToString()), "size"); });
+        Assert.False(big["ok"]!.GetValue<bool>());
+        var mine = await PostVideoAsync(guest, token, "vstart", f => { f.Add(new StringContent("halb.mp4"), "name"); f.Add(new StringContent("100"), "size"); });
+        var otherToken = AppFactory.Token(await other.GetStringAsync("/moments/hochladen"))!;
+        var foreign = await PostVideoAsync(other, otherToken, "vpart", f => { f.Add(new StringContent(mine["id"]!.GetValue<string>()), "id"); f.Add(new StringContent("0"), "n"); f.Add(new ByteArrayContent(new byte[100]), "part", "part"); });
+        Assert.False(foreign["ok"]!.GetValue<bool>());
     }
 
     private static async Task UploadTaggedAsync(HttpClient c, string tag)

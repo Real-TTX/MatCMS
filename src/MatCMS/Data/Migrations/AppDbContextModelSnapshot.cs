@@ -15,7 +15,7 @@ namespace MatCMS.Data.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("MatCMS.Models.AiChange", b =>
                 {
@@ -1021,6 +1021,9 @@ namespace MatCMS.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Email")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MaintenanceSeen")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PasswordHash")

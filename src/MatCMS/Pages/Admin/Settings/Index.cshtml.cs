@@ -473,6 +473,7 @@ public class IndexModel : PageModel
             else row.Value = value;
             await _db.SaveChangesAsync();
         }
+        await HttpContext.RequestServices.GetRequiredService<MaintenanceNotice>().RecordAsync(User);
         TempData["Flash"] = Values.TryGetValue(SettingKeys.MaintenanceEnabled, out var on) && on == "1"
             ? "Wartungsmodus ist AKTIV — Besucher sehen die Wartungsseite."
             : "Wartungsmodus gespeichert (aus).";

@@ -689,6 +689,13 @@ The operator picks a password OR a PIN of 4, 6 or 8 digits; the kind is stored I
 `MaintenanceAccess.PinDigits`), so the page can never draw boxes for a password, and changing the kind needs a new value. A PIN is entered
 in code boxes (MatUi FORM-19 look, drawn by the page's own small script in `MaintenancePage` — the public site never loads matui.js;
 the real field stays the posted one and works without the script).
+**A note for the admins and "somebody else changed it"** (`Services/MaintenanceNotice.cs`): Settings → Wartung has a note (`maintenance.note`,
+back office only — the dashboard's maintenance line shows it, it travels in backups). Every back-office user keeps the state they last saw
+(`User.MaintenanceSeen`: on/off, title, text, note, a fingerprint of the PIN hash); the admin layout asks `CheckAsync` on every page and shows a
+dialog only "Gesehen" closes when the state differs and this user did not make it. Who made it is known only for the settings page
+(`RecordAsync` → `maintenance.lastChange`, in NO backup); any other writer (cloud rollout, restore, content op) leaves a state that does not
+match that record and reads as "from outside" — so no writer has to call anything. The first look ever only records. A confirmation names the
+state's fingerprint; changed meanwhile, the dialog comes again. Tests: `MaintenanceNoticeTests`.
 
 ## License and pricing
 

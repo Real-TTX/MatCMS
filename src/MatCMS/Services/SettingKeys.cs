@@ -137,6 +137,12 @@ public static class SettingKeys
     /// empty = no way past. Set on this site only: protected from every outside writer and in no backup — a short PIN's hash
     /// is guessed offline in seconds, and a backup travels.</summary>
     public const string MaintenancePin = "maintenance.pinHash";
+    /// <summary>A note for the site's admins about the maintenance (why, until when, who to ask). Shown only in the back office — on the
+    /// dashboard and in the dialog that asks an admin to confirm a change made by somebody else (<see cref="MaintenanceNotice"/>).</summary>
+    public const string MaintenanceNote = "maintenance.note";
+    /// <summary>Who last changed the maintenance mode in Settings → Wartung, when, and to what (<see cref="MaintenanceNotice"/>). In no backup:
+    /// a restore that changes the mode must read as a change from outside, not as the change the backup's admin once made.</summary>
+    public const string MaintenanceLastChange = "maintenance.lastChange";
 
     // Custom code / tracking (own tab under Settings). Raw HTML injected site-wide.
     public const string CodeHead = "code.head";           // before </head>
@@ -211,7 +217,8 @@ public static class SettingKeys
 
     /// <summary>One of the site's own AI keys (the fixed ones or a profile's sign-in) — never in a backup.</summary>
     /// <summary>Keys a backup never carries: the site's own AI keys and the maintenance PIN's hash.</summary>
-    public static bool NotInBackup(string? key) => IsAiOwn(key) || string.Equals(key, MaintenancePin, StringComparison.OrdinalIgnoreCase);
+    public static bool NotInBackup(string? key) => IsAiOwn(key) || string.Equals(key, MaintenancePin, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(key, MaintenanceLastChange, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsAiOwn(string? key) => key is not null
         && (AiOwn.Contains(key, StringComparer.OrdinalIgnoreCase) || key.StartsWith(AiChatGptTokensPrefix, StringComparison.OrdinalIgnoreCase));
@@ -307,7 +314,7 @@ public static class SettingKeys
     public static readonly string[] Code = [AnalyticsGa4, CodeHead, CodeBodyStart, CodeBodyEnd];
 
     /// <summary>Maintenance-mode keys (managed on the Settings → Wartung tab).</summary>
-    public static readonly string[] Maintenance = [MaintenanceEnabled, MaintenanceTitle, MaintenanceMessage];
+    public static readonly string[] Maintenance = [MaintenanceEnabled, MaintenanceTitle, MaintenanceMessage, MaintenanceNote];
 
     /// <summary>Machine-translation keys (managed on the Settings → Sprachen tab).</summary>
     public static readonly string[] Translate = [TranslateProvider, TranslateApiKey, TranslateUrl];

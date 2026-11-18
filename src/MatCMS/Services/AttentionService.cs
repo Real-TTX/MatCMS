@@ -53,7 +53,12 @@ public sealed class AttentionService
 
         if (!SettingKeys.IsSetupDone(Get)) Add("info", "ti-compass", "setup", Page("/Admin/Setup/Index"), null, null);
         if (Get(SettingKeys.MaintenanceEnabled) == "1")
-            Add("warn", "ti-barrier-block", "maintenance", Settings("maintenance"), Get(SettingKeys.MaintenanceTitle) is { } mt ? D("maintenanceTitle", mt) : null, null);
+            Add("warn", "ti-barrier-block", "maintenance", Settings("maintenance"),
+                string.Join(" · ", new[] { Get(SettingKeys.MaintenanceTitle) is { Length: > 0 } mt ? D("maintenanceTitle", mt) : null,
+                    Get(SettingKeys.MaintenanceNote) is { Length: > 0 } mn ? D("maintenanceNote", mn.Trim()) : null }.Where(x => x is not null)) is { Length: > 0 } md ? md : null, null);
+        // the admins' note is what the dashboard's line says (it shows the text, not the detail) — that is where the others read it
+        if (Get(SettingKeys.MaintenanceEnabled) == "1" && Get(SettingKeys.MaintenanceNote) is { Length: > 0 } note)
+            a[^1] = a[^1] with { Text = D("maintenanceNote", note.Trim()) };
 
         var cfg = await _backups.GetConfigAsync();
         var stored = _backups.ListStored();

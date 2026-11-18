@@ -851,6 +851,12 @@
                 <textarea name="Values[@SettingKeys.MaintenanceMessage]" rows="3" placeholder="@T["maintenance.defaultMessage"]">@V(SettingKeys.MaintenanceMessage)</textarea>
             </div>
 
+            <div class="form-field">
+                <label for="maint-note">@T["settings.maint.noteLabel"]</label>
+                <textarea id="maint-note" name="Values[@SettingKeys.MaintenanceNote]" rows="3" maxlength="2000" placeholder="@T["settings.maint.notePlaceholder"]">@V(SettingKeys.MaintenanceNote)</textarea>
+                <div class="help">@T["settings.maint.noteHelp"]</div>
+            </div>
+
             @{
                 // Preselected: the stored kind; with nothing stored a 6-digit PIN.
                 var pinKind = Model.MaintenanceHasPin ? (Model.MaintenancePinDigits > 0 ? Model.MaintenancePinDigits.ToString() : "password") : "6";

@@ -411,3 +411,13 @@ html[data-theme] .admin--matui .admin-content:has(.live-editor) > .alert-error {
 /* a notice inside a table cell (an order's history) wraps — the cell's nowrap ran it under the side column */
 .admin--matui td .alert { white-space: normal; min-width: 0; }
 .admin--matui table.data td:last-child:has(> .alert) { width: 60%; white-space: normal; }   /* the actions column rule (1%, nowrap) is not for a text column */
+
+/* The dialog "Wartungsmodus geändert" (MaintenanceNotice): what changed, the state now as a tinted line (COLOR-04, no side bar), the admins' note. */
+#maint-seen .mat-dialog__title { display: flex; align-items: center; gap: 8px; }
+#maint-seen .maint-seen__list { margin: 0 0 var(--mat-space-3); padding-left: 1.2em; }
+#maint-seen .maint-seen__list li + li { margin-top: 4px; }
+#maint-seen .maint-seen__now { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--mat-radius-md, 8px); font-weight: 600; }
+#maint-seen .maint-seen__now.is-on { background: var(--warn-bg); color: var(--warn-fg); }
+#maint-seen .maint-seen__now.is-off { background: var(--ok-bg); color: var(--ok-fg); }
+#maint-seen .maint-seen__note { margin-top: var(--mat-space-3); padding: 10px 12px; border: 1px solid var(--mat-border); border-radius: var(--mat-radius-md, 8px); background: var(--mat-surface-2); }
+#maint-seen .maint-seen__note p { margin: 4px 0 0; white-space: pre-line; }

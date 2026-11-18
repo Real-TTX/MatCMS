@@ -18,11 +18,13 @@ public static class MomentsUpload
     public static string Panel(IPluginContext ctx, Viewer v, IReadOnlyList<Album> albums, long preselect = 0)
     {
         var approval = ctx.Settings.GetBool(MomentsSettings.UploadApproval) && !v.Admin;
+        var video = MomentsVideo.Allowed(ctx);
         // the hosts choose the album (the photographer's, the photo booth's …); a guest's photos go to the guests' album by themselves
         var choose = v.Admin && albums.Count > 0;
         var pick = preselect > 0 && albums.Any(a => a.Id == preselect) ? preselect : albums.FirstOrDefault(a => !a.Guests)?.Id ?? albums.FirstOrDefault()?.Id ?? 0;
         var sb = new StringBuilder("<section class=\"mo-card mo-upload\"><form method=\"post\" action=\"").Append(MomentsPublic.Base).Append("/hochladen\" enctype=\"multipart/form-data\" data-mo-up data-max=\"")
-            .Append(MomentsSettings.MaxBytes(ctx).ToString(CultureInfo.InvariantCulture)).Append("\" data-mo-words=\"").Append(M.H(ScriptWords(ctx))).Append("\">").Append(ctx.Antiforgery)
+            .Append(MomentsSettings.MaxBytes(ctx).ToString(CultureInfo.InvariantCulture)).Append("\" data-max-video=\"").Append(video ? MomentsVideo.MaxBytes(ctx).ToString(CultureInfo.InvariantCulture) : "0")
+            .Append("\" data-mo-words=\"").Append(M.H(ScriptWords(ctx))).Append("\">").Append(ctx.Antiforgery)
             .Append("<input type=\"hidden\" name=\"action\" value=\"upload\">");
         if (choose)
         {
@@ -39,12 +41,14 @@ public static class MomentsUpload
             sb.Append("</select></label>");
         }
         sb
-            .Append("<label class=\"mo-drop\"><input type=\"file\" name=\"file\" multiple accept=\"image/*\"><span class=\"mo-big\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload.choose")).Append("</span>")
-            .Append("<small>").Append(ctx.T("moments.upload.chooseHint")).Append("</small></label>")
+            .Append("<label class=\"mo-drop\"><input type=\"file\" name=\"file\" multiple accept=\"").Append(video ? "image/*,video/*" : "image/*").Append("\"><span class=\"mo-big\"><i class=\"ti ti-camera-plus\" aria-hidden=\"true\"></i> ")
+            .Append(ctx.T(video ? "moments.upload.chooseMedia" : "moments.upload.choose")).Append("</span>")
+            .Append("<small>").Append(ctx.T(video ? "moments.upload.chooseMediaHint" : "moments.upload.chooseHint")).Append("</small></label>")
             .Append("<div class=\"mo-up-tiles\" aria-live=\"polite\"></div><p class=\"mo-up-status\" role=\"status\"></p>")
             .Append("<noscript><button class=\"mo-btn\" type=\"submit\">").Append(ctx.T("moments.upload")).Append("</button></noscript></form>")
             .Append("<p class=\"mo-muted small\">").Append(approval ? ctx.T("moments.upload.approvalNote") + " " : "")
-            .Append(ctx.T("moments.upload.limits", M.Size(ctx, MomentsSettings.MaxBytes(ctx)))).Append("</p>")
+            .Append(ctx.T("moments.upload.limits", M.Size(ctx, MomentsSettings.MaxBytes(ctx))))
+            .Append(video ? " " + ctx.T("moments.upload.videoLimits", M.Size(ctx, MomentsVideo.MaxBytes(ctx))) : "").Append("</p>")
             .Append("<p class=\"mo-up-done\" hidden><a class=\"mo-btn\" href=\"").Append(MomentsPublic.Base).Append("/meine\"><i class=\"ti ti-check\" aria-hidden=\"true\"></i> ").Append(ctx.T("moments.upload.done")).Append("</a></p></section>");
         return sb.Append(MomentsScript.Upload).ToString();
     }
@@ -53,7 +57,7 @@ public static class MomentsUpload
     private static string ScriptWords(IPluginContext ctx)
     {
         var o = new JsonObject();
-        foreach (var k in new[] { "left1", "leftN", "done1", "doneN", "pending", "thanks", "bad1", "badN", "format", "tooBig", "error", "failed", "offline" })
+        foreach (var k in new[] { "left1", "leftN", "done1", "doneN", "pending", "thanks", "bad1", "badN", "format", "tooBig", "error", "failed", "offline", "vtooBig", "vformat" })
             o[k] = ctx.T("moments.upjs." + k);
         return o.ToJsonString();
     }

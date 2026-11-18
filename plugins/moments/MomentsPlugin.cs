@@ -56,6 +56,8 @@ public sealed class MomentsPlugin : IPlugin
         // may get one of them. On every start, a household whose number names no account, or an account with another address, lets go of it — its next
         // sign-in finds its own account by the address, or makes one.
         b.Lifecycle.OnLoad(ReleaseStaleAccountsAsync);
+        // 1.8: the pieces of video uploads nobody finished
+        b.Job("video-pieces", JobSchedule.EveryInterval(TimeSpan.FromHours(1)), MomentsVideo.CleanupAsync);
         b.On(HostEvents.MemberExport, ExportAsync);
     }
 

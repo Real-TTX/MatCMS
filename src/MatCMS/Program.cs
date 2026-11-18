@@ -202,6 +202,7 @@ builder.Services.AddHostedService<LogRetentionService>();
 builder.Services.AddSingleton<StatsCollector>();
 builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<AttentionService>();
+builder.Services.AddScoped<MaintenanceNotice>();
 builder.Services.AddHostedService<StatsFlushService>();
 builder.Services.AddHttpClient();
 // "Beitrag aus Link": its own client, because the URL comes from a person — the handler refuses

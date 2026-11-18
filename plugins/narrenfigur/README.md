@@ -11,7 +11,7 @@ Besucher klicken sie an und rüsten sie aus:
 | Schellen | sie läutet (Ton aus dem Browser, keine Datei) |
 | Glühwein | sie prostet |
 
-Mit leerer Hand öffnet der Klick das Menü „Hexe ausrüsten“; der gelbe Knopf über ihr (links neben dem ×) tut das immer; beide Knöpfe erscheinen, wenn die Maus über der Figur ist (auf dem Handy sind sie immer da). Das × schickt sie weg
+Mit leerer Hand öffnet der Klick das Menü „Hexe ausrüsten“ bzw. „Narr ausrüsten“; der gelbe Knopf über ihr (links neben dem ×) tut das immer; beide Knöpfe erscheinen, wenn die Maus über der Figur ist (auf dem Handy sind sie immer da). Das × schickt sie weg
 (nur ihr Kopf schaut dann über den Rand und holt sie zurück). Die Wahl merkt sich der Browser (`localStorage`), der Server speichert nichts.
 
 ## Aufbau
@@ -24,9 +24,15 @@ Mit leerer Hand öffnet der Klick das Menü „Hexe ausrüsten“; der gelbe Kno
 - Deutsch und Englisch: Einstellungen über die Tabelle in `plugin.csx`, die Worte der Figur in `figur.js` (nach `<html lang>`).
 - Wer „Bewegung reduzieren“ eingestellt hat, bekommt keinen Flug und nur wenig Konfetti.
 
-## Eine weitere Figur (Schalksteinnarr)
+## Die Figuren
 
-Vorgesehen, noch nicht gezeichnet (es fehlt ein Foto des Häs): eine zweite Zeichnung in `FIGURES` (`figur.js`), eine weitere Option
-der Einstellung `figure` in `plugin.csx`, und die Route gibt den gespeicherten Wert aus.
+- **Wurmberghexe** (seit 1.0) und **Schalksteinnarr** (seit 1.2: lachende Holzmaske mit roter Nase, struppiges Haar, Haube und
+  Zackenkragen halb rot, halb blau mit Schellen, cremefarbenes Häs mit Weinberg, Trauben und Weinglas, rot-blaue Zacken am Saum und
+  an den Hosenbeinen, weißes Fell über der Schulter).
+- Die Einstellung **Figur** ist die, die ein Besucher zuerst sieht. Mit **„Besucher können die Figur wechseln“** (an) steht unten im
+  Menü „Figur“ mit beiden Köpfen; die Wahl merkt sich der Browser (`narrenfigur.figure`), was sie in der Hand hat, bleibt.
+- Beide Zeichnungen haben denselben Rahmen (Hand bei 151/178, Winkarm ab 71/121, Kopf im Ausschnitt `60 14 80 110`), deshalb passen
+  Gegenstände, Flug und Bewegungen zu jeder. Eine weitere Figur = eine Zeichnung in `FIGURES`, ihre Worte in `T` (beide Sprachen) und
+  eine Option der Einstellung in `plugin.csx`.
 
 Tests: `NarrenfigurTests` (jeder Text in beiden Sprachen; die Seite trägt die Dateien, die Route antwortet).

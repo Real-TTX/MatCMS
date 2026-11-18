@@ -84,6 +84,15 @@ public class IndexModel : PageModel
         return RedirectToPage();
     }
 
+    /// <summary>"Gesehen" in the dialog the admin layout shows when somebody else changed the maintenance mode (<see cref="MaintenanceNotice"/>).
+    /// Back to the page the dialog was on; a state that changed meanwhile is not confirmed and the dialog comes again.</summary>
+    public async Task<IActionResult> OnPostMaintenanceSeenAsync(string? fingerprint, string? returnUrl, string? go)
+    {
+        await HttpContext.RequestServices.GetRequiredService<MaintenanceNotice>().AcknowledgeAsync(User, fingerprint);
+        if (go == "settings") return RedirectToPage("/Admin/Settings/Index", new { tab = "maintenance" });
+        return Url.IsLocalUrl(returnUrl) ? LocalRedirect(returnUrl!) : RedirectToPage("/Admin/Index");
+    }
+
     /// <summary>The theme button at the foot of the menu (system → light → dark): saves the colour scheme
     /// alone, by fetch, and leaves the admin bar setting as it is (OnPostAppearance writes both).</summary>
     public async Task<IActionResult> OnPostThemeAsync(string? theme)

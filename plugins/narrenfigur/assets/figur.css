@@ -63,6 +63,15 @@
 .nf__item[aria-pressed="true"] { border-color: var(--accent, #013daf); background: color-mix(in srgb, var(--accent, #013daf) 10%, #fff); }
 .nf__item[data-item="none"] { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 8px; padding: 6px; }
 .nf__item[data-item="none"] svg { width: 20px; height: 20px; }
+/* switching the figure: a small head each, under the items */
+.nf__label { display: block; margin: 12px 2px 6px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .6; }
+.nf__figs { display: grid; gap: 6px; }
+.nf__pick { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 5px; border: 2px solid #eadfca; border-radius: 14px; background: #fffaf0; color: inherit; cursor: pointer;
+  font: 600 12px/1.15 inherit; text-align: left; transition: transform .15s ease, border-color .15s ease, background .15s ease; }
+.nf__pick svg { flex: none; width: 26px; height: 36px; }
+.nf__pick:hover { transform: translateY(-2px) rotate(1deg); border-color: var(--accent, #013daf); }
+.nf__pick[aria-pressed="true"] { border-color: var(--accent, #013daf); background: color-mix(in srgb, var(--accent, #013daf) 10%, #fff); }
+.nf__pick:focus-visible { outline: 3px solid var(--accent, #013daf); outline-offset: 3px; }
 
 /* sent away: only her head peeks over the edge */
 .nf__back { display: none; width: 46px; margin-left: auto; padding: 0; border: 0; background: none; cursor: pointer; transform: translateY(26px); transition: transform .25s cubic-bezier(.3, 1.5, .5, 1);

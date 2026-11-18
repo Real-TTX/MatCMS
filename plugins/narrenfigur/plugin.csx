@@ -11,13 +11,18 @@ using System.Text.Json.Nodes;
 // Languages: the back office (settings) is German and English through the tables below; the figure's own words are in figur.js,
 // also in both, picked by <html lang>.
 //
-// A further figure (the Schalksteinnarr) is a new drawing in figur.js (FIGURES) and a new option of the setting "figure".
+// Two figures so far, the Wurmberghexe and the Schalksteinnarr (1.2): the setting "figure" is the one a visitor meets first, and with
+// "choose" on, the menu lets visitors switch (kept in their browser). A further figure is a drawing in figur.js (FIGURES, T) and an option here.
 
 (string Key, string De, string En)[] NfRows =
 {
     ("nf.set.figure", "Figur", "Figure"),
     ("nf.set.figureHelp", "Welche Figur auf der Website steht.", "Which figure stands on the website."),
     ("nf.figure.hexe", "Wurmberghexe", "Wurmberg witch"),
+    ("nf.figure.narr", "Schalksteinnarr", "Schalkstein jester"),
+    ("nf.set.choose", "Besucher können die Figur wechseln", "Visitors can switch the figure"),
+    ("nf.set.chooseHelp", "Im Menü der Figur steht dann jede Figur zur Wahl; der Browser merkt sich die Wahl. Aus: Es steht immer die oben gewählte.",
+        "The figure's menu then offers every figure; the browser remembers the choice. Off: it is always the one chosen above."),
     ("nf.set.side", "Ecke", "Corner"),
     ("nf.side.right", "Unten rechts", "Bottom right"),
     ("nf.side.left", "Unten links", "Bottom left"),
@@ -29,7 +34,8 @@ Plugin.Strings("de", NfRows.ToDictionary(r => r.Key, r => r.De));
 Plugin.Strings("en", NfRows.ToDictionary(r => r.Key, r => r.En));
 
 Plugin.Settings
-    .Choice("figure", "nf.set.figure", "hexe", new[] { new FieldOption("hexe", "nf.figure.hexe") }, "nf.set.figureHelp")
+    .Choice("figure", "nf.set.figure", "hexe", new[] { new FieldOption("hexe", "nf.figure.hexe"), new FieldOption("narr", "nf.figure.narr") }, "nf.set.figureHelp")
+    .Bool("choose", "nf.set.choose", true, "nf.set.chooseHelp")
     .Choice("side", "nf.set.side", "right", new[] { new FieldOption("right", "nf.side.right"), new FieldOption("left", "nf.side.left") })
     .Bool("homeOnly", "nf.set.homeOnly", false, "nf.set.homeOnlyHelp")
     .Bool("phone", "nf.set.phone", true);
@@ -37,12 +43,13 @@ Plugin.Settings
 // What the script needs of the settings. Only the declared values go out: a saved value that is none of them falls back.
 Plugin.Route("/narrenfigur/config", ctx => PluginResult.Json(new JsonObject
 {
-    ["figure"] = "hexe",   // the only one so far; a second figure reads ctx.Settings.Get("figure") here
+    ["figure"] = ctx.Settings.Get("figure") == "narr" ? "narr" : "hexe",
+    ["choose"] = ctx.Settings.GetBool("choose"),
     ["side"] = ctx.Settings.Get("side") == "left" ? "left" : "right",
     ["homeOnly"] = ctx.Settings.GetBool("homeOnly"),
     ["phone"] = ctx.Settings.GetBool("phone"),
 }).WithHeader("Cache-Control", "no-cache"));
 
 // The version in the address makes a browser fetch the files again after an update.
-Plugin.Body("<link rel=\"stylesheet\" href=\"/plugin-assets/narrenfigur/figur.css?v=1.1\">"
-    + "<script src=\"/plugin-assets/narrenfigur/figur.js?v=1.1\" defer></script>");
+Plugin.Body("<link rel=\"stylesheet\" href=\"/plugin-assets/narrenfigur/figur.css?v=1.2\">"
+    + "<script src=\"/plugin-assets/narrenfigur/figur.js?v=1.2\" defer></script>");

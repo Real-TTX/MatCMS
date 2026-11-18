@@ -6,6 +6,7 @@
 @inject MatCMS.Services.SitePreview Preview
 @inject MatCMS.Data.AppDbContext Db
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject MatCMS.Services.MaintenanceNotice MaintNotice
 @{
     var title = ViewData["Title"] as string ?? "Admin";
     var displayName = User.FindFirst("DisplayName")?.Value ?? User.Identity?.Name ?? "Admin";
@@ -236,6 +237,47 @@
         </form>
     </div>
     @Html.AntiForgeryToken()
+
+    @{
+        // Somebody else switched or changed the maintenance mode since this user last looked: they confirm it before going on (MaintenanceNotice).
+        var maintChange = await MaintNotice.CheckAsync(User);
+    }
+    @if (maintChange is not null)
+    {
+        var ms = maintChange.State;
+        <dialog id="maint-seen" class="mat-dialog" aria-labelledby="maint-seen-title" data-maint-seen>
+            <form method="post" action="@Url.Page("/Admin/Account/Index", "MaintenanceSeen")" class="mat-dialog__form">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="fingerprint" value="@ms.Fingerprint" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <div class="mat-dialog__head"><h2 class="mat-dialog__title" id="maint-seen-title"><i class="ti ti-barrier-block" aria-hidden="true"></i> @T["maint.ack.title"]</h2></div>
+                <div class="mat-dialog__body">
+                    <p>@(maintChange.By is null ? T["maint.ack.introOutside"] : T["maint.ack.intro", maintChange.By, maintChange.AtUtc!.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")])</p>
+                    @if (maintChange.Changes.Count > 0)
+                    {
+                        <ul class="maint-seen__list">
+                            @foreach (var c in maintChange.Changes) { <li>@T["maint.ack.change." + c]</li> }
+                        </ul>
+                    }
+                    <p class="maint-seen__now @(ms.On ? "is-on" : "is-off")"><i class="ti @(ms.On ? "ti-barrier-block" : "ti-world")" aria-hidden="true"></i> @T[ms.On ? "maint.ack.nowOn" : "maint.ack.nowOff"]</p>
+                    @if (ms.Note.Length > 0)
+                    {
+                        <div class="maint-seen__note"><strong>@T["maint.ack.note"]</strong><p>@ms.Note</p></div>
+                    }
+                </div>
+                <div class="mat-dialog__foot">
+                    <div class="mat-btn-row">
+                        <button type="submit" class="btn btn-ghost" name="go" value="settings">@T["maint.ack.open"]</button>
+                        <button type="submit" class="btn" autofocus>@T["maint.ack.seen"]</button>
+                    </div>
+                </div>
+            </form>
+        </dialog>
+        <script>
+            // Only "Gesehen" closes it: Escape and a click beside it do nothing.
+            (function () { var d = document.getElementById("maint-seen"); if (!d || !d.showModal) return; d.addEventListener("cancel", function (e) { e.preventDefault(); }); d.showModal(); })();
+        </script>
+    }
 
     @if (shotDue)
     {

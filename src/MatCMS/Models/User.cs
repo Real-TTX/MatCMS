@@ -25,6 +25,10 @@ public class User
     /// <summary>What the dashboard shows for THIS user and in which order, as JSON (<see cref="MatCMS.Services.DashboardLayout"/>); null = follow the site's default layout.</summary>
     public string? DashboardJson { get; set; }
 
+    /// <summary>The state of the maintenance mode this user last saw and confirmed (JSON, <see cref="MatCMS.Services.MaintenanceNotice"/>);
+    /// null = never looked yet (the first visit only records it). A different state that this user did not make asks for a confirmation.</summary>
+    public string? MaintenanceSeen { get; set; }
+
     // --- Two-factor (TOTP) ----------------------------------------------------
     // Off for every existing account; turned on only after the user confirms a code during enrolment.
     // The secret is stored DataProtection-ENCRYPTED (see TwoFactorService) and recovery codes only as

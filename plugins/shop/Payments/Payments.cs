@@ -66,6 +66,14 @@ internal static class Payments
     {
         var store = new ShopStore(ctx.Data);
         await ShopMail.SendAsync(ctx, store, ShopMail.Placed, order, items, v => v["payment_info"] = BankInstructions(ctx, cfg, order), ct: ct);
+        // The operator learns of it NOW: a transfer is marked paid by hand, so the "paid" notification would only ever follow her own click.
+        // Only for transfers — an online payment that is abandoned leaves a placed order nobody has to act on; its notification comes when paid.
+        if (cfg.NotifyEmail.Length > 0)
+            await ShopMail.SendAsync(ctx, store, ShopMail.AdminPlaced, order, items, v =>
+            {
+                v["admin_url"] = $"{ctx.Site.Origin}/admin/p/shop/orders/{order.Id}";
+                v["note"] = string.IsNullOrWhiteSpace(order.Note) ? "—" : order.Note;
+            }, cfg.NotifyEmail, ct);
         return new PaymentStart(null, null);
     }
 

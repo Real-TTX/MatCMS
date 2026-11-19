@@ -307,6 +307,9 @@ Nach jeder Phase: Tests grün, CLAUDE.md und dieses Dokument nachgezogen, ein Co
 2. **Einstellungen** (Shop → Einstellungen): Verkäufer (Firma, Anschrift, USt-IdNr. — Pflicht für eine ordnungsgemäße Rechnung), Währung, Kleinunternehmer,
    Steuersatz für Versand, Rechtstexte (Adressen der AGB, Widerrufsbelehrung, Datenschutzerklärung und die **Version**, die mit jeder Bestellung gespeichert wird),
    Nummernkreise, Kasse (Bestellen ohne Konto, Konto anbieten), Benachrichtigungsadresse, Downloads, Vorkasse (Bankverbindung, Zahlungsfrist).
+   Die **Benachrichtigungsadresse** (Kasse → „Benachrichtigung bei neuen Bestellungen an“) bekommt seit 2.3 eine Vorkasse-Bestellung schon beim Eingang
+   (`shop.admin.placed`, mit der Anmerkung des Kunden) — vorher kam die Mail erst bei „bezahlt“, und das setzt bei Vorkasse der Betreiber selbst. Stripe/PayPal
+   melden sich weiter erst bezahlt (`shop.admin.order`): ein abgebrochener Online-Checkout ist keine Bestellung, um die sich jemand kümmern muss.
 3. **Mail:** der Shop verschickt über den SMTP-Zugang der Seite (oder das Relay der Cloud). Ohne Mailversand läuft alles weiter; jeder fehlgeschlagene Versand steht im
    Verlauf der Bestellung, und „E-Mails → Erneut senden“ versucht es noch einmal. Die Texte der sechs Shop-Mails stehen unter **Mailvorlagen** und sind dort änderbar.
 4. **Stripe** (Online-Zahlung):

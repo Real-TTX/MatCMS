@@ -13,6 +13,9 @@ internal static class ShopMail
     public const string Cancelled = "shop.order.cancelled";
     public const string Refunded = "shop.order.refunded";
     public const string AdminOrder = "shop.admin.order";
+    /// <summary>Shop 2.3: a bank-transfer order tells the operator when it comes IN. The paid mail alone never came for it — the operator marks such an
+    /// order paid herself, so she learnt of a new order only by looking into the back office (nslibera, 2026-11-19).</summary>
+    public const string AdminPlaced = "shop.admin.placed";
 
     private static readonly MailPlaceholder[] Common =
     {
@@ -135,6 +138,27 @@ internal static class ShopMail
 
             Im Admin: {{admin_url}}
             """) { Placeholders = With(new MailPlaceholder("admin_url", "Link zur Bestellung im Admin")), Loops = new[] { ItemsLoop } },
+
+        new(AdminPlaced, "Shop: Bestellung eingegangen, Vorkasse (an den Betreiber)", "Geht an die Benachrichtigungsadresse des Shops, sobald eine Bestellung mit Vorkasse aufgegeben ist — sie wartet auf die Überweisung.",
+            "Neue Bestellung {{order_number}} ({{total}}) – wartet auf Überweisung",
+            """
+            Eine neue Bestellung ist eingegangen. Bezahlt wird per Vorkasse:
+
+            {{order_number}} – {{customer_name}} – {{total}}
+
+            {{#items}}{{qty}} × {{title}}  –  {{line}}
+            {{/items}}
+            Versand ({{shipping_method}}): {{shipping_cost}}
+
+            Lieferadresse:
+            {{shipping_address}}
+
+            Anmerkung des Kunden:
+            {{note}}
+
+            Sobald das Geld auf dem Konto ist, die Bestellung im Admin als bezahlt markieren:
+            {{admin_url}}
+            """) { Placeholders = With(new MailPlaceholder("admin_url", "Link zur Bestellung im Admin"), new MailPlaceholder("note", "Anmerkung des Kunden zur Bestellung (z. B. der Name für eine Widmung)")), Loops = new[] { ItemsLoop } },
     };
 
     private static string OrderUrl(IPluginContext ctx, Order o) => $"{ctx.Site.Origin}/shop/order/{Uri.EscapeDataString(o.Number)}?t={Uri.EscapeDataString(o.AccessToken)}";

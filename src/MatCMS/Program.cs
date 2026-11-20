@@ -130,6 +130,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = embedAuth ? SameSiteMode.None : SameSiteMode.Lax;
         if (embedAuth) options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        MatCMS.Services.RelativeAuthRedirects.Apply(options);   // behind the edge the Host is the node's address, not the browser's
     })
     // A SECOND, independent scheme for public-site visitors (the "guest area" login). Its own cookie
     // and login path, kept apart from the admin one so the two audiences never bleed into each other.
@@ -142,6 +143,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromDays(30);
         options.SlidingExpiration = true;
         options.Cookie.Name = "matcms.member";
+        MatCMS.Services.RelativeAuthRedirects.Apply(options);
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
     });

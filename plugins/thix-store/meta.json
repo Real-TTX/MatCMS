@@ -1,0 +1,6 @@
+{
+  "Key": "thix-store",
+  "Name": "Thix-Store",
+  "Version": "1.0",
+  "Description": "Für thixapps.de: der Store des ThixLaunchers auf der Website. Die Übersicht /apps und je App eine Seite /apps/<Kurzname> (Beschreibung, Funktionen, Bilder, aktuelle Version), alles aus dem Katalog des Launchers (docs/catalog.json im Repository Real-TTX/ThixLauncher) und den Manifesten der Release-Kanäle. Installiert wird mit dem ThixLauncher, die Pakete jeder App gibt es aufklappbar unter „Weitere Downloads“. Dazu die Blöcke „Thix-Apps“ (Kacheln) und „Thix-Hero“ (Kopf mit gezeichnetem Launcher-Fenster). Bilder laufen über die eigene Seite, ein Besucher spricht nie mit GitHub, bevor er etwas herunterlädt. Deutsch und Englisch."
+}

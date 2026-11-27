@@ -135,6 +135,7 @@ builder.Services.AddScoped<ChatGptAccounts>();
 builder.Services.AddScoped<ChatGptAuthService>();
 builder.Services.AddScoped<InstanceService>();
 builder.Services.AddScoped<StatsService>();
+builder.Services.AddScoped<PluginOperationService>();
 builder.Services.AddScoped<HostImagesService>();
 builder.Services.AddScoped<ProfileOpsService>();
 builder.Services.AddScoped<AttentionService>();
@@ -985,6 +986,7 @@ MatCMS.Cloud.Api.NodeApi.MapNodeApi(app);
 MatCMS.Cloud.Api.NotificationApi.MapNotificationApi(app);
 MatCMS.Cloud.Api.CloudConfigApi.MapCloudConfigApi(app);
 MatCMS.Cloud.Api.StatsApi.MapStatsApi(app);
+MatCMS.Cloud.Api.PluginOperationsApi.MapPluginOperationsApi(app);
 MatCMS.Cloud.Api.OverviewApi.MapOverviewApi(app);
 MatCMS.Cloud.Api.BackupUsersApi.MapBackupUsersApi(app);
 

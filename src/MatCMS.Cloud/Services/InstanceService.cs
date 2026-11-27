@@ -297,6 +297,13 @@ public class InstanceService
         if (!instance.NamePinned && IsUnnamed(instance.Name) && !IsUnnamed(beat.SiteName))
             instance.Name = beat.SiteName!.Trim();
 
+        // The plugin operation catalogue rides only when it changed (a plugin switched on/off/updated); null = keep the last one.
+        if (beat.PluginOperations is { } ops)
+        {
+            instance.PluginOperationsJson = System.Text.Json.JsonSerializer.Serialize(ops.Take(PluginOperationService.MaxOperations));
+            instance.PluginOperationsAt = DateTime.UtcNow;
+        }
+
         await RecordSyncReportAsync(instance, beat, ct);
         await RecordContentOpReportsAsync(instance, beat, ct);
         await RecordInstanceLogsAsync(instance, beat, ct);

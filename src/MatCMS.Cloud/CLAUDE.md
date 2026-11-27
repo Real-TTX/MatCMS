@@ -1332,6 +1332,15 @@ the admin UI uses. There is no second restore path and no second backup format.
   dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent.
   **This bumped `CloudProtocol.Version` 14 → 15 — cloud and instances must deploy together.**
 - **Shop tools ride the same channel** (`Mcp/ContentTools.cs`: `create_product`, `create_coupon`, `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`). They enqueue PLUGIN operations (`product.create`, `order.list`, `order.update`, `variant.set` …) that the instance's shop plugin answers; an operation that READS answers with `data`, which the instance's `ContentOpApplier` returns as the report's `ResultJson` (so `get_content_op` shows it as `result`). Orders hold personal data, so even `list_shop_orders` needs the restore right (not read scope). No REST twin yet: like the other content ops these are MCP-only.
+- **Every plugin operation, generically** (`Mcp/PluginOperationTools.cs` `list_plugin_operations` / `run_plugin_operation`, REST
+  `GET /api/v1/instances/{id}/plugin-operations`, `POST …/plugin-operations/{name}` with the arguments object as the body, and
+  `GET …/content-ops/{opId}` — the first REST twin of `get_content_op`; all through `Services/PluginOperationService.cs`). The site reports its
+  catalogue on the heartbeat only when it changed (`HeartbeatRequest.PluginOperations`, `MatCMS.Shared/PluginOperationInfo.cs`); the cloud
+  keeps the last one (`Instance.PluginOperationsJson` + `PluginOperationsAt`, migration `AddInstancePluginOperations`) — the list answers at
+  once, a run is a content op whose kind is the QUALIFIED name (`shop.product.create`). Rules: only a listed name (internal undo helpers are
+  never listed), writes AND personal data (reads of orders included) need `CanRestore`, a core content-op kind is refused, a write is queued
+  as overwrite (so "Backup vor KI-Änderung" applies). A site that never reported a catalogue (older version) is told so — no protocol bump,
+  the field is additive. The hand-written shop tools above stay for the clients that use them.
 - **MCP reads + edits (Stage 2, Increment 2 — built).** Reading existing content does NOT parse a backup in
   the cloud (that would duplicate the content format the instance owns — the exact coupling the repo avoids).
   Instead **reads flow through the same content-op channel**: `list_pages` / `get_page` enqueue a `pages.list`

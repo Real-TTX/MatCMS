@@ -212,6 +212,18 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
   and switch the plugin off through Admin → Plugins (a request of its own, as on a site). In a test, unloading in the test's own code right after a
   request, or while holding an undisposed `HttpResponseMessage` of a plugin route, keeps the request alive and looks like a leak.
   A plugin's redirect cannot carry a `#fragment` (`PluginResults.SafeLocal` turns it into "/") — the forum jumps to a post with `?p=` instead.
+- **Every plugin describes its content as OPERATIONS — script and native alike (rule, 27.11.2026; `docs/plugin-system-v2.md` §3.2a).**
+  list/read/create/update/delete-or-switch-off per kind of content, each a `PluginOperationSpec` (German description an AI reads, example
+  arguments, `Writes`, `PersonalData` for customers'/members'/guests' data, `Internal` for undo helpers only), every write answering with an
+  `undo` that names an internal op of the same plugin. Agents know a plugin ONLY through them (site assistant, cloud MCP, the site's own MCP
+  server). A plugin without own content is listed with its reason in `plugins/OPERATIONS.md`; `PluginOperationsRuleTests` fails for a plugin
+  that is neither. **Names are qualified `{plugin}.{name}`** for every caller (`PluginContributions.FindOperation`: qualified first, a short
+  name only while ONE plugin declares it — what the cloud's older tools send); the docs plugin's `page.read` was shadowed by the core content
+  op `page.read` before. `RunOperationAsync` qualifies an answer's `undo` name itself. The ONE outside shape is
+  `MatCMS.Shared.PluginOperationInfo` (`PluginContributions.Catalog()`, internal ones left out): the site sends it on the heartbeat when it
+  changed (`HeartbeatRequest.PluginOperations`, additive — no protocol bump), the cloud keeps it on `Instance.PluginOperationsJson` and runs a
+  listed name through the content-op channel (`PluginOperationService`: writes AND personal data need the restore right, a core kind is
+  refused). Never rename a shipped op or change its arguments — add a new one.
 - **Plugin API endpoints for other programs** (`IPluginBuilder.Api(method, pattern, handler, ApiRouteOptions)`, served by `Services/Plugins/PluginApiEndpoint.cs` at
   `/api/v1/{plugin}/{path}`; `GET /api/v1` lists them with `allowed` for the calling key). Auth is a **site API key** (`SiteApiKey`, Admin → API-Schlüssel,
   `SiteApiKeyService`): `msk_…`, shown ONCE, stored as SHA-256 only, Bearer or `X-Api-Key`, rights `{plugin}:{read|write|personal}` (write implies read,
@@ -573,6 +585,17 @@ through the cloud relay — the key never lives on the site.
   (compiled with `PluginRunner.Check` first; a new one is saved OFF, a running one whose code changed is switched OFF until the admin looks).
   Markup for layouts and components is REFUSED, not cleaned, when anything in it runs (`AssistantMarkup`: script/iframe/object/base/meta/link,
   `on*`, `srcdoc`, `javascript:`/`data:` addresses, CSS expressions) — the refusal names it so the model rewrites it.
+- **Plugins, plans and attachments** (`AssistantToolsPlugins.cs`): `plugin_action` (one op), `plugin_batch` (the same op for ≤ 50 entries per
+  call, every entry its own status line and its own undo journal row — one "Rückgängig" takes back a whole import), `propose_plan` (title,
+  steps, count, a preview table; the run then ENDS with state `plan`, the page draws the plan as a card with "Plan ausführen" / "Ändern …")
+  and `read_attachment` (a kept attachment text, ≤ 400 lines per call). The gate is code: more than `MaxWritesWithoutPlan` (5) plugin writes
+  in a run are refused until the PREVIOUS run ended with a plan (the editor has seen it and answered); after `propose_plan` nothing else is
+  written in that run. The prompt lists the ops grouped by plugin with qualified names, the switched-on/-off plugins, and fixed rules for big
+  jobs (plan first, batches, read the rest of a table). **Tables**: `.xlsx` is read by `SpreadsheetText` (zip + XML, NO library — nothing to
+  licence; shared strings, inline strings, cached formula results, dates by number format, ≤ 20 000 rows), `.csv/.tsv` by
+  `AssistantFiles.ReadDelimited` (separator guessed, quotes, Windows-1252 fallback); both become "Zeile n: a | b | c" lines, are NOT put in the
+  media library, ride the message only with their first `MaxInlineTableChars` (12 000) and are kept whole in `ai-files/{conversation}` for
+  `read_attachment` (documents and text files are kept too). Tests: `AssistantImportTests`.
 - **A run always finishes visibly**: an answer that only ANNOUNCES ("done": false, no actions) is told to go on (twice, then "stalled"), a
   question to the user ends it as "waiting", a busy/slow provider is asked again (2×, growing pause), the limit is 50 calls. The LAST step of
   every run is kind `end` with `state` done|waiting|limit|stalled|error|cancelled — the page draws it as a status line, with "Weitermachen"

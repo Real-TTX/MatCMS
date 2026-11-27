@@ -292,6 +292,39 @@ neuen Builder erhalten, damit `leserstimmen`, `cookie-consent` & Co. unveränder
 | `Sitemap`, `Search` | Einträge für Sitemap/Suche. | — |
 | `Extension(name)` | Erweiterungspunkt, den andere Plugins bedienen (`shop.payment`), per Name + JSON. | — |
 
+### 3.2a Operationen — die Regel für JEDES Plugin (27.11.2026)
+
+**Jedes Plugin mit eigenen Inhalten beschreibt, was man damit tun kann, als Operationen** — Script und Native gleich.
+Agenten (der KI-Assistent der Website, das MCP der Cloud, der MCP-Server der Website) kennen ein Plugin nur über seine
+Operationen; was nicht als Operation beschrieben ist, gibt es für sie nicht.
+
+- **Was:** zu jedem Inhalt `…list`, `…read`, `…create`, `…update` und Löschen bzw. Abschalten — mit
+  `IPluginBuilder.Operation(new PluginOperationSpec(name, beschreibung, argumente, Writes, PersonalData, Internal), handler)`.
+  Beschreibung und Beispiel-Argumente sind für eine KI geschrieben (Deutsch, kurz, jedes Argument genannt).
+- **Antwort:** `{"status": "applied"|"skipped-exists"|"failed", "message": "…", "data"?: …, "undo"?: {"name", "args"}}`.
+  Ein Lesen antwortet mit `data`. **Jedes Schreiben antwortet mit `undo`**, das eine `Internal: true`-Operation desselben
+  Plugins nennt (`…remove` für Neues, `…restore` mit dem alten Stand für Geändertes) — so nimmt „Rückgängig“ des Assistenten
+  auch einen Stapel von 200 Produkten zurück.
+- **Flags:** `Writes: false` für Lesen. `PersonalData: true` für alles mit Daten von Kunden, Mitgliedern, Gästen
+  (Bestellungen, Buchungen, Mitgliederlisten, Meldungen) — solche Operationen bekommt der Assistent nie (jede Antwort geht an
+  ein fremdes Modell), und die Cloud verlangt dafür auch beim Lesen das Wiederherstellen-Recht. `Internal: true` nur für Undo-Helfer:
+  nie gelistet, nur der Host führt sie aus (`RunOperationAsync(…, allowInternal: true)`).
+- **Namen:** ein Plugin deklariert kurze Namen (`product.create`); jeder Aufrufer nennt sie **qualifiziert**
+  `{plugin}.{name}` (`shop.product.create`, `docs.page.read`) — so verdeckt kein Kern-Name (`page.read` der Content-Ops) und
+  kein anderes Plugin eine Operation. Ein kurzer Name gilt weiter, solange nur ein Plugin ihn hat (die älteren Cloud-Tools
+  senden ihn). Der Host qualifiziert auch den `undo`-Namen einer Antwort selbst. Namen und Argumente einer ausgelieferten
+  Operation ändern sich nicht mehr (die Cloud ruft sie auf) — eine neue Fassung ist eine neue Operation.
+- **Prüfen wie das Admin:** jede Operation geht durch denselben Code wie die Formulare des Plugins (Store, Flow, Bereinigung);
+  nie SQL aus Argumenten, Rich-Text durch die Reinigung des Plugins.
+- **Ausnahme:** ein Plugin ohne eigene Inhalte (nur Einstellungen oder eine Anzeige von etwas anderem) hat keine Operationen
+  und steht mit Grund in `plugins/OPERATIONS.md`. `PluginOperationsRuleTests` prüft, dass jedes Plugin unter `plugins/`
+  Operationen hat oder dort steht.
+- **Ein Katalog, ein Format:** `PluginContributions.Catalog()` liefert `MatCMS.Shared.PluginOperationInfo` (qualifizierter Name,
+  Plugin, Beschreibung, Argumente, Writes, PersonalData; ohne Internal). Dieselbe Liste meldet die Website der Cloud im
+  Heartbeat (`HeartbeatRequest.PluginOperations`, nur wenn geändert), und der MCP-Server der Website listet dieselbe.
+  Cloud: `list_plugin_operations` / `run_plugin_operation` (MCP) und `GET|POST /api/v1/instances/{id}/plugin-operations[/{name}]`
+  (REST), Ergebnis über den Content-Op-Kanal (`get_content_op`, `GET …/content-ops/{opId}`).
+
 ### 3.3 Daten — die schwierigste Entscheidung
 
 Gleiche API verlangt, dass auch ein Script-Plugin **echte Tabellen** bekommt, ohne EF-Migrationen zu

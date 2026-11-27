@@ -331,3 +331,189 @@ AddBlock("googlereviews", "Google Bewertungen", "Zeigt Google-Rezensionen als Ka
     }
     catch (Exception ex) { return "<div class='matg'><div class='matg-empty'>Google-Bewertungen: " + System.Net.WebUtility.HtmlEncode(ex.Message) + "</div></div>"; }
 }, blockFields);
+
+// ---- operations: what the cloud, MCP and the site's AI assistant can do with the MANUAL reviews --------------------------------
+// Only the reviews typed in on the admin page (ManualKey): the configuration holds API keys and is never read or written here, the
+// Places-API cache is Google's data. The rules of the admin's form: stars 1–5, plain text (drawn encoded); a name is required here
+// (an empty card helps nobody), name ≤ 80, text ≤ 3000, date is free text ≤ 40 ("Juli 2026"). The cards appear in this order, and
+// only while the mode is "Manuell". Every write answers with an undo naming an internal operation (review.remove / review.restore).
+object GrGate() => "matcms.plugin.google-reviews.manual";   // interned: the same object for every run of the script
+JsonObject GrAnswer(string status, string message, JsonNode data = null, JsonNode undo = null)
+{
+    var o = new JsonObject { ["status"] = status, ["message"] = message };
+    if (data != null) o["data"] = data;
+    if (undo != null) o["undo"] = undo;
+    return o;
+}
+JsonObject GrUndo(string name, JsonObject args) => new JsonObject { ["name"] = name, ["args"] = args };
+JsonObject GrArgs(JsonNode a) => a as JsonObject ?? new JsonObject();
+string GrS(JsonNode n, string k) { try { return n?[k]?.GetValue<string>() ?? ""; } catch { return n?[k]?.ToString() ?? ""; } }
+string GrOpt(JsonObject a, string k) => a[k] == null ? null : GrS(a, k);
+long GrId(JsonNode n) { try { return n?["id"]?.GetValue<long>() ?? 0; } catch { return long.TryParse(GrS(n, "id"), out var v) ? v : 0; } }
+int GrRating(JsonNode n) { try { return n?["rating"]?.GetValue<int>() ?? 0; } catch { return int.TryParse(GrS(n, "rating"), out var v) ? v : 0; } }
+int? GrInt(JsonObject a, string k) { if (a[k] == null) return null; try { return a[k].GetValue<int>(); } catch { return int.TryParse(GrS(a, k), out var v) ? v : -1; } }
+AppDbContext GrDb(IPluginContext ctx) => (AppDbContext)ctx.Unsafe.Services.GetService(typeof(AppDbContext));
+JsonArray GrLoad(AppDbContext db)
+{
+    var s = db.SiteSettings.FirstOrDefault(x => x.Key == ManualKey);
+    if (s == null || string.IsNullOrWhiteSpace(s.Value)) return new JsonArray();
+    try { return JsonNode.Parse(s.Value) as JsonArray ?? new JsonArray(); } catch { return new JsonArray(); }
+}
+void GrSave(AppDbContext db, JsonArray arr)
+{
+    var s = db.SiteSettings.FirstOrDefault(x => x.Key == ManualKey);
+    if (s == null) db.SiteSettings.Add(new SiteSetting { Key = ManualKey, Value = arr.ToJsonString() });
+    else s.Value = arr.ToJsonString();
+    db.SaveChanges();
+}
+// The mode as the block reads it (saved config, else the plugin's configuration, else manual) — only the mode, never a key.
+string GrMode(AppDbContext db)
+{
+    try
+    {
+        var row = db.SiteSettings.FirstOrDefault(x => x.Key == CfgKey);
+        var m = row == null ? "" : (JsonNode.Parse(row.Value) as JsonObject)?["mode"]?.GetValue<string>() ?? "";
+        if (!string.IsNullOrWhiteSpace(m)) return m.Trim().ToLowerInvariant();
+    } catch { }
+    var c = (Config("mode") ?? "").Trim().ToLowerInvariant();
+    return c.Length > 0 ? c : "manual";
+}
+JsonObject GrView(JsonNode r) => new JsonObject { ["id"] = GrId(r), ["name"] = GrS(r, "name"), ["rating"] = GrRating(r), ["text"] = GrS(r, "text"), ["date"] = GrS(r, "date") };
+// null = fine, else the reason. A null argument = not sent (update).
+string GrCheck(string name, string text, int? rating, string date)
+{
+    if (name != null && name.Trim().Length == 0) return "Name fehlt.";
+    if (name != null && name.Trim().Length > 80) return "Name ist länger als 80 Zeichen.";
+    if (text != null && text.Trim().Length > 3000) return "Text ist länger als 3000 Zeichen.";
+    if (rating != null && (rating < 1 || rating > 5)) return "Sterne müssen 1 bis 5 sein.";
+    if (date != null && date.Trim().Length > 40) return "Datum ist länger als 40 Zeichen (freier Text, z. B. „Juli 2026“).";
+    return null;
+}
+
+Plugin.Operation(new PluginOperationSpec("review.list",
+    "Die von Hand eingetragenen Google-Bewertungen auflisten (in der Reihenfolge der Anzeige): id, Name, Sterne 1–5, Text, Datum (freier Text). " +
+    "Sie erscheinen nur im Modus „Manuell“ – die Antwort nennt den Modus.", "{}", Writes: false), (ctx, args, ct) =>
+{
+    var db = GrDb(ctx);
+    var arr = GrLoad(db);
+    var mode = GrMode(db);
+    return Task.FromResult<JsonNode>(GrAnswer("applied", arr.Count + " eingetragene Bewertungen · Modus: " + mode + (mode == "manual" ? "" : " (sie werden gerade nicht gezeigt)"),
+        new JsonArray(arr.Select(n => (JsonNode)GrView(n)).ToArray())));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.read", "Eine von Hand eingetragene Google-Bewertung lesen.", """{"id": 638700000000000000}""", Writes: false), (ctx, args, ct) =>
+{
+    var id = GrId(GrArgs(args));
+    var r = GrLoad(GrDb(ctx)).FirstOrDefault(n => GrId(n) == id);
+    return Task.FromResult<JsonNode>(r == null ? GrAnswer("failed", "Bewertung nicht gefunden.") : GrAnswer("applied", GrS(r, "name"), GrView(r)));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.create",
+    "Eine Google-Bewertung von Hand eintragen (von Google abgeschrieben), wie im Admin. name (≤ 80), rating 1–5 (Standard 5), text (≤ 3000, reiner Text), " +
+    "date: freier Text wie „Juli 2026“. Gleicher Name und Text wird übersprungen.",
+    """{"name": "Maria S.", "rating"?: 5, "text": "…", "date"?: "Juli 2026"}"""), (ctx, args, ct) =>
+{
+    var a = GrArgs(args);
+    var name = GrOpt(a, "name") ?? "";
+    var text = GrOpt(a, "text") ?? "";
+    var rating = GrInt(a, "rating") ?? 5;
+    var date = GrOpt(a, "date") ?? "";
+    var bad = GrCheck(name, text, rating, date);
+    if (bad != null) return Task.FromResult<JsonNode>(GrAnswer("failed", bad));
+    var db = GrDb(ctx);
+    long id;
+    lock (GrGate())
+    {
+        var arr = GrLoad(db);
+        if (arr.Count >= 500) return Task.FromResult<JsonNode>(GrAnswer("failed", "Es sind schon 500 Bewertungen eingetragen."));
+        if (arr.Any(n => GrS(n, "name") == name.Trim() && GrS(n, "text") == text.Trim())) return Task.FromResult<JsonNode>(GrAnswer("skipped-exists", "Diese Bewertung ist schon eingetragen."));
+        long max = 0;
+        foreach (var n in arr) max = Math.Max(max, GrId(n));
+        id = Math.Max(max + 1, DateTime.UtcNow.Ticks);
+        arr.Add(new JsonObject { ["id"] = id, ["name"] = name.Trim(), ["rating"] = rating, ["text"] = text.Trim(), ["date"] = date.Trim() });
+        GrSave(db, arr);
+    }
+    ctx.Log("Google-Bewertung eingetragen (Plugin-Aktion): " + name.Trim());
+    return Task.FromResult<JsonNode>(GrAnswer("applied", "Bewertung von " + name.Trim() + " eingetragen.", new JsonObject { ["id"] = id },
+        GrUndo("review.remove", new JsonObject { ["id"] = id })));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.update",
+    "Eine von Hand eingetragene Google-Bewertung ändern; nicht genannte Felder bleiben. Regeln wie review.create.",
+    """{"id": 638700000000000000, "name"?: "…", "rating"?: 4, "text"?: "…", "date"?: "August 2026"}"""), (ctx, args, ct) =>
+{
+    var a = GrArgs(args);
+    var name = GrOpt(a, "name"); var text = GrOpt(a, "text"); var rating = GrInt(a, "rating"); var date = GrOpt(a, "date");
+    var bad = GrCheck(name, text, rating, date);
+    if (bad != null) return Task.FromResult<JsonNode>(GrAnswer("failed", bad));
+    var db = GrDb(ctx);
+    var id = GrId(a);
+    JsonObject before;
+    lock (GrGate())
+    {
+        var arr = GrLoad(db);
+        if (arr.FirstOrDefault(n => GrId(n) == id) is not JsonObject r) return Task.FromResult<JsonNode>(GrAnswer("failed", "Bewertung nicht gefunden."));
+        before = GrView(r);
+        if (name != null) r["name"] = name.Trim();
+        if (text != null) r["text"] = text.Trim();
+        if (rating != null) r["rating"] = rating.Value;
+        if (date != null) r["date"] = date.Trim();
+        GrSave(db, arr);
+    }
+    return Task.FromResult<JsonNode>(GrAnswer("applied", "Bewertung " + id + " geändert.", null, GrUndo("review.restore", new JsonObject { ["review"] = before })));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.delete", "Eine von Hand eingetragene Google-Bewertung löschen.", """{"id": 638700000000000000}"""), (ctx, args, ct) =>
+{
+    var db = GrDb(ctx);
+    var id = GrId(GrArgs(args));
+    JsonObject gone; int at;
+    lock (GrGate())
+    {
+        var arr = GrLoad(db);
+        at = arr.ToList().FindIndex(n => GrId(n) == id);
+        if (at < 0) return Task.FromResult<JsonNode>(GrAnswer("failed", "Bewertung nicht gefunden."));
+        gone = (JsonObject)arr[at].DeepClone();
+        arr.RemoveAt(at);
+        GrSave(db, arr);
+    }
+    return Task.FromResult<JsonNode>(GrAnswer("applied", "Bewertung von " + GrS(gone, "name") + " gelöscht.", null,
+        GrUndo("review.restore", new JsonObject { ["review"] = gone, ["position"] = at })));
+});
+
+// ---- the undos: only the host runs them (Internal), with what an earlier answer recorded
+Plugin.Operation(new PluginOperationSpec("review.remove", "Nimmt eine eingetragene Google-Bewertung wieder heraus (Rückgängig).", Internal: true), (ctx, args, ct) =>
+{
+    var db = GrDb(ctx);
+    var id = GrId(GrArgs(args));
+    lock (GrGate())
+    {
+        var arr = GrLoad(db);
+        var at = arr.ToList().FindIndex(n => GrId(n) == id);
+        if (at < 0) return Task.FromResult<JsonNode>(GrAnswer("skipped-exists", "Bewertung ist schon weg."));
+        arr.RemoveAt(at);
+        GrSave(db, arr);
+    }
+    return Task.FromResult<JsonNode>(GrAnswer("applied", "Bewertung wieder herausgenommen."));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.restore",
+    "Stellt eine Google-Bewertung aus einer Rückgängig-Aufzeichnung wieder her (gelöscht: wieder an ihrem Platz; geändert: alte Werte).", Internal: true), (ctx, args, ct) =>
+{
+    var a = GrArgs(args);
+    if (a["review"] is not JsonObject saved || GrId(saved) <= 0) return Task.FromResult<JsonNode>(GrAnswer("failed", "Keine Bewertung in der Aufzeichnung."));
+    var db = GrDb(ctx);
+    lock (GrGate())
+    {
+        var arr = GrLoad(db);
+        if (arr.FirstOrDefault(n => GrId(n) == GrId(saved)) is JsonObject r)
+            foreach (var kv in saved) r[kv.Key] = kv.Value?.DeepClone();
+        else
+        {
+            var pos = GrInt(a, "position") ?? arr.Count;
+            arr.Insert(Math.Clamp(pos, 0, arr.Count), saved.DeepClone());
+        }
+        GrSave(db, arr);
+    }
+    return Task.FromResult<JsonNode>(GrAnswer("applied", "Bewertung von " + GrS(saved, "name") + " wiederhergestellt."));
+});

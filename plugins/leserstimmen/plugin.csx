@@ -948,4 +948,233 @@ AddAdminPage("leserstimmen", req =>
     return sb.ToString();
 });
 
+// ---- operations: what the cloud, MCP and the site's AI assistant can do with the reviews -----------------------------------
+// The same rules as the admin's own form: plain text (every text is drawn encoded), name ≤ 80, text ≤ 3000, links only http(s)
+// (SafeUrl), at most MaxPerStore per collection, every write under Gate(). Too long is REFUSED here, not cut — an agent learns
+// to shorten, a silently cut quote does not read right. A review waiting for approval carries a visitor's name and e-mail that
+// nobody has agreed to publish yet: only review.pending shows those (PersonalData — never offered to the assistant, whose every
+// answer goes to an outside model); list and read show what the site shows anyway, and never an e-mail address.
+// Every write answers with an undo naming an internal operation (review.remove / review.restore).
+JsonObject OpAnswer(string status, string message, JsonNode data = null, JsonNode undo = null)
+{
+    var o = new JsonObject { ["status"] = status, ["message"] = message };
+    if (data != null) o["data"] = data;
+    if (undo != null) o["undo"] = undo;
+    return o;
+}
+JsonObject OpUndo(string name, JsonObject args) => new JsonObject { ["name"] = name, ["args"] = args };
+JsonObject OpArgs(JsonNode a) => a as JsonObject ?? new JsonObject();
+bool OpHas(JsonObject a, string k) => a.ContainsKey(k) && a[k] != null;
+string OpStr(JsonObject a, string k) => OpHas(a, k) ? S(a, k) : null;
+bool? OpFlag(JsonObject a, string k) { try { return a[k] is JsonValue v && v.TryGetValue<bool>(out var b) ? b : null; } catch { return null; } }
+int OpInt(JsonObject a, string k, int def) { if (!OpHas(a, k)) return def; try { return a[k].GetValue<int>(); } catch { return int.TryParse(S(a, k), out var v) ? v : int.MinValue; } }
+AppDbContext OpDb(IPluginContext ctx) => ctx.Unsafe.Services.GetRequiredService<AppDbContext>();
+void OpBadge(IPluginContext ctx, AppDbContext db) => RefreshBadge(ctx.Unsafe.Services.GetService<PluginRegistry>(), db);
+// What the site shows of a review (no e-mail).
+JsonObject OpPublic(string store, JsonNode r) => new JsonObject
+{
+    ["id"] = L(r, "id"), ["store"] = store, ["name"] = S(r, "name"), ["rating"] = Rating(r), ["text"] = S(r, "text"),
+    ["link"] = SafeUrl(S(r, "link")), ["date"] = S(r, "date"), ["published"] = Approved(r)
+};
+// The review with this id (optionally only in one collection) — ids are unique per collection, in practice site-wide.
+(string Store, JsonArray Arr, JsonObject R) OpFind(AppDbContext db, JsonObject a)
+{
+    long id = 0;
+    try { id = a["id"]?.GetValue<long>() ?? 0; } catch { long.TryParse(S(a, "id"), out id); }
+    var only = OpStr(a, "store");
+    if (id <= 0) return (null, null, null);
+    foreach (var key in db.SiteSettings.Where(x => x.Key.StartsWith(Prefix)).Select(x => x.Key).ToList())
+    {
+        var store = key.Substring(Prefix.Length);
+        if (only != null && Slug(only) != store) continue;
+        var arr = Load(db, store);
+        if (arr.FirstOrDefault(n => L(n, "id") == id) is JsonObject r) return (store, arr, r);
+    }
+    return (null, null, null);
+}
+// The checks of the admin's form; null = fine, else the reason.
+string OpCheck(string name, string text, int rating, string linkIn)
+{
+    if (name != null && name.Trim().Length == 0) return "Name fehlt.";
+    if (name != null && name.Trim().Length > 80) return "Name ist länger als 80 Zeichen.";
+    if (text != null && text.Trim().Length == 0) return "Text fehlt.";
+    if (text != null && text.Trim().Length > 3000) return "Text ist länger als 3000 Zeichen.";
+    if (rating != NoRating && (rating < 0 || rating > 5)) return "Wertung muss 0 (ohne Wertung) bis 5 sein.";
+    if (!string.IsNullOrWhiteSpace(linkIn) && SafeUrl(linkIn).Length == 0) return "Link muss eine http(s)-Adresse sein.";
+    return null;
+}
+const int NoRating = int.MinValue + 1; // "rating not sent" for OpCheck
+
+Plugin.Operation(new PluginOperationSpec("review.list",
+    "Veröffentlichte Leserstimmen auflisten (neueste zuerst): id, Sammlung, Name, Wertung (0 = ohne), Text, Link, Datum. store: nur diese Sammlung " +
+    "(wie im Block eingetragen); search: im Namen oder Text. Wartende Stimmen zeigt review.pending.",
+    """{"store"?: "default", "search"?: "text", "limit"?: 50}""", Writes: false), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var db = OpDb(ctx);
+    var only = OpStr(a, "store");
+    var search = (OpStr(a, "search") ?? "").Trim();
+    var limit = Math.Clamp(OpInt(a, "limit", 50), 1, 500);
+    var rows = All(db).Where(x => only == null || x.Store == Slug(only)).ToList();
+    var pub = rows.Where(x => Approved(x.R))
+        .Where(x => search.Length == 0 || S(x.R, "name").Contains(search, StringComparison.OrdinalIgnoreCase) || S(x.R, "text").Contains(search, StringComparison.OrdinalIgnoreCase))
+        .OrderByDescending(x => S(x.R, "date"), StringComparer.Ordinal).ToList();
+    var waiting = rows.Count(x => !Approved(x.R));
+    var stores = string.Join(", ", rows.Select(x => x.Store).Distinct().OrderBy(x => x));
+    return Task.FromResult<JsonNode>(OpAnswer("applied",
+        pub.Count + " veröffentlichte Stimmen" + (waiting > 0 ? ", " + waiting + " warten auf Freigabe" : "") + (stores.Length > 0 ? ". Sammlungen: " + stores : ""),
+        new JsonArray(pub.Take(limit).Select(x => (JsonNode)OpPublic(x.Store, x.R)).ToArray())));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.read",
+    "Eine veröffentlichte Leserstimme lesen. Eine wartende liest nur review.pending (sie trägt Daten des Absenders).",
+    """{"id": 638700000000000000, "store"?: "default"}""", Writes: false), (ctx, args, ct) =>
+{
+    var (store, _, r) = OpFind(OpDb(ctx), OpArgs(args));
+    if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Leserstimme nicht gefunden."));
+    if (!Approved(r)) return Task.FromResult<JsonNode>(OpAnswer("failed", "Diese Stimme wartet auf Freigabe – lesbar nur über review.pending."));
+    return Task.FromResult<JsonNode>(OpAnswer("applied", S(r, "name"), OpPublic(store, r)));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.pending",
+    "Leserstimmen, die auf Freigabe warten, mit den Angaben des Absenders (Name, E-Mail, Link) – zum Moderieren. Freigeben: review.update mit published: true.",
+    """{"store"?: "default"}""", Writes: false, PersonalData: true), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var only = OpStr(a, "store");
+    var list = All(OpDb(ctx)).Where(x => !Approved(x.R) && (only == null || x.Store == Slug(only)))
+        .OrderByDescending(x => S(x.R, "date"), StringComparer.Ordinal)
+        .Select(x => { var o = OpPublic(x.Store, x.R); o["email"] = S(x.R, "email"); return (JsonNode)o; }).ToArray();
+    return Task.FromResult<JsonNode>(OpAnswer("applied", list.Length + " Stimmen warten auf Freigabe", new JsonArray(list)));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.create",
+    "Eine Leserstimme von Hand eintragen (z. B. von Instagram oder aus einem Shop), wie „Von Hand hinzufügen“ im Admin. name ≤ 80 Zeichen, text ≤ 3000 (reiner Text), " +
+    "rating 1–5 oder 0 = ohne Wertung (Standard 5), link: http(s)-Adresse, date: ISO-Datum (Standard jetzt), published: Standard true. store: Sammlung wie im Block. " +
+    "Gleicher Name und Text in derselben Sammlung wird übersprungen.",
+    """{"store"?: "default", "name": "Anna K.", "text": "…", "rating"?: 5, "link"?: "https://…", "date"?: "2026-10-05", "published"?: true}"""), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var store = Slug(OpStr(a, "store") ?? "default");
+    var name = OpStr(a, "name") ?? "";
+    var text = (OpStr(a, "text") ?? "").Replace("\r\n", "\n");
+    var rating = OpInt(a, "rating", 5);
+    var link = OpStr(a, "link") ?? "";
+    var bad = OpCheck(name, text, rating, link);
+    if (bad != null) return Task.FromResult<JsonNode>(OpAnswer("failed", bad));
+    var date = DateTime.UtcNow;
+    if (OpStr(a, "date") is { Length: > 0 } ds && !DateTime.TryParse(ds, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out date))
+        return Task.FromResult<JsonNode>(OpAnswer("failed", "date ist kein Datum (z. B. 2026-10-05)."));
+    var db = OpDb(ctx);
+    long id;
+    lock (Gate())
+    {
+        var arr = Load(db, store);
+        if (arr.Count >= MaxPerStore) return Task.FromResult<JsonNode>(OpAnswer("failed", "Die Sammlung „" + store + "“ ist voll (" + MaxPerStore + ")."));
+        if (arr.Any(n => S(n, "name") == name.Trim() && S(n, "text") == text.Trim()))
+            return Task.FromResult<JsonNode>(OpAnswer("skipped-exists", "Diese Stimme steht schon in der Sammlung „" + store + "“."));
+        id = NextId(arr);
+        arr.Add(new JsonObject
+        {
+            ["id"] = id, ["name"] = name.Trim(), ["text"] = text.Trim(), ["rating"] = rating, ["email"] = "", ["link"] = SafeUrl(link),
+            ["date"] = date.ToUniversalTime().ToString("o"), ["approved"] = OpFlag(a, "published") ?? true
+        });
+        Save(db, store, arr);
+    }
+    ctx.Log("Leserstimme eingetragen (Plugin-Aktion): " + name.Trim());
+    OpBadge(ctx, db);
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Leserstimme von " + name.Trim() + " in „" + store + "“ eingetragen.",
+        new JsonObject { ["id"] = id, ["store"] = store }, OpUndo("review.remove", new JsonObject { ["id"] = id, ["store"] = store })));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.update",
+    "Eine Leserstimme ändern oder moderieren; nicht genannte Felder bleiben. published: true = freigeben, false = verbergen. Regeln wie review.create.",
+    """{"id": 638700000000000000, "store"?: "default", "name"?: "…", "text"?: "…", "rating"?: 4, "link"?: "https://…", "published"?: true}"""), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var name = OpStr(a, "name");
+    var text = OpStr(a, "text")?.Replace("\r\n", "\n");
+    var rating = OpHas(a, "rating") ? OpInt(a, "rating", 5) : NoRating;
+    var link = OpStr(a, "link");
+    var bad = OpCheck(name, text, rating, link);
+    if (bad != null) return Task.FromResult<JsonNode>(OpAnswer("failed", bad));
+    var db = OpDb(ctx);
+    JsonObject before;
+    string store;
+    lock (Gate())
+    {
+        var (st, arr, r) = OpFind(db, a);
+        if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Leserstimme nicht gefunden."));
+        store = st;
+        before = new JsonObject
+        {
+            ["id"] = L(r, "id"), ["name"] = S(r, "name"), ["text"] = S(r, "text"), ["rating"] = Rating(r), ["link"] = S(r, "link"), ["approved"] = Approved(r)
+        };
+        if (name != null) r["name"] = name.Trim();
+        if (text != null) r["text"] = text.Trim();
+        if (rating != NoRating) r["rating"] = rating;
+        if (link != null) r["link"] = SafeUrl(link);
+        if (OpFlag(a, "published") is bool p) r["approved"] = p;
+        Save(db, store, arr);
+    }
+    OpBadge(ctx, db);
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Leserstimme " + before["id"] + " geändert.", null,
+        OpUndo("review.restore", new JsonObject { ["store"] = store, ["review"] = before })));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.delete", "Eine Leserstimme löschen.", """{"id": 638700000000000000, "store"?: "default"}"""), (ctx, args, ct) =>
+{
+    var db = OpDb(ctx);
+    JsonObject gone;
+    string store;
+    lock (Gate())
+    {
+        var (st, arr, r) = OpFind(db, OpArgs(args));
+        if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Leserstimme nicht gefunden."));
+        store = st;
+        gone = (JsonObject)r.DeepClone();
+        arr.Remove(r);
+        Save(db, store, arr);
+    }
+    OpBadge(ctx, db);
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Leserstimme von " + S(gone, "name") + " gelöscht.", null,
+        OpUndo("review.restore", new JsonObject { ["store"] = store, ["review"] = gone })));
+});
+
+// ---- the two undos: only the host runs them (Internal), with what an earlier answer recorded
+Plugin.Operation(new PluginOperationSpec("review.remove", "Nimmt eine eingetragene Leserstimme wieder heraus (Rückgängig).", Internal: true), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var db = OpDb(ctx);
+    lock (Gate())
+    {
+        var (store, arr, r) = OpFind(db, a);
+        if (r == null) return Task.FromResult<JsonNode>(OpAnswer("skipped-exists", "Leserstimme ist schon weg."));
+        arr.Remove(r);
+        Save(db, store, arr);
+    }
+    OpBadge(ctx, db);
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Leserstimme wieder herausgenommen."));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.restore",
+    "Stellt eine Leserstimme aus einer Rückgängig-Aufzeichnung wieder her (gelöscht: wieder da; geändert: alte Werte).", Internal: true), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    if (a["review"] is not JsonObject saved || L(saved, "id") <= 0) return Task.FromResult<JsonNode>(OpAnswer("failed", "Keine Leserstimme in der Aufzeichnung."));
+    var store = Slug(OpStr(a, "store") ?? "default");
+    var db = OpDb(ctx);
+    lock (Gate())
+    {
+        var arr = Load(db, store);
+        if (arr.FirstOrDefault(n => L(n, "id") == L(saved, "id")) is JsonObject r)
+            foreach (var kv in saved) r[kv.Key] = kv.Value?.DeepClone();
+        else arr.Add(saved.DeepClone());
+        Save(db, store, arr);
+    }
+    OpBadge(ctx, db);
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Leserstimme von " + S(saved, "name") + " wiederhergestellt."));
+});
+
 Log("Leserstimmen geladen.");

@@ -210,4 +210,158 @@ AddAdminPage("bewertungen", req =>
     return sb.ToString();
 });
 
+// ---- operations: what the cloud, MCP and the site's AI assistant can do with the reviews ------------------------------------
+// Reviews here come from VISITORS only (the admin has no hand entry), so there is no create and no editing of a visitor's words:
+// an agent can read, moderate (publish / hide) and delete. A review waiting for approval carries the sender's name before anybody
+// agreed to publish it — only review.pending shows those (PersonalData: never offered to the assistant, whose answers go to an
+// outside model). Every write answers with an undo naming the internal review.restore.
+JsonObject OpAnswer(string status, string message, JsonNode data = null, JsonNode undo = null)
+{
+    var o = new JsonObject { ["status"] = status, ["message"] = message };
+    if (data != null) o["data"] = data;
+    if (undo != null) o["undo"] = undo;
+    return o;
+}
+JsonObject OpUndo(JsonObject args) => new JsonObject { ["name"] = "review.restore", ["args"] = args };
+JsonObject OpArgs(JsonNode a) => a as JsonObject ?? new JsonObject();
+string OpS(JsonNode n, string k) { try { return n?[k]?.GetValue<string>() ?? ""; } catch { return n?[k]?.ToString() ?? ""; } }
+long OpId(JsonNode n) { try { return n?["id"]?.GetValue<long>() ?? 0; } catch { return long.TryParse(OpS(n, "id"), out var v) ? v : 0; } }
+bool OpApproved(JsonNode n) { try { return n?["approved"]?.GetValue<bool>() ?? false; } catch { return false; } }
+int OpRating(JsonNode n) { try { return Math.Clamp(n?["rating"]?.GetValue<int>() ?? 5, 1, 5); } catch { return 5; } }
+AppDbContext OpDb(IPluginContext ctx) => (AppDbContext)ctx.Unsafe.Services.GetService(typeof(AppDbContext));
+JsonArray OpLoad(AppDbContext db, string key)
+{
+    var s = db.SiteSettings.FirstOrDefault(x => x.Key == key);
+    if (s == null || string.IsNullOrWhiteSpace(s.Value)) return new JsonArray();
+    try { return JsonNode.Parse(s.Value) as JsonArray ?? new JsonArray(); } catch { return new JsonArray(); }
+}
+void OpSave(AppDbContext db, string key, JsonArray arr)
+{
+    var s = db.SiteSettings.FirstOrDefault(x => x.Key == key);
+    if (s == null) db.SiteSettings.Add(new SiteSetting { Key = key, Value = arr.ToJsonString() });
+    else s.Value = arr.ToJsonString();
+    db.SaveChanges();
+}
+// Every review with its collection (the part of the settings key after "plugin.reviews.").
+List<(string Store, JsonObject R)> OpAll(AppDbContext db)
+{
+    var rows = new List<(string, JsonObject)>();
+    foreach (var s in db.SiteSettings.Where(x => x.Key.StartsWith("plugin.reviews.")).ToList())
+        try { if (JsonNode.Parse(s.Value) is JsonArray a) foreach (var n in a) if (n is JsonObject o) rows.Add((s.Key.Substring("plugin.reviews.".Length), o)); } catch { }
+    return rows;
+}
+// The review with this id, optionally only in one collection.
+(string Store, JsonArray Arr, JsonObject R) OpFind(AppDbContext db, JsonObject a)
+{
+    var id = OpId(a);
+    var only = a["store"] != null ? KeyFor(OpS(a, "store")) : null;
+    if (id <= 0) return (null, null, null);
+    foreach (var key in db.SiteSettings.Where(x => x.Key.StartsWith("plugin.reviews.")).Select(x => x.Key).ToList())
+    {
+        if (only != null && key != only) continue;
+        var arr = OpLoad(db, key);
+        if (arr.FirstOrDefault(n => OpId(n) == id) is JsonObject r) return (key.Substring("plugin.reviews.".Length), arr, r);
+    }
+    return (null, null, null);
+}
+JsonObject OpPublic(string store, JsonNode r) => new JsonObject
+{
+    ["id"] = OpId(r), ["store"] = store, ["name"] = OpS(r, "name"), ["rating"] = OpRating(r), ["text"] = OpS(r, "text"),
+    ["date"] = OpS(r, "date"), ["published"] = OpApproved(r)
+};
+
+Plugin.Operation(new PluginOperationSpec("review.list",
+    "Veröffentlichte Bewertungen auflisten (neueste zuerst): id, Sammlung, Name, Sterne 1–5, Text, Datum. store: nur diese Sammlung (wie im Block). " +
+    "Wartende zeigt review.pending.",
+    """{"store"?: "default", "limit"?: 50}""", Writes: false), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var only = a["store"] != null ? KeyFor(OpS(a, "store")).Substring("plugin.reviews.".Length) : null;
+    int limit = 50; try { limit = Math.Clamp(a["limit"]?.GetValue<int>() ?? 50, 1, 500); } catch { }
+    var rows = OpAll(OpDb(ctx)).Where(x => only == null || x.Store == only).ToList();
+    var pub = rows.Where(x => OpApproved(x.R)).OrderByDescending(x => OpS(x.R, "date"), StringComparer.Ordinal).ToList();
+    var waiting = rows.Count - pub.Count;
+    return Task.FromResult<JsonNode>(OpAnswer("applied", pub.Count + " veröffentlichte Bewertungen" + (waiting > 0 ? ", " + waiting + " warten auf Freigabe" : ""),
+        new JsonArray(pub.Take(limit).Select(x => (JsonNode)OpPublic(x.Store, x.R)).ToArray())));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.read",
+    "Eine veröffentlichte Bewertung lesen. Eine wartende liest nur review.pending.", """{"id": 638700000000000000}""", Writes: false), (ctx, args, ct) =>
+{
+    var (store, _, r) = OpFind(OpDb(ctx), OpArgs(args));
+    if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Bewertung nicht gefunden."));
+    if (!OpApproved(r)) return Task.FromResult<JsonNode>(OpAnswer("failed", "Diese Bewertung wartet auf Freigabe – lesbar nur über review.pending."));
+    return Task.FromResult<JsonNode>(OpAnswer("applied", OpS(r, "name"), OpPublic(store, r)));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.pending",
+    "Bewertungen, die auf Freigabe warten, mit dem Namen des Absenders – zum Moderieren. Freigeben: review.update mit published: true.",
+    """{"store"?: "default"}""", Writes: false, PersonalData: true), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    var only = a["store"] != null ? KeyFor(OpS(a, "store")).Substring("plugin.reviews.".Length) : null;
+    var list = OpAll(OpDb(ctx)).Where(x => !OpApproved(x.R) && (only == null || x.Store == only))
+        .OrderByDescending(x => OpS(x.R, "date"), StringComparer.Ordinal).Select(x => (JsonNode)OpPublic(x.Store, x.R)).ToArray();
+    return Task.FromResult<JsonNode>(OpAnswer("applied", list.Length + " Bewertungen warten auf Freigabe", new JsonArray(list)));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.update",
+    "Eine Bewertung moderieren: published true = freigeben, false = verbergen. Name, Sterne und Text stammen vom Besucher und bleiben, wie sie sind.",
+    """{"id": 638700000000000000, "published": true}"""), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    bool published;
+    try { published = a["published"]?.GetValue<bool>() ?? throw new InvalidOperationException(); }
+    catch { return Task.FromResult<JsonNode>(OpAnswer("failed", "published (true oder false) fehlt.")); }
+    var db = OpDb(ctx);
+    string store; long id; bool was;
+    lock (reviewLock)
+    {
+        var (st, arr, r) = OpFind(db, a);
+        if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Bewertung nicht gefunden."));
+        store = st; id = OpId(r); was = OpApproved(r);
+        r["approved"] = published;
+        OpSave(db, "plugin.reviews." + store, arr);
+    }
+    ctx.Log("Bewertung " + (published ? "freigegeben" : "verborgen") + " (Plugin-Aktion, " + id + ")");
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Bewertung " + id + (published ? " freigegeben." : " verborgen."), null,
+        OpUndo(new JsonObject { ["store"] = store, ["review"] = new JsonObject { ["id"] = id, ["approved"] = was } })));
+});
+
+Plugin.Operation(new PluginOperationSpec("review.delete", "Eine Bewertung löschen.", """{"id": 638700000000000000}"""), (ctx, args, ct) =>
+{
+    var db = OpDb(ctx);
+    string store; JsonObject gone;
+    lock (reviewLock)
+    {
+        var (st, arr, r) = OpFind(db, OpArgs(args));
+        if (r == null) return Task.FromResult<JsonNode>(OpAnswer("failed", "Bewertung nicht gefunden."));
+        store = st; gone = (JsonObject)r.DeepClone();
+        arr.Remove(r);
+        OpSave(db, "plugin.reviews." + store, arr);
+    }
+    ctx.Log("Bewertung gelöscht (Plugin-Aktion, " + OpId(gone) + ")");
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Bewertung von " + OpS(gone, "name") + " gelöscht.", null,
+        OpUndo(new JsonObject { ["store"] = store, ["review"] = gone })));
+});
+
+// The undo of both writes: only the host runs it (Internal), with what an earlier answer recorded.
+Plugin.Operation(new PluginOperationSpec("review.restore",
+    "Stellt eine Bewertung aus einer Rückgängig-Aufzeichnung wieder her (gelöscht: wieder da; moderiert: alter Status).", Internal: true), (ctx, args, ct) =>
+{
+    var a = OpArgs(args);
+    if (a["review"] is not JsonObject saved || OpId(saved) <= 0) return Task.FromResult<JsonNode>(OpAnswer("failed", "Keine Bewertung in der Aufzeichnung."));
+    var key = KeyFor(OpS(a, "store"));
+    var db = OpDb(ctx);
+    lock (reviewLock)
+    {
+        var arr = OpLoad(db, key);
+        if (arr.FirstOrDefault(n => OpId(n) == OpId(saved)) is JsonObject r)
+            foreach (var kv in saved) r[kv.Key] = kv.Value?.DeepClone();
+        else arr.Add(saved.DeepClone());
+        OpSave(db, key, arr);
+    }
+    return Task.FromResult<JsonNode>(OpAnswer("applied", "Bewertung " + OpId(saved) + " wiederhergestellt."));
+});
+
 Log("Bewertungen-Plugin geladen. Offen: " + pending);

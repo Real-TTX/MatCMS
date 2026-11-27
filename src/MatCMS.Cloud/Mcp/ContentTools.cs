@@ -388,7 +388,8 @@ public class ContentTools
         if (op is null) throw new McpException("Vorgang nicht gefunden.");
         // The result of a write or of an order read is the restore right's, like queuing it was: without this a key that
         // may only read the site could fetch a list_shop_orders answer (customers' names and addresses) by its opId.
-        if (!key.CanRestore && !MatCMS.Shared.ContentOpRules.ResultNeedsOnlyReadScope(op.Kind))
+        // A plain plugin read the site listed (Writes false, not PersonalData — PluginOperationService) counts like a page read.
+        if (!key.CanRestore && !PluginOperationService.ResultReadableWithoutRestore(instance, op.Kind))
             throw new McpException("Dieser Schlüssel darf das Ergebnis dieses Vorgangs nicht lesen (fehlendes Wiederherstellen-Recht).");
         return new
         {

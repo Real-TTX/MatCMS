@@ -86,7 +86,7 @@ public sealed class PluginOperationService
     public sealed record RunResult(bool Ok, string? Error, ContentOp? Op = null, PluginOperationInfo? Info = null);
 
     /// <summary>Checks the name against the site's catalogue and the key's rights, then queues the operation.</summary>
-    public async Task<RunResult> RunAsync(Instance instance, ApiKey key, string? name, string? argsJson, CancellationToken ct = default)
+    public async Task<RunResult> RunAsync(Instance instance, ApiKey key, string? name, string? argsJson, CancellationToken ct = default, string? by = null)
     {
         name = (name ?? "").Trim();
         if (name.Length == 0) return new(false, "name fehlt (der qualifizierte Name aus list_plugin_operations, z. B. shop.product.create).");
@@ -108,7 +108,7 @@ public sealed class PluginOperationService
 
         // A write is queued as an overwrite: it changes live content (so the profile's "Backup vor KI-Änderung" takes its restore point first).
         var queued = await _instances.EnqueueContentOpAsync(instance, op.Name, args, overwrite: op.Writes,
-            reason: $"KI: {(op.PluginName.Length > 0 ? op.PluginName : op.Plugin)} – {op.Name}", ct);
+            reason: $"KI: {(op.PluginName.Length > 0 ? op.PluginName : op.Plugin)} – {op.Name}", ct, by: by);
         return new(true, null, queued, op);
     }
 }

@@ -38,7 +38,7 @@ public static class PluginOperationsApi
             if (fail is not null) return fail;
             string body;
             using (var reader = new StreamReader(ctx.Request.Body)) body = await reader.ReadToEndAsync(ctx.RequestAborted);
-            var r = await ops.RunAsync(instance!, key!, name, body, ctx.RequestAborted);
+            var r = await ops.RunAsync(instance!, key!, name, body, ctx.RequestAborted, by: "api:" + key!.Name);
             if (!r.Ok) return Error(r.Error!, r.Error!.Contains("Wiederherstellen-Recht") ? StatusCodes.Status403Forbidden : StatusCodes.Status400BadRequest);
             return Results.Accepted($"/api/v1/instances/{instance!.PublicId}/content-ops/{r.Op!.Id}",
                 new { ok = true, opId = r.Op.Id, queued = true, name = r.Info!.Name, writes = r.Info.Writes });

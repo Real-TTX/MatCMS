@@ -47,7 +47,7 @@ public class PluginOperationTools
         CancellationToken ct = default)
     {
         var instance = await ResolveAsync(me, instances, instanceId, ct);
-        var r = await ops.RunAsync(instance, me.Key, name, argsJson, ct);
+        var r = await ops.RunAsync(instance, me.Key, name, argsJson, ct, by: me.Actor);
         if (!r.Ok) throw new McpException(r.Error!);
         return new { ok = true, opId = r.Op!.Id, queued = true, name = r.Info!.Name, writes = r.Info.Writes, message = "Eingereiht — Ergebnis via get_content_op(opId)." };
     }

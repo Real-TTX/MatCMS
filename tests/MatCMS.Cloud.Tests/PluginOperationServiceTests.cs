@@ -60,6 +60,23 @@ public class PluginOperationServiceTests
     }
 
     [Fact]
+    public void No_core_kind_is_ever_a_plugin_operation_and_only_plain_plugin_reads_are_readable_without_restore()
+    {
+        foreach (var k in new[] { "page.create", "page.updateBlocks", "pages.list", "setting.set", "site.address", "form.create", "cleanup.apply", "cleanup.analyze" })
+            Assert.True(PluginOperationService.IsCoreKind(k), k);
+        Assert.False(PluginOperationService.IsCoreKind("shop.product.create"));
+        Assert.False(PluginOperationService.IsCoreKind("site-x.thing.list"));
+
+        var site = Site(List, Create, Orders, new() { Name = "page.read", Plugin = "page", Writes = false });
+        Assert.True(PluginOperationService.ResultReadableWithoutRestore(site, "shop.product.list"));
+        Assert.False(PluginOperationService.ResultReadableWithoutRestore(site, "shop.product.create"));   // a write's answer
+        Assert.False(PluginOperationService.ResultReadableWithoutRestore(site, "shop.order.list"));       // personal data
+        Assert.False(PluginOperationService.ResultReadableWithoutRestore(site, "order.list"));            // not listed under that name
+        Assert.True(PluginOperationService.ResultReadableWithoutRestore(site, "page.read"));              // the core read, by ContentOpRules
+        Assert.False(PluginOperationService.ResultReadableWithoutRestore(site, "setting.set"));
+    }
+
+    [Fact]
     public void The_catalogue_fingerprint_changes_with_what_an_agent_reads_and_only_then()
     {
         var a = new List<PluginOperationInfo> { List, Create };

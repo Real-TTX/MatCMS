@@ -47,14 +47,18 @@ public static class PluginOperationsApi
         // The op's state — the REST counterpart of the MCP tool get_content_op (which had no REST twin until plugin operations had one).
         app.MapGet("/api/v1/instances/{publicId}/content-ops/{opId:int}", async (HttpContext ctx, string publicId, int opId, ApiKeyService keys, InstanceService instances) =>
         {
-            var (_, instance, fail) = await ResolveAsync(ctx, publicId, keys, instances);
+            var (key, instance, fail) = await ResolveAsync(ctx, publicId, keys, instances);
             if (fail is not null) return fail;
             var op = await instances.FindContentOpAsync(instance!.Id, opId, ctx.RequestAborted);
             if (op is null) return Error("Vorgang nicht gefunden.", StatusCodes.Status404NotFound);
+            // The same rule as get_content_op: a result goes out without the restore right only for reads anybody who may read the site
+            // sees anyway — never for a write's answer or a personal-data read (an order list holds customers' names and addresses).
+            var mayRead = key!.CanRestore || PluginOperationService.ResultReadableWithoutRestore(instance, op.Kind);
             return Results.Ok(new
             {
-                opId = op.Id, kind = op.Kind, done = op.DoneAt != null, outcome = op.Outcome, detail = op.Detail,
-                result = op.ResultJson is null ? null : (object?)System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(op.ResultJson),
+                opId = op.Id, kind = op.Kind, done = op.DoneAt != null, outcome = op.Outcome, detail = mayRead ? op.Detail : null,
+                result = !mayRead || op.ResultJson is null ? null : (object?)System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(op.ResultJson),
+                resultWithheld = !mayRead && op.ResultJson is not null,
                 createdAt = op.CreatedAt, doneAt = op.DoneAt,
             });
         }).RequireRateLimiting("operatorApi");

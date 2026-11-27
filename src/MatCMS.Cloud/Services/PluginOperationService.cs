@@ -21,11 +21,25 @@ public sealed class PluginOperationService
     /// <summary>The most entries kept of one site's catalogue.</summary>
     public const int MaxOperations = 400;
 
-    /// <summary>The kinds <c>ContentOpApplier</c> handles itself; never reachable through here.</summary>
-    private static readonly HashSet<string> CoreKinds = new(StringComparer.Ordinal)
+    /// <summary>The core content-op kinds (ContentOpApplier's own: page.*, pages.list, setting.set, site.address, form.create, cleanup.*), by
+    /// their first segment — a name starting with one of these is never a plugin's here, even if a plugin's key happens to be "page".</summary>
+    private static readonly string[] CorePrefixes = ["page.", "pages.", "setting.", "site.", "form.", "cleanup."];
+
+    /// <summary>True for a name the generic tool must never queue: a core content-op kind (or anything under its first segment).</summary>
+    public static bool IsCoreKind(string name) => CorePrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal)) || name is "pages.list";
+
+    /// <summary>
+    /// The result of a content op of THIS kind may be read with read scope alone: the core reads <see cref="ContentOpRules.ResultNeedsOnlyReadScope"/>
+    /// names, and a plugin operation the site listed as a plain read (<see cref="PluginOperationInfo.Writes"/> false AND not
+    /// <see cref="PluginOperationInfo.PersonalData"/>). Everything else — every write, every personal-data read (orders, bookings, members) — needs
+    /// the restore right, the right its op needed to be queued. <c>get_content_op</c> and the REST twin both ask here.
+    /// </summary>
+    public static bool ResultReadableWithoutRestore(Instance instance, string kind)
     {
-        "page.create", "form.create", "setting.set", "cleanup.analyze", "cleanup.apply", "pages.list", "page.read", "page.updateBlocks",
-    };
+        if (ContentOpRules.ResultNeedsOnlyReadScope(kind)) return true;
+        if (IsCoreKind(kind)) return false;
+        return Catalog(instance)?.FirstOrDefault(o => o.Name == kind) is { Writes: false, PersonalData: false };
+    }
 
     private readonly InstanceService _instances;
 
@@ -76,7 +90,7 @@ public sealed class PluginOperationService
     {
         name = (name ?? "").Trim();
         if (name.Length == 0) return new(false, "name fehlt (der qualifizierte Name aus list_plugin_operations, z. B. shop.product.create).");
-        if (CoreKinds.Contains(name)) return new(false, $"„{name}“ ist keine Plugin-Aktion.");
+        if (IsCoreKind(name)) return new(false, $"„{name}“ ist keine Plugin-Aktion.");
         var ops = Catalog(instance);
         if (ops is null) return new(false, "Diese Website hat noch keine Plugin-Aktionen gemeldet (ältere MatCMS-Version oder noch kein Heartbeat).");
         var op = ops.FirstOrDefault(o => o.Name == name);

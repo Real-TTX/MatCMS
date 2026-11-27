@@ -16,6 +16,9 @@ public class McpContext
     private readonly IHttpContextAccessor _http;
     public McpContext(IHttpContextAccessor http) => _http = http;
 
+    /// <summary>Who asked, for the instance log and the content op: "mcp:&lt;key name&gt;" (the REST twin writes "api:&lt;key name&gt;").</summary>
+    public string Actor => "mcp:" + Key.Name;
+
     /// <summary>The caller's key. Throws if a tool is somehow reached without the middleware — a bug, not a
     /// client error, since the middleware refuses an unauthenticated request before any tool runs.</summary>
     public ApiKey Key => _http.HttpContext?.Items[ItemKey] as ApiKey

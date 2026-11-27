@@ -40,6 +40,7 @@ public class ContentOpApplier
                 "page.create" => await CreatePageAsync(op, ct),
                 "form.create" => await CreateFormAsync(op, ct),
                 "setting.set" => await SetSettingAsync(op, ct),
+                "site.address" => await SetAddressAsync(op, ct),
                 "cleanup.analyze" => await AnalyzeCleanupAsync(op, ct),
                 "cleanup.apply" => await ApplyCleanupAsync(op, ct),
                 "pages.list" => await ListPagesAsync(op, ct),
@@ -116,9 +117,23 @@ public class ContentOpApplier
             page.Blocks.Add(new ContentBlock { BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
 
         _db.Pages.Add(page);
+        // "In die Navigation" means the site's header menu: the public menus are built from MenuItems only, so ShowInNav
+        // alone (all this did before) showed the page nowhere. Same entry as the assistant's addToMenu; never twice.
+        var menuNote = "";
+        if (showInNav)
+        {
+            var url = Assistant.AssistantTools.PublicUrl(slug, Localizer.DefaultCulture);
+            if (!await _db.MenuItems.AnyAsync(m => m.Menu == "header" && m.Locale == Localizer.DefaultCulture && m.Url == url, ct))
+            {
+                var max = await _db.MenuItems.Where(m => m.Menu == "header" && m.Locale == Localizer.DefaultCulture && m.ParentId == null)
+                    .MaxAsync(m => (int?)m.SortOrder, ct) ?? 0;
+                _db.MenuItems.Add(new MenuItem { Menu = "header", Locale = Localizer.DefaultCulture, Label = page.NavLabel ?? page.Title, Url = url, SortOrder = max + 1 });
+                menuNote = ", ins Menü aufgenommen";
+            }
+        }
         await _db.SaveChangesAsync(ct);
 
-        return Report(op, "applied", $"Seite „{slug}“ mit {validated.Count} Block/Blöcken angelegt.");
+        return Report(op, "applied", $"Seite „{slug}“ mit {validated.Count} Block/Blöcken angelegt{menuNote}.");
     }
 
     private async Task<ContentOpReport> CreateFormAsync(PendingContentOp op, CancellationToken ct)
@@ -190,6 +205,27 @@ public class ContentOpApplier
         return fields.ToJsonString();
     }
 
+    /// <summary>The cloud's hosting push of the site's public address (protocol 19): the ONE way the content channel sets
+    /// <c>site.canonicalUrl</c>, which <c>setting.set</c> refuses — it is the origin of every member mail link. Only an
+    /// absolute https address (or empty = take it back) is accepted, and nothing but these two keys is written.</summary>
+    private async Task<ContentOpReport> SetAddressAsync(PendingContentOp op, CancellationToken ct)
+    {
+        var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
+            ?? throw new InvalidOperationException("PayloadJson ist kein Objekt.");
+        var url = (payload["canonicalUrl"]?.GetValue<string>() ?? "").Trim().TrimEnd('/');
+        if (url.Length > 0 && !(Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps && u.PathAndQuery == "/" && string.IsNullOrEmpty(u.UserInfo)))
+            return Report(op, "failed", $"„{url}“ ist keine https-Adresse ohne Pfad.");
+        var proxy = url.Length > 0 && payload["behindHttpsProxy"]?.GetValue<string>() == "1" ? "1" : "";
+        foreach (var (key, value) in new[] { (SettingKeys.CanonicalUrl, url), (SettingKeys.BehindHttpsProxy, proxy) })
+        {
+            var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
+            if (row is null) _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value });
+            else row.Value = value;
+        }
+        await _db.SaveChangesAsync(ct);
+        return Report(op, "applied", url.Length > 0 ? $"Öffentliche Adresse: {url}." : "Öffentliche Adresse zurückgesetzt.");
+    }
+
     private async Task<ContentOpReport> SetSettingAsync(PendingContentOp op, CancellationToken ct)
     {
         var payload = JsonNode.Parse(op.PayloadJson) as JsonObject
@@ -202,6 +238,9 @@ public class ContentOpApplier
         // instance's cloud connection. Same guard as the profile sync applier (CloudSyncService).
         if (SettingKeys.IsProtected(key))
             return Report(op, "failed", $"Schlüssel „{key}“ ist geschützt (Cloud-Verbindung, Erlaubnis für native Plugins) und kann von außen nicht gesetzt werden.");
+        // Script fields and sign-in/security policy: never from the content channel (see ContentOpRules for why).
+        if (MatCMS.Shared.ContentOpRules.IsRefusedSetting(key))
+            return Report(op, "failed", $"Schlüssel „{key}“ (Code, Sicherheit, Anmeldung, Mail, Adresse) wird über diesen Weg nicht gesetzt – bitte im Admin der Website oder im Profil.");
 
         var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key, ct);
         if (row is null) { _db.SiteSettings.Add(new SiteSetting { Key = key, Value = value }); }
@@ -262,13 +301,15 @@ public class ContentOpApplier
             .FirstOrDefaultAsync(ct);
         if (page is null) return Report(op, "failed", $"Seite „{slug}“ nicht gefunden.");
 
-        // Top-level blocks in order. Nested/child blocks are out of scope for the v1 read (edits target the
-        // top-level list); DataJson is forwarded as-is so the AI sees the real field values.
+        // Top-level blocks in order, each with its ID — page.updateBlocks edits a block BY that id, so a read → edit round trip
+        // keeps everything the model did not touch. `editable` names the text fields it may change (the validator's list);
+        // `children` says a block holds others, which an edit keeps as they are. DataJson is forwarded as-is.
         var blocks = await _db.ContentBlocks.AsNoTracking()
             .Where(b => b.PageId == page.Id && b.ParentId == null)
             .OrderBy(b => b.SortOrder)
-            .Select(b => new { type = b.BlockType, dataJson = b.DataJson })
+            .Select(b => new { b.Id, type = b.BlockType, dataJson = b.DataJson, children = _db.ContentBlocks.Count(c => c.ParentId == b.Id) })
             .ToListAsync(ct);
+        var editable = EditableFields();
 
         var result = new JsonObject
         {
@@ -277,7 +318,10 @@ public class ContentOpApplier
             ["published"] = page.IsPublished,
             ["blocks"] = new JsonArray(blocks.Select(b => (JsonNode)new JsonObject
             {
+                ["id"] = b.Id,
                 ["type"] = b.type,
+                ["editable"] = new JsonArray((editable.TryGetValue(b.type, out var f) ? f : new List<string>()).Select(x => (JsonNode)x).ToArray()),
+                ["children"] = b.children,
                 ["data"] = JsonNode.Parse(string.IsNullOrWhiteSpace(b.dataJson) ? "{}" : b.dataJson),
             }).ToArray()),
         };
@@ -297,22 +341,116 @@ public class ContentOpApplier
         // Overwrite, so the page MUST already exist — this never creates one (that is page.create's job).
         if (page is null) return Report(op, "failed", $"Seite „{slug}“ nicht gefunden.");
 
-        var blocksJson = payload["blocks"]?.ToJsonString() ?? "[]";
-        var validated = _blockGen.ValidateBlocks(blocksJson);
-        if (validated.Count == 0)
-            return Report(op, "failed", "Keine gültigen Blöcke — Seite unverändert gelassen.");
+        if (payload["blocks"] is not JsonArray incoming || incoming.Count == 0)
+            return Report(op, "failed", "Keine Blöcke angegeben — Seite unverändert gelassen.");
+        // An older cloud sends no `removeMissing` and no ids: its list IS the whole page (the old replace). Treating a missing
+        // key as "keep the rest" would leave its old blocks AND add its new copies — every edit would duplicate the page.
+        // The current cloud always sends the key.
+        var removeMissing = payload["removeMissing"] is not JsonValue rm || (rm.TryGetValue<bool>(out var rmv) && rmv);
 
-        // Replace the whole top-level block list. Child blocks (if any) hang off their parents and are
-        // removed with them via the cascade; the new list is a flat set of validated top-level blocks.
-        _db.ContentBlocks.RemoveRange(page.Blocks);
+        // A PATCH, not a replace. It used to throw the page's blocks away and write back only what the text validator
+        // let through: a get_page → update_page_blocks round trip silently lost every picture, link, list, layout field,
+        // nested block, plugin block and everything after the 12th block. Now:
+        //  - a block WITH an id (from get_page) is the existing block: only the text fields it sends are validated and
+        //    written over its stored data; every other field and its children stay. Its type cannot change.
+        //  - a block WITHOUT an id is new and goes through the validator as before.
+        //  - an existing block the list does not name stays where it was (after the named ones) unless removeMissing is
+        //    true — a model that left blocks out by accident must not delete them.
+        var top = page.Blocks.Where(b => b.ParentId == null).OrderBy(b => b.SortOrder).ToList();
+        var byId = top.ToDictionary(b => b.Id);
+        var ordered = new List<ContentBlock>();
+        var notes = new List<string>();
+        var editable = EditableFields();
+        int edited = 0, added = 0;
+        foreach (var item in incoming)
+        {
+            if (item is not JsonObject obj) continue;
+            var type = (obj["type"] as JsonValue)?.ToString() ?? "";
+            // An item that carries an id in ANY form is an existing block, never a new one: a model that sent "12" or "Id"
+            // would otherwise get a copy, and with removeMissing the original would be deleted.
+            var idNode = obj.FirstOrDefault(kv => kv.Key.Equals("id", StringComparison.OrdinalIgnoreCase)).Value;
+            if (obj.Any(kv => kv.Key.Equals("id", StringComparison.OrdinalIgnoreCase)))
+            {
+                int id;
+                if (idNode is JsonValue iv && (iv.TryGetValue<int>(out id) || (iv.TryGetValue<string>(out var ids) && int.TryParse(ids, out id)))) { }
+                else { notes.Add($"Block-ID „{idNode?.ToJsonString()}“ ist keine Zahl – übergangen."); continue; }
+                if (!byId.TryGetValue(id, out var existing)) { notes.Add($"Block {id} gibt es auf dieser Seite nicht – übergangen."); continue; }
+                if (ordered.Contains(existing)) { notes.Add($"Block {id} steht doppelt in der Liste – der zweite Eintrag ist übergangen."); continue; }
+                if (type.Length > 0 && !type.Equals(existing.BlockType, StringComparison.OrdinalIgnoreCase))
+                    notes.Add($"Block {id}: der Typ bleibt „{existing.BlockType}“ (ändern geht nur über einen neuen Block).");
+                ordered.Add(existing);
+                if (obj["data"] is not JsonObject d || d.Count == 0) continue;
+
+                var fields = editable.TryGetValue(existing.BlockType, out var f) ? f : new List<string>();
+                var stored = (string.IsNullOrWhiteSpace(existing.DataJson) ? null : JsonNode.Parse(existing.DataJson) as JsonObject) ?? new JsonObject();
+                var changes = new JsonObject();
+                var cleared = new List<string>();
+                var ignored = new List<string>();
+                foreach (var kv in d)
+                {
+                    // The field's own id, whatever casing the model used — written under any other spelling it would be a
+                    // second key next to the real one, and the edit would silently not show.
+                    var fid = fields.FirstOrDefault(x => x.Equals(kv.Key, StringComparison.OrdinalIgnoreCase));
+                    if (fid is null) { ignored.Add(kv.Key); continue; }
+                    var sent = kv.Value is JsonValue sv && sv.TryGetValue<string>(out var s) ? s : null;
+                    if (sent is null) { ignored.Add(kv.Key); continue; }
+                    var current = stored.FirstOrDefault(x => x.Key.Equals(fid, StringComparison.OrdinalIgnoreCase));
+                    if (current.Value is JsonValue cv && cv.TryGetValue<string>(out var cs) && cs == sent) continue; // unchanged: leave it alone
+                    if (sent.Trim().Length == 0) { cleared.Add(fid); continue; }                                      // "" empties the field
+                    changes[fid] = sent;
+                }
+                var check = changes.Count == 0 ? new() : _blockGen.ValidateBlocks(new JsonArray(new JsonObject { ["type"] = existing.BlockType, ["data"] = changes }));
+                var written = check.Count == 0 ? new JsonObject() : check[0].Data;
+                foreach (var key in changes.Select(kv => kv.Key).Where(k => !written.ContainsKey(k))) ignored.Add(key);
+                if (written.Count == 0 && cleared.Count == 0)
+                {
+                    if (ignored.Count > 0) notes.Add($"Block {id} ({existing.BlockType}): Felder {string.Join(", ", ignored)} nicht geändert (nur Textfelder sind änderbar).");
+                    continue;
+                }
+                foreach (var key in stored.Select(x => x.Key).Where(k => written.Any(w => w.Key.Equals(k, StringComparison.OrdinalIgnoreCase)) || cleared.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList())
+                    stored.Remove(key);
+                foreach (var kv in written) stored[kv.Key] = kv.Value?.DeepClone();
+                if (ignored.Count > 0) notes.Add($"Block {id}: Felder {string.Join(", ", ignored)} nicht geändert (nur Textfelder sind änderbar).");
+                existing.DataJson = stored.ToJsonString();
+                edited++;
+            }
+            else
+            {
+                var fresh = _blockGen.ValidateBlocks(new JsonArray(obj.DeepClone()));
+                if (fresh.Count == 0) { notes.Add($"Neuer Block „{type}“ ist ungültig oder leer – übergangen."); continue; }
+                var nb = new ContentBlock { PageId = page.Id, BlockType = fresh[0].Type, DataJson = fresh[0].Data.ToJsonString() };
+                page.Blocks.Add(nb);
+                ordered.Add(nb);
+                added++;
+            }
+        }
+        if (ordered.Count == 0)
+            return Report(op, "failed", "Keine gültigen Blöcke — Seite unverändert gelassen." + (notes.Count > 0 ? " " + string.Join(" ", notes) : ""));
+
+        var missing = top.Where(b => !ordered.Contains(b)).ToList();
+        var removed = 0;
+        if (removeMissing)
+        {
+            // Children hang off their parent and go with it (cascade), exactly as deleting the block in the editor.
+            _db.ContentBlocks.RemoveRange(missing);
+            removed = missing.Count;
+        }
+        else ordered.AddRange(missing);
+
         var sort = 0;
-        foreach (var (type, _, data) in validated)
-            page.Blocks.Add(new ContentBlock { PageId = page.Id, BlockType = type, DataJson = data.ToJsonString(), SortOrder = sort++ });
+        foreach (var b in ordered) b.SortOrder = sort++;
         page.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        return Report(op, "applied", $"Seite „{slug}“: {validated.Count} Block/Blöcke ersetzt.");
+        var summary = $"Seite „{slug}“: {edited} geändert, {added} neu, {removed} entfernt"
+            + (!removeMissing && missing.Count > 0 ? $", {missing.Count} nicht genannte behalten" : "") + ".";
+        return Report(op, notes.Count == 0 ? "applied" : "partial", notes.Count == 0 ? summary : summary + " " + string.Join(" ", notes));
     }
+
+    /// <summary>Block type → the text fields a content op may change (the validator's own list, so read and write agree).</summary>
+    private Dictionary<string, List<string>> EditableFields() =>
+        _blockGen.AllowedBlocks().GroupBy(b => b.Type, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Fields.Select(f => f.Id).ToList(), StringComparer.OrdinalIgnoreCase);
 
     private async Task<int> NextNavOrderAsync(CancellationToken ct)
     {

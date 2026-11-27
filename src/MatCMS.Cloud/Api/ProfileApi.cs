@@ -11,7 +11,8 @@ namespace MatCMS.Cloud.Api;
 /// The profile-management surface of the operator API (<c>/api/v1/profiles</c> and the instance↔profile
 /// assignment endpoints). The work is <see cref="ProfileOpsService"/>, shared with the MCP profile tools; this file
 /// is transport only — the key, its rights, the status codes, and the plugin ZIP up/download, which stays REST.
-/// Reads need only a valid key; writes need <see cref="ApiKey.CanManageProfiles"/>; an instance call additionally
+/// Reads need a valid key, but the join code takes the profile right and a scoped key sees only its instances' profiles
+/// (ProfileOpsService); writes need <see cref="ApiKey.CanManageProfiles"/>; an instance call additionally
 /// honours the key's instance scope.
 /// </summary>
 public static class ProfileApi
@@ -36,14 +37,14 @@ public static class ProfileApi
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            return Results.Ok(new { canManageProfiles = key!.CanManageProfiles, profiles = await ops.ListAsync() });
+            return Results.Ok(new { canManageProfiles = key!.CanManageProfiles, profiles = await ops.ListAsync(key) });
         }).RequireRateLimiting("operatorApi");
 
         app.MapGet("/api/v1/profiles/{id:int}", async (HttpContext ctx, int id, ApiKeyService keys, ProfileOpsService ops) =>
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var r = await ops.GetAsync(id);
+            var r = await ops.GetAsync(id, key);
             return Send(r);
         }).RequireRateLimiting("operatorApi");
 
@@ -149,7 +150,7 @@ public static class ProfileApi
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            var r = await ops.RecommendedAsync(id);
+            var r = await ops.RecommendedAsync(id, key);
             return Send(r);
         }).RequireRateLimiting("operatorApi");
 
@@ -299,6 +300,7 @@ public static class ProfileApi
         {
             var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
+            if (!await ops.MayReadAsync(id, key)) return Results.NotFound(); // a scoped key: only its instances' profiles
             var row = await ops.GetPluginAsync(id, pluginKey);
             if (row is null) return Results.NotFound();
             return Results.File(row.Bundle, "application/zip", $"{row.Key}.zip");
@@ -406,9 +408,9 @@ public static class ProfileApi
         // What a profile's instances actually get — with everything it inherits, and where each item comes from.
         app.MapGet("/api/v1/profiles/{id:int}/effective", async (HttpContext ctx, int id, ApiKeyService keys, ProfileOpsService ops) =>
         {
-            var (_, error) = await CallerAsync(ctx, keys);
+            var (key, error) = await CallerAsync(ctx, keys);
             if (error is not null) return error;
-            return Send(await ops.EffectiveAsync(id));
+            return Send(await ops.EffectiveAsync(id, key));
         }).RequireRateLimiting("operatorApi");
     }
 

@@ -37,6 +37,11 @@ public class BlockGenerator
             // wrong. An AiIgnore list (e.g. the hero's optional slideshow images) does NOT count: the
             // block renders fine without it and stays AI-generable for its text fields.
             if (def.Fields.Any(f => f.ItemFields.Count > 0 && !f.AiIgnore)) continue;
+            // A block with a raw-HTML field (the HTML block) is never offered: its text is put on the page unencoded and
+            // unsanitised, so a model (steered by a document or a page it read) could write a script onto a live site — the
+            // same rule as the assistant's AssistantBlocks. Since page.updateBlocks edits blocks by id this matters twice:
+            // page.read would otherwise list the field as editable.
+            if (def.Fields.Any(f => f.RawHtml || f.ItemFields.Any(i => i.RawHtml))) continue;
             var fields = new List<GenField>();
             foreach (var f in def.Fields)
             {

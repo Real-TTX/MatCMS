@@ -82,6 +82,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("OAuthClientId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Prefix")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -265,6 +268,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestedBy")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ResultJson")

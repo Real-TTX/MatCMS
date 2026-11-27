@@ -31,6 +31,10 @@ public class ContentOp
     /// <summary>Why the cloud is asking, in the site's language — written to the instance's log.</summary>
     public string? Reason { get; set; }
 
+    /// <summary>Who queued it: "mcp:&lt;key name&gt;" for an AI client, null for the cloud's own ops (cleanup page, address push).
+    /// Shown in the instance log, so a change on a live site can be traced to the key that asked for it.</summary>
+    public string? RequestedBy { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>When the instance reported this op done (UTC), or null while still pending. A pending op is

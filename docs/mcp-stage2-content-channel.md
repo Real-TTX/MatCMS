@@ -1,9 +1,8 @@
 # MCP Stage 2 — Content/Config changes to connected instances
 
-Status: **design only, no code yet.** Stage 1 (the `/mcp` server exposing the read + backup/restore
-operator actions) is in progress. This document designs Stage 2: letting an external AI (ChatGPT /
-Claude, via the MCP server) make **content and configuration changes** to connected MatCMS instances —
-"change this connected website's pages / blocks / settings".
+Status: **built** (pages, posts, forms, settings, cleanup, the shop operations — see `src/MatCMS.Cloud/CLAUDE.md`, "MCP content ops").
+This was the design; where code and this text disagree, the code and the CLAUDE.md are right. Later changes not designed here:
+page edits are a PATCH by block id (protocol 19), and `set_setting` refuses script and sign-in keys (`ContentOpRules`).
 
 All identifiers below are real types in the repo. Comments explain the *why*.
 

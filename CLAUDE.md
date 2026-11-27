@@ -603,7 +603,7 @@ through the cloud relay — the key never lives on the site.
   that refuses them and says so (`AiResponse.Note`).
 - **Cloud side** (`MatCMS.Cloud/Services/AiService.cs`): completion cap 16 000 and 280 s — a reasoning model spends the cap on thinking and
   came back EMPTY with the old 60/220/500-token caps, which is why the old actions "did not work"; an empty answer is now an error that says
-  why. Refusals naming `max_tokens`, `temperature`, `response_format` or a picture are retried without it. `CloudProtocol.Version` 18.
+  why. Refusals naming `max_tokens`, `temperature`, `response_format` or a picture are retried without it. `CloudProtocol.Version` 18 (19 since page edits by block id).
 - **The site's OWN AI connection** (Einstellungen → KI, `Services/OwnAi.cs`) — MatCMS must work without a cloud: an API key (OpenAI or any
   compatible server, e.g. DeepSeek) or a signed-in ChatGPT account (device code, like Codex). `SiteAiTransport` (the one `IAiTransport`)
   uses it when set up, else the cloud relay; `AiService.Enabled` = own connection configured OR `ai.transport=cloud`. The provider code is

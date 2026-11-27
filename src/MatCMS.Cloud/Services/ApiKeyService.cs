@@ -28,7 +28,7 @@ public class ApiKeyService
     /// </summary>
     public async Task<Created> CreateAsync(string name, bool canRestore, bool allInstances,
         IEnumerable<int> instanceIds, CancellationToken ct = default, bool canManageProfiles = false,
-        bool canManageStore = false, bool canManageHosting = false)
+        bool canManageStore = false, bool canManageHosting = false, int? oauthClientId = null)
     {
         var raw = Tag + Base64Url(RandomNumberGenerator.GetBytes(32));
         var key = new ApiKey
@@ -41,6 +41,7 @@ public class ApiKeyService
             CanManageStore = canManageStore,
             CanManageHosting = canManageHosting,
             AllInstances = allInstances,
+            OAuthClientId = oauthClientId,
         };
         if (!allInstances)
             key.Instances = instanceIds.Distinct()

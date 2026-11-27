@@ -467,7 +467,7 @@ public class InstanceService
     /// records the intent; the instance applies it on its next beat through its own validated writers and
     /// reports back. The returned row's <see cref="ContentOp.Id"/> is the op id the caller can poll on.</summary>
     public async Task<ContentOp> EnqueueContentOpAsync(Instance instance, string kind, string payloadJson,
-        bool overwrite, string? reason, CancellationToken ct = default)
+        bool overwrite, string? reason, CancellationToken ct = default, string? by = null)
     {
         var op = new ContentOp
         {
@@ -475,12 +475,33 @@ public class InstanceService
             Kind = kind,
             PayloadJson = payloadJson,
             Overwrite = overwrite,
-            Reason = reason
+            Reason = reason,
+            RequestedBy = by
         };
         _db.ContentOps.Add(op);
-        Log(instance, InstanceEventKind.ContentOpQueued, $"KI-Änderung eingereiht ({kind}).");
+        Log(instance, InstanceEventKind.ContentOpQueued,
+            by is null ? $"KI-Änderung eingereiht ({kind})." : $"KI-Änderung eingereiht ({kind}) von {by}.");
         await _db.SaveChangesAsync(ct);
         return op;
+    }
+
+    /// <summary>Tells a site its public address (empty = take it back) — the cloud's OWN push after hosting published a
+    /// domain or host address. A site on protocol 19 gets the op "site.address": `setting.set` refuses `site.canonicalUrl`
+    /// there, because the canonical address is where member mails point their reset and invitation links, and a steered
+    /// model must not be able to send those to another host. An older site gets the two settings as before.</summary>
+    public async Task EnqueueAddressAsync(Instance instance, string url, CancellationToken ct = default)
+    {
+        var proxy = url.Length > 0 ? "1" : "";
+        if (instance.ProtocolVersion >= CloudProtocol.BlockPatchSince)
+        {
+            await EnqueueContentOpAsync(instance, "site.address",
+                System.Text.Json.JsonSerializer.Serialize(new { canonicalUrl = url, behindHttpsProxy = proxy }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
+            return;
+        }
+        await EnqueueContentOpAsync(instance, "setting.set",
+            System.Text.Json.JsonSerializer.Serialize(new { key = "site.canonicalUrl", value = url }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
+        await EnqueueContentOpAsync(instance, "setting.set",
+            System.Text.Json.JsonSerializer.Serialize(new { key = "site.behindHttpsProxy", value = proxy }), overwrite: true, reason: "Hosting: hinter HTTPS-Proxy", ct);
     }
 
     /// <summary>The still-pending content ops for an instance, oldest first, as the wire DTO. Null (not an
@@ -794,11 +815,7 @@ public class InstanceService
 
         if (p.PushCanonical && instance.Status == InstanceStatus.Approved)
         {
-            var url = "https://" + address;
-            await EnqueueContentOpAsync(instance, "setting.set",
-                System.Text.Json.JsonSerializer.Serialize(new { key = "site.canonicalUrl", value = url }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
-            await EnqueueContentOpAsync(instance, "setting.set",
-                System.Text.Json.JsonSerializer.Serialize(new { key = "site.behindHttpsProxy", value = "1" }), overwrite: true, reason: "Hosting: hinter HTTPS-Proxy", ct);
+            await EnqueueAddressAsync(instance, "https://" + address, ct);
         }
     }
 

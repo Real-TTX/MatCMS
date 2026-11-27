@@ -15,7 +15,12 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 18;
+    public const int Version = 19;
+
+    /// <summary>From this version on a site edits a page's blocks BY ID (page.updateBlocks keeps what it is not told to change,
+    /// page.read hands out ids). The cloud refuses update_page_blocks for an older site: it would still replace the whole
+    /// page with what the text validator lets through and lose pictures, links and nested blocks.</summary>
+    public const int BlockPatchSince = 19;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";

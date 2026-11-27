@@ -1198,10 +1198,7 @@ public class ProxyService
     {
         if (!wanted || url is null) return "";
         if (inst.Status != InstanceStatus.Approved) return " Instanz ist nicht freigegeben — ihre Adresse bitte dort selbst eintragen.";
-        await _instances.EnqueueContentOpAsync(inst, "setting.set",
-            JsonSerializer.Serialize(new { key = "site.canonicalUrl", value = url }), overwrite: true, reason: "Hosting: öffentliche Adresse", ct);
-        await _instances.EnqueueContentOpAsync(inst, "setting.set",
-            JsonSerializer.Serialize(new { key = "site.behindHttpsProxy", value = url.Length > 0 ? "1" : "" }), overwrite: true, reason: "Hosting: hinter HTTPS-Proxy", ct);
+        await _instances.EnqueueAddressAsync(inst, url, ct);
         return url.Length > 0 ? " Die Instanz übernimmt die Adresse beim nächsten Kontakt." : " Die Instanz setzt ihre Adresse beim nächsten Kontakt zurück.";
     }
 }

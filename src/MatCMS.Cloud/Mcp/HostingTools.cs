@@ -180,7 +180,7 @@ public class HostingTools
         if (!me.Key.CanRestore)
             throw new McpException("Dieser Schlüssel darf keine Instanzen entfernen (fehlendes Restore-Recht).");
         var inst = await ResolveAsync(me, instances, instanceId, ct);
-        var r = await removals.RemoveByModeAsync(inst, mode, ct);
+        var r = await removals.RemoveByModeAsync(inst, mode, ct, by: me.Actor);
         if (!r.Ok) throw new McpException(r.Message);
         return new { ok = true, removed = r.Removed, pending = !r.Removed, message = r.Message };
     }

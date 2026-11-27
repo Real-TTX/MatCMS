@@ -56,20 +56,48 @@ public sealed class ProfileOpsService
 
     // ---- read -------------------------------------------------------------------------------------
 
-    public async Task<object> ListAsync() => await _db.Profiles.AsNoTracking().OrderBy(p => p.Name).Select(p => new
-    {
-        id = p.Id,
-        name = p.Name,
-        description = p.Description,
-        isDefault = p.IsDefault,
-        revision = p.Revision,
-        joinCode = p.JoinCode,
-        parentId = p.ParentId,
-        instanceCount = _db.Instances.Count(i => i.ProfileId == p.Id)
-    }).ToListAsync();
+    // ---- who may read what ------------------------------------------------------------------------
+    // A profile's join code is an ENROLMENT secret: with AutoApprove (the default) whoever holds it registers a site that is
+    // approved at once and receives the profile's whole configuration. So reading it takes the profile right, not just "any
+    // valid key", and a key scoped to some instances sees only the profiles those instances use (and, in them, only those
+    // instances). viewer == null is the admin UI and sees everything.
 
-    public async Task<Result> GetAsync(int id)
+    private static bool SeesAllProfiles(ApiKey? viewer) => viewer is null || viewer.AllInstances || viewer.CanManageProfiles;
+    private static bool SeesJoinCode(ApiKey? viewer) => viewer is null || viewer.CanManageProfiles;
+
+    private async Task<List<int>> VisibleProfileIdsAsync(ApiKey viewer)
     {
+        var scoped = viewer.Instances.Select(s => s.InstanceId).ToList();
+        return await _db.Instances.AsNoTracking().Where(i => scoped.Contains(i.Id) && i.ProfileId != null)
+            .Select(i => i.ProfileId!.Value).Distinct().ToListAsync();
+    }
+
+    /// <summary>Whether this key may read the profile at all (the same answer as "does not exist" when not). Public for the
+    /// plugin download, which streams a bundle and so is not one of the reads above.</summary>
+    public async Task<bool> MayReadAsync(int id, ApiKey? viewer) =>
+        SeesAllProfiles(viewer) || (await VisibleProfileIdsAsync(viewer!)).Contains(id);
+
+    public async Task<object> ListAsync(ApiKey? viewer = null)
+    {
+        var all = SeesAllProfiles(viewer);
+        var visible = all ? new List<int>() : await VisibleProfileIdsAsync(viewer!);
+        var showCode = SeesJoinCode(viewer);
+        return await _db.Profiles.AsNoTracking().Where(p => all || visible.Contains(p.Id)).OrderBy(p => p.Name).Select(p => new
+        {
+            id = p.Id,
+            name = p.Name,
+            description = p.Description,
+            isDefault = p.IsDefault,
+            revision = p.Revision,
+            joinCode = showCode ? p.JoinCode : null,
+            parentId = p.ParentId,
+            instanceCount = _db.Instances.Count(i => i.ProfileId == p.Id)
+        }).ToListAsync();
+    }
+
+    public async Task<Result> GetAsync(int id, ApiKey? viewer = null)
+    {
+        if (!await MayReadAsync(id, viewer)) return NoProfile; // the same answer as "does not exist"
         var p = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NoProfile;
         var settings = await _db.ProfileSettings.AsNoTracking().Where(s => s.ProfileId == id)
@@ -84,13 +112,15 @@ public sealed class ProfileOpsService
             .Select(x => new { x.Name, x.AccentColor, x.HeadingFont, x.BodyFont }).ToListAsync();
         var mailTemplates = await _db.ProfileMailTemplates.AsNoTracking().Where(x => x.ProfileId == id)
             .Select(x => new { x.Key, x.Name, x.Subject, x.Enabled, x.IsHtml }).ToListAsync();
-        var instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id)
+        var everyInstance = SeesAllProfiles(viewer);
+        var scope = everyInstance ? new List<int>() : viewer!.Instances.Select(s => s.InstanceId).ToList();
+        var instances = await _db.Instances.AsNoTracking().Where(i => i.ProfileId == id && (everyInstance || scope.Contains(i.Id)))
             .Select(i => new { i.PublicId, i.Name, appliedRevision = i.AppliedRevision, nativePlugins = i.NativePlugins, matcmsStore = i.MatcmsStore, mailFromName = i.MailFromName }).ToListAsync();
         var parentName = p.ParentId is int ppid ? await _db.Profiles.AsNoTracking().Where(x => x.Id == ppid).Select(x => x.Name).FirstOrDefaultAsync() : null;
         var children = await _profiles.ChildNamesAsync(id);
         return Result.Done(new
         {
-            p.Id, p.Name, p.Description, p.JoinCode, p.AutoApprove, p.IsDefault, p.Revision,
+            p.Id, p.Name, p.Description, JoinCode = SeesJoinCode(viewer) ? p.JoinCode : null, p.AutoApprove, p.IsDefault, p.Revision,
             p.ActivateTemplateName,
             // Inheritance: what it inherits from, and who inherits from it. The lists below are this profile's OWN items;
             // what its instances actually get (with the inherited ones) is GET …/effective.
@@ -251,9 +281,9 @@ public sealed class ProfileOpsService
 
     // ---- settings ---------------------------------------------------------------------------------
 
-    public async Task<Result> RecommendedAsync(int id)
+    public async Task<Result> RecommendedAsync(int id, ApiKey? viewer = null)
     {
-        if (!await ExistsAsync(id)) return NoProfile;
+        if (!await MayReadAsync(id, viewer) || !await ExistsAsync(id)) return NoProfile;
         var missing = await _profiles.MissingRecommendedAsync(id);
         return Result.Done(new
         {
@@ -624,8 +654,9 @@ public sealed class ProfileOpsService
 
     /// <summary>What the instances of a profile actually get, with everything it inherits — and from which profile each item comes.
     /// Secrets are masked. The same build as the instances' own /config, so it cannot disagree with what they receive.</summary>
-    public async Task<Result> EffectiveAsync(int id)
+    public async Task<Result> EffectiveAsync(int id, ApiKey? viewer = null)
     {
+        if (!await MayReadAsync(id, viewer)) return NoProfile;
         var p = await _db.Profiles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NoProfile;
         var origins = new Dictionary<string, string>();

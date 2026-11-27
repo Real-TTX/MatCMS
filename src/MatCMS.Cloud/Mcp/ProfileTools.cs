@@ -9,7 +9,8 @@ namespace MatCMS.Cloud.Mcp;
 /// <summary>
 /// Profiles for an AI client — the same operations as <c>/api/v1/profiles</c>, through the same
 /// <see cref="ProfileOpsService"/>, so a profile edited by an agent behaves exactly like one edited in the admin: every
-/// write bumps the revision and rolls out on the instances' next beat. Reads need any key; writes need the key's
+/// write bumps the revision and rolls out on the instances' next beat. Reads need any key (the join code the profile right, a
+/// scoped key sees only its instances' profiles); writes need the key's
 /// profile right; instance calls honour its scope. Plugin bundles stay REST (a ZIP is no chat payload).
 /// </summary>
 [McpServerToolType]
@@ -40,21 +41,21 @@ public class ProfileTools
 
     // ---- read -------------------------------------------------------------------------------------
 
-    [McpServerTool(Name = "list_profiles"), Description("List the configuration profiles: id, name, description, whether it is the default, revision, join code and how many instances use it. canManageProfiles says whether this key may change them.")]
+    [McpServerTool(Name = "list_profiles"), Description("List the configuration profiles: id, name, description, whether it is the default, revision, join code (only for a key with the profile right) and how many instances use it. A key limited to some instances sees only their profiles. canManageProfiles says whether this key may change them.")]
     public static async Task<object> ListProfiles(McpContext me, ProfileOpsService ops) =>
-        new { canManageProfiles = me.Key.CanManageProfiles, profiles = await ops.ListAsync() };
+        new { canManageProfiles = me.Key.CanManageProfiles, profiles = await ops.ListAsync(me.Key) };
 
     [McpServerTool(Name = "get_profile"), Description("One profile in full: policy, which payloads it syncs and how (keep = stay in line, add = only create missing, once = seed once), AI settings, mail source, and its settings (secrets masked), users, plugins, components, templates, mail templates and assigned instances.")]
-    public static async Task<object> GetProfile(ProfileOpsService ops, [Description("Profile id (from list_profiles).")] int profileId) =>
-        Unwrap(await ops.GetAsync(profileId));
+    public static async Task<object> GetProfile(McpContext me, ProfileOpsService ops, [Description("Profile id (from list_profiles).")] int profileId) =>
+        Unwrap(await ops.GetAsync(profileId, me.Key));
 
     [McpServerTool(Name = "get_profile_effective"), Description("What a profile's sites actually receive, WITH everything the profile inherits from its parent profile(s): settings (secrets masked), users, plugins, components, templates, mail templates, mail/AI transport — each item with the profile it comes from.")]
-    public static async Task<object> GetProfileEffective(ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
-        Unwrap(await ops.EffectiveAsync(profileId));
+    public static async Task<object> GetProfileEffective(McpContext me, ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
+        Unwrap(await ops.EffectiveAsync(profileId, me.Key));
 
     [McpServerTool(Name = "get_recommended_settings"), Description("The settings every profile should carry for the full feature set, and which of them this profile is missing.")]
-    public static async Task<object> GetRecommendedSettings(ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
-        Unwrap(await ops.RecommendedAsync(profileId));
+    public static async Task<object> GetRecommendedSettings(McpContext me, ProfileOpsService ops, [Description("Profile id.")] int profileId) =>
+        Unwrap(await ops.RecommendedAsync(profileId, me.Key));
 
     // ---- lifecycle --------------------------------------------------------------------------------
 

@@ -749,12 +749,13 @@ app.MapGet("/.well-known/oauth-authorization-server", (HttpContext ctx) =>
         token_endpoint = $"{baseUrl}/oauth/token",
         grant_types_supported = new[] { "authorization_code" },
         code_challenge_methods_supported = new[] { "S256" },
-        token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic", "none" },
+        // No "none": the token endpoint refuses a client without its secret, so advertising it sent such clients into a dead end.
+        token_endpoint_auth_methods_supported = new[] { "client_secret_post", "client_secret_basic" },
     });
 });
 
 app.MapPost("/oauth/token", async (HttpContext ctx, AuthService auth, InstanceService instances, OAuthCodes codes,
-    ApiKeyService apiKeys, OAuthClientService clients) =>
+    ApiKeyService apiKeys, OAuthClientService clients, AppDbContext tokenDb) =>
 {
     var form = await ctx.Request.ReadFormAsync();
 
@@ -792,9 +793,12 @@ app.MapPost("/oauth/token", async (HttpContext ctx, AuthService auth, InstanceSe
             || (cgrant.CodeChallenge is not null && !OAuthCodes.VerifyPkce(cgrant.CodeChallenge, form["code_verifier"].ToString())))
             return Results.Json(new { error = "invalid_grant" }, statusCode: StatusCodes.Status400BadRequest);
 
+        // The key names who approved it (the consent page is Admin-only) and remembers its client, so revoking the
+        // connector revokes what it minted (OAuthClients page).
+        var approver = await tokenDb.Users.AsNoTracking().Where(u => u.Id == cgrant.UserId).Select(u => u.Username).FirstOrDefaultAsync(ctx.RequestAborted) ?? "?";
         var minted = await apiKeys.CreateAsync(
-            name: $"Connector: {client.Name} · {DateTime.UtcNow:yyyy-MM-dd}",
-            canRestore: true, allInstances: true, instanceIds: Array.Empty<int>(), ctx.RequestAborted);
+            name: $"Connector: {client.Name} · {approver} · {DateTime.UtcNow:yyyy-MM-dd}",
+            canRestore: true, allInstances: true, instanceIds: Array.Empty<int>(), ctx.RequestAborted, oauthClientId: client.Id);
         return Results.Ok(new { access_token = minted.RawKey, token_type = "Bearer", scope = "operator" });
     }
 
@@ -960,6 +964,7 @@ app.MapPost("/api/v1/instances/{publicId}/backups/{id:int}/restore", async (
     var row = await store.FindAsync(instance.Id, id);
     if (row is null) return Results.NotFound();
 
+    instances.Log(instance, MatCMS.Cloud.Models.InstanceEventKind.RestoreRequested, $"Wiederherstellung von Backup {row.Id} angefordert von api:{key!.Name}.");
     await store.RequestRestoreAsync(row, ctx.RequestAborted);
     return Results.Ok(new { ok = true, id = row.Id, message = "Wiederherstellung vorgemerkt — die Instanz spielt sie beim nächsten Kontakt ein." });
 }).RequireRateLimiting("operatorApi");

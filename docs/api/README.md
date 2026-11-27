@@ -80,7 +80,7 @@ Benutzer; Entfernen stoppt nur künftige Rollouts). Sync-Modi je Payload: `keep`
 Schreiben braucht **CanManageProfiles**. Lesen braucht nur einen gültigen Schlüssel.
 
 ### Profile allgemein
-- `GET /api/v1/profiles` → `{ canManageProfiles, profiles:[{ id, name, description, isDefault, revision, joinCode, instanceCount }] }`
+- `GET /api/v1/profiles` → `{ canManageProfiles, profiles:[{ id, name, description, isDefault, revision, joinCode, instanceCount }] }` — `joinCode` nur mit `CanManageProfiles` (sonst `null`; ein Beitrittscode meldet mit AutoApprove sofort eine freigegebene Website an); ein auf Instanzen begrenzter Schlüssel sieht nur die Profile seiner Instanzen und darin nur seine Instanzen (gilt auch für `GET …/{id}`, `…/effective`, `…/settings/recommended`)
 - `GET /api/v1/profiles/{id}` → vollständiges Profil inкл. aller Payload-Listen (Secrets maskiert als `***`) und zugeordneter Instanzen.
 - `POST /api/v1/profiles` `{ name, description? }` → `{ id, name, joinCode }`
 - `PATCH /api/v1/profiles/{id}` – Felder optional, nur gesetzte werden geändert:
@@ -310,7 +310,7 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `list_pages` | Seiten einer Site (async → `get_content_op`) |
 | `get_page` | eine Seite mit Blöcken lesen (async) |
 | `create_page` | neue Seite anlegen (add-only) |
-| `update_page_blocks` | die Blöcke einer Seite ersetzen (CanRestore) |
+| `update_page_blocks` | Blöcke einer Seite bearbeiten, **blockweise nach `id`** aus `get_page`: nur gesendete Textfelder ändern sich, Bilder/Links/Unterblöcke bleiben; Block ohne `id` = neu; nicht genannte Blöcke bleiben, außer `removeMissing: true` (CanRestore; Website ab Protokoll 19) |
 | `create_post` | neuen Beitrag anlegen (add-only) |
 | `create_product` | neues Shop-Produkt anlegen (add-only; Preis brutto in Cent; optional Kategorie — wird angelegt, falls neu —, Schlagwörter, „hervorgehoben“, Statt-Preis; das Shop-Plugin muss auf der Site eingeschaltet sein) |
 | `create_coupon` | neuen Gutschein-Code im Shop anlegen (add-only, ein vorhandener Code wird übersprungen; Prozent, Festbetrag oder Versand frei, optional Mindestwert, Ablaufdatum, Höchstzahl, einmal pro Kunde, Kategorie) |
@@ -320,10 +320,10 @@ Instanz beim nächsten Heartbeat über ihre **eigenen** Validierer anwendet (add
 | `create_shop_attribute` | neue Produkt-Eigenschaft anlegen (Auswahl, Text, Zahl mit Einheit, Ja/Nein; add-only) |
 | `set_product_attributes` | einem Produkt Werte für Eigenschaften geben (nur gültige Optionen werden gespeichert, Unbekanntes wird gemeldet) |
 | `create_form` | neues Formular anlegen (add-only; Felder als JSON-Array) — CanRestore |
-| `set_setting` | eine Site-Einstellung setzen (`cloud.*`-Schlüssel werden abgewiesen) — CanRestore |
+| `set_setting` | eine Site-Einstellung setzen — abgewiesen: `cloud.*`, `code.*` (Kopf-/Body-Code), `security.*`, `sso.*`, `smtp.*`, `mail.transport`, `members.selfRegistration`, `site.canonicalUrl`, `site.behindHttpsProxy`, `site.domainRoutes`, `ContactRecipient` (`MatCMS.Shared/ContentOpRules`, die Website prüft selbst noch einmal) — CanRestore |
 | `analyze_cleanup` | unbenutzte Medien/Komponenten + Plugins der Site ermitteln (async → `get_content_op`, `result` = Liste) — read |
 | `apply_cleanup` | gewählte unbenutzte Medien/Komponenten/Plugins löschen (Site re-prüft „noch unbenutzt") — **destruktiv**, CanRestore |
-| `get_content_op` | Status/Ergebnis einer Op abfragen: `pending` / `applied` / `skipped-exists` / `failed` |
+| `get_content_op` | Status/Ergebnis einer Op abfragen: `pending` / `applied` / `partial` / `skipped-exists` / `failed`. Ohne CanRestore nur die Ergebnisse von `pages.list`, `page.read`, `cleanup.analyze` (Bestelllisten enthalten Kundendaten) |
 
 **Store-Tools** (verwalten den cloud-weiten Katalog direkt, ohne Instanz-Umlauf; **synchron**; Schreiben braucht **CanManageStore**):
 
@@ -839,7 +839,7 @@ Kind-Blöcke (`card`, `column`, `faq`, `step`, `service`, `feature`, `plan`, `be
 ## 9. Rezepte für eine KI
 
 - **Neue Unterseite mit Text anlegen:** `create_page` mit `hero` + `richtext`/`cards` → `opId` → `get_content_op` bis `applied`.
-- **Bestehende Seite umtexten:** `get_page` (async) → Blöcke anpassen → `update_page_blocks` (CanRestore).
+- **Bestehende Seite umtexten:** `get_page` (async, jeder Block mit `id` und `editable`) → nur die geänderten Felder je `id` an `update_page_blocks` (CanRestore).
 - **Bild/Design ändern:** Backup ziehen (Abschnitt 3) → `content.json`/`assets/` bearbeiten → hochladen → restore.
 - **Konfiguration auf viele Sites ausrollen:** Profil per Abschnitt 4 bearbeiten (`PATCH`/Payload-Endpunkte); die Instanzen ziehen die neue Revision automatisch. Mit `POST …/instances/{publicId}/sync` einen sofortigen Neu-Pull vormerken.
 - **Neue Site an ein Profil hängen:** `PUT /api/v1/instances/{publicId}/profile { profileId }`.

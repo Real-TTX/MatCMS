@@ -40,19 +40,8 @@
 .code-status.is-ok { color: #1e7a34; }
 .code-status.is-error { color: #b42318; font-family: ui-monospace, monospace; }
 
-/* Toolbar above a code field (token chips). */
-.code-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
-.code-toolbar .code-hint { font-size: 12px; color: var(--muted); margin-right: 4px; }
-.token-chip {
-    font-family: ui-monospace, monospace;
-    font-size: 12px;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 2px 7px;
-    cursor: pointer;
-}
-.token-chip:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* The toolbar above a code field and its token chips live in the shared admin.css / admin-matui.css: the CMS's mail
+   templates use them too and showed the browser's bare buttons while they were only here. */
 
 /* ============ Live previews ============ */
 /* The theme preview is a whole sample page, so it needs more height than MatCMS's component preview
@@ -473,16 +462,16 @@ table.data tr.is-editing { background: color-mix(in srgb, var(--accent) 8%, #fff
 .scope-instances { margin: 8px 0 0 24px; padding-left: 12px; border-left: 2px solid var(--border, var(--line)); max-height: 320px; overflow: auto; }
 
 /* Full-screen cloud self-update (Pages/Admin/CloudUpdate): one centred box, nothing else to click. */
-body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg, #f4f5f7); }
-.cu-box { width: min(760px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 36px 36px 28px; box-shadow: 0 20px 60px rgba(15, 23, 42, .08); text-align: center; }
+body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--mat-bg); }
+.cu-box { width: min(760px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: var(--mat-radius-xl); padding: 36px 36px 28px; box-shadow: var(--mat-shadow-2); text-align: center; }
 .cu-logo { display: block; max-height: 44px; margin: 0 auto 18px; }
-.cu-box h1 { font-family: Geologica, sans-serif; font-size: 26px; margin: 0 0 6px; }
+.cu-box h1 { font-size: var(--mat-fs-xl); margin: 0 0 6px; }
 .cu-status { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 24px 0 6px; font-weight: 600; }
 .cu-spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--accent) 22%, transparent); border-top-color: var(--accent); animation: ua-spin .9s linear infinite; flex: none; }
-.cu-spinner.is-ok { animation: none; border-color: #16a34a; background: #16a34a; }
-.cu-spinner.is-err { animation: none; border-color: #dc2626; background: #dc2626; }
+.cu-spinner.is-ok { animation: none; border-color: var(--mat-success); background: var(--mat-success); }
+.cu-spinner.is-err { animation: none; border-color: var(--mat-danger); background: var(--mat-danger); }
 .cu-version { margin-bottom: 18px; font-size: 13px; }
-.cu-log { text-align: left; background: #0f172a; color: #cbd5e1; border-radius: 10px; padding: 14px 16px; font-size: 12px; line-height: 1.55; height: 280px; overflow: auto; white-space: pre-wrap; margin: 0; }
+.cu-log { text-align: left; background: #0f172a; color: #cbd5e1; border-radius: var(--mat-radius-lg); padding: 14px 16px; font-size: 12px; line-height: 1.55; height: 280px; overflow: auto; white-space: pre-wrap; margin: 0; }
 .cu-actions { margin-top: 18px; }
 
 /* Usage bars in the hosting tables: a fixed width, so a column of them reads as a column. */
@@ -493,7 +482,7 @@ body.cu-screen { min-height: 100vh; display: flex; align-items: center; justify-
 .steps-list { margin: 0; padding-left: 22px; display: grid; gap: 8px; line-height: 1.55; }
 /* "Ressourcen": CPU and RAM stacked in one cell, each with its short label in front. */
 .usage-cell .usage-row + .usage-row { margin-top: 6px; }
-.usage-label { flex: 0 0 32px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted); }
+.usage-label { flex: 0 0 32px; font-size: 11px; font-weight: 600; color: var(--muted); }
 
 /* Phone topbar: the switcher and the page title SHRINK (ellipsis) and the icons on the right keep their room.
    Without this a long title ("Benachrichtigungen", "ChatGPT-Connector") made the bar wider than the screen, and

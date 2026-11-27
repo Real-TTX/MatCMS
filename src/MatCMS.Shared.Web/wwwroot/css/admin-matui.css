@@ -157,7 +157,7 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
   min-height: var(--mat-btn-height, var(--mat-control-h)); padding: 0 var(--mat-btn-pad-x, var(--mat-space-4));
   border: 1px solid transparent; border-radius: var(--mat-btn-radius, var(--mat-radius));
   background: var(--mat-accent); color: var(--mat-on-accent);
-  font-family: var(--mat-font); font-size: var(--mat-fs-sm); font-weight: 600; letter-spacing: 0; text-transform: none; line-height: 1;
+  font-family: var(--mat-font); font-size: var(--mat-fs-md); font-weight: 600; letter-spacing: 0; text-transform: none; line-height: 1;
   transition: background var(--mat-dur-fast) var(--mat-ease), border-color var(--mat-dur-fast) var(--mat-ease), color var(--mat-dur-fast) var(--mat-ease);
 }
 :is(.admin--matui, .login-matui) .btn:hover { background: var(--mat-accent-hover); border-color: transparent; color: var(--mat-on-accent); text-decoration: none; }
@@ -252,7 +252,11 @@ html[data-theme="dark"] .admin--matui .mat-vs.is-active { background: var(--mat-
 :is(.admin--matui, .login-matui) .tab.active { color: var(--mat-accent-text); border-bottom-color: var(--mat-accent); }
 
 /* Badges = MatUi pills */
-:is(.admin--matui, .login-matui) .badge { font-size: var(--mat-fs-xs); font-weight: 600; letter-spacing: 0; padding: 2px 8px; }
+/* = .mat-pill's size (24 px, 650): two kinds of pill side by side were 22 and 24 px high. */
+:is(.admin--matui, .login-matui) .badge { display: inline-flex; align-items: center; gap: 4px; min-height: var(--mat-pill-height, 24px); padding: 0 var(--mat-pill-pad-x, 10px);
+  border-radius: var(--mat-pill-radius, var(--mat-radius-pill)); font-size: var(--mat-fs-xs); font-weight: 650; letter-spacing: 0; text-transform: none; line-height: 1.2; vertical-align: middle; }
+/* "Off" was a light grey on the card's white and hardly there: MatUi's neutral pill, muted text on surface-3. */
+html[data-theme] :is(.admin--matui, .login-matui) .badge-off { background: var(--mat-surface-3); color: var(--mat-text-muted); border-color: transparent; }
 
 /* Fields = .mat-field / .mat-label / .mat-input. Not the fields inside a MatUi picker's panel (its search box): this rule outweighs MatUi's own
    (0,6,2), and its padding put the magnifier on the placeholder. */
@@ -263,11 +267,13 @@ html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) input
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) select,
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea,
 :is(.admin--matui, .login-matui) .list-search {
-  min-height: var(--mat-input-height, var(--mat-control-h)); height: auto; padding: 6px var(--mat-input-pad-x, var(--mat-space-3));
+  min-height: var(--mat-input-height, var(--mat-control-h)); height: auto; padding: 0 var(--mat-input-pad-x, var(--mat-space-3));
   border: 1px solid var(--mat-border-strong); border-radius: var(--mat-input-radius, var(--mat-radius));
   background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-md);
 }
-html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea { padding-top: var(--mat-space-2); line-height: var(--mat-lh); }
+/* The padding 0 above lets the height floor decide: a field is exactly as tall as the button next to it (6 px top and bottom made it
+   35 px against the button's 34). A text area has rows, so it keeps room above and below its text. */
+html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) textarea { padding: var(--mat-space-2) var(--mat-input-pad-x, var(--mat-space-3)); line-height: var(--mat-lh); }
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) .mat-input:not(.mat-picker__panel *):focus,
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not(.mat-picker__panel *):focus,
 html[data-theme] :is(.admin--matui, .login-matui) :is(.form-field, .field) select:focus,
@@ -416,8 +422,100 @@ html[data-theme] .admin--matui .admin-content:has(.live-editor) > .alert-error {
 #maint-seen .mat-dialog__title { display: flex; align-items: center; gap: 8px; }
 #maint-seen .maint-seen__list { margin: 0 0 var(--mat-space-3); padding-left: 1.2em; }
 #maint-seen .maint-seen__list li + li { margin-top: 4px; }
-#maint-seen .maint-seen__now { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--mat-radius-md, 8px); font-weight: 600; }
+#maint-seen .maint-seen__now { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: var(--mat-radius); font-weight: 600; }
 #maint-seen .maint-seen__now.is-on { background: var(--warn-bg); color: var(--warn-fg); }
 #maint-seen .maint-seen__now.is-off { background: var(--ok-bg); color: var(--ok-fg); }
-#maint-seen .maint-seen__note { margin-top: var(--mat-space-3); padding: 10px 12px; border: 1px solid var(--mat-border); border-radius: var(--mat-radius-md, 8px); background: var(--mat-surface-2); }
+#maint-seen .maint-seen__note { margin-top: var(--mat-space-3); padding: 10px 12px; border: 1px solid var(--mat-border); border-radius: var(--mat-radius); background: var(--mat-surface-2); }
 #maint-seen .maint-seen__note p { margin: 4px 0 0; white-space: pre-line; }
+
+/* ---- 3f. One scale for every control (UI pass 2026-11-27) ------------------------------------------
+   "Teilweise eckige Buttons, teilweise abgerundet": the admin's own small controls had sizes and corners of their own.
+   The rule since: every control — a button of any size, a field, a picker, a segmented switch, an icon button — has MatUi's
+   --mat-radius; cards, dialogs and tables --mat-radius-lg; pills and chips are round. A field is as tall as the button beside it
+   (--mat-control-h, small --mat-control-h-sm); a button says its words in 14 px (small 13), never in capitals; a label above a group
+   is MatUi's group heading (sentence case, small, semi-bold, muted). Add nothing here with a size or a corner of its own. */
+/* MatUi's own small button took --mat-radius-sm (4 px) beside the admin's 6 px ones: one radius for every size. */
+:root { --mat-btn-radius: var(--mat-radius); }
+
+/* Labels above a group of things were small capitals with letter spacing; MatUi writes them in sentence case. (The assistant's
+   .ai-* labels are its own page's and stay as they are.) */
+:is(.admin--matui, .login-matui) :is(.admin-nav-label, .form-section, .le-section-label, .list-item-head .li-title, .med-side-label, .bpick-grouphead,
+  .ui-subnav-label, .ui-cols-side .kv-label, .lp-pop-group, .asset-table th, .tpl-file-badge) { text-transform: none; letter-spacing: 0; }
+:is(.admin--matui, .login-matui) :is(.admin-nav-label, .form-section, .le-section-label, .list-item-head .li-title, .med-side-label, .bpick-grouphead, .ui-subnav-label,
+  .lp-pop-group, .asset-table th) { font-size: var(--mat-fs-sm); font-weight: 600; color: var(--mat-text-muted); opacity: 1; }
+/* A section heading of a form (template designer "Farben", "Typografie") heads part of the card: the text colour, a step bigger. */
+:is(.admin--matui, .login-matui) :is(h3, div).form-section { font-size: var(--mat-fs-md); color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .tpl-file-badge { font-size: var(--mat-fs-xs); font-weight: 600; }
+
+/* The list's view switch (list/tiles: media, instances, store, the editor's devices) = MatUi's segmented control (.mat-seg): a
+   track, the chosen one lifted on the surface in the accent's text colour. It was a square box with a white-on-accent block. */
+:is(.admin--matui, .login-matui) .view-toggle { display: inline-flex; padding: 3px; gap: 2px; border: 0; border-radius: var(--mat-radius); background: var(--mat-surface-3); overflow: visible; }
+:is(.admin--matui, .login-matui) .vt-btn { width: calc(var(--mat-control-h) - 6px); height: calc(var(--mat-control-h) - 6px); border: 0; border-radius: calc(var(--mat-radius) - 3px);
+  background: transparent; color: var(--mat-text-muted); transition: background var(--mat-dur-fast) var(--mat-ease), color var(--mat-dur-fast) var(--mat-ease); }
+:is(.admin--matui, .login-matui) .vt-btn + .vt-btn { border-left: 0; }
+:is(.admin--matui, .login-matui) .vt-btn:hover { color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .vt-btn.active { background: var(--mat-surface); color: var(--mat-accent-text); box-shadow: var(--mat-shadow-1); }
+:is(.admin--matui, .login-matui) .vt-btn:focus-visible { outline: none; box-shadow: var(--mat-focus-ring); }
+/* The period and level filters (Statistik, Protokolle: site.css's gallery pills) — the same segmented control; it wraps when long. */
+:is(.admin--matui, .login-matui) .gallery-filter { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: var(--mat-radius); background: var(--mat-surface-3); }
+/* in a page head the head's own margin is the distance (site.css's 24 px for the gallery came on top of it) */
+:is(.admin--matui, .login-matui) .page-head .gallery-filter { margin-bottom: 0; }
+html[data-theme] :is(.admin--matui, .login-matui) .gallery-filter .gfilter { display: inline-flex; align-items: center; min-height: calc(var(--mat-control-h) - 6px); padding: 0 var(--mat-space-3);
+  border: 0; border-radius: calc(var(--mat-radius) - 3px); background: transparent; color: var(--mat-text-muted); font-size: var(--mat-fs-sm); font-weight: 600; text-decoration: none; }
+html[data-theme] :is(.admin--matui, .login-matui) .gallery-filter .gfilter:hover { color: var(--mat-text); }
+html[data-theme] :is(.admin--matui, .login-matui) .gallery-filter .gfilter.active { background: var(--mat-surface); color: var(--mat-accent-text); box-shadow: var(--mat-shadow-1); }
+/* The pager's numbers are buttons of the small size. */
+:is(.admin--matui, .login-matui) .pager-btn { min-width: var(--mat-control-h-sm); height: var(--mat-control-h-sm); border-color: var(--mat-border-strong); border-radius: var(--mat-radius);
+  background: var(--mat-surface); color: var(--mat-text); font-size: var(--mat-fs-sm); font-weight: 600; }
+:is(.admin--matui, .login-matui) .pager-btn:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); }
+:is(.admin--matui, .login-matui) .pager-btn.active { background: var(--mat-accent); border-color: var(--mat-accent); color: var(--mat-on-accent); }
+
+/* The search of a list toolbar had the light hairline (admin.css drops the "heavy" border inside the framed bar); every other field
+   — and the filter picker right beside it — has the strong one. */
+html[data-theme] :is(.admin--matui, .login-matui) [data-list] .page-head .list-toolbar .list-search { border-color: var(--mat-border-strong); }
+
+/* Icon-only helpers (field rows, dialogs): a ghost icon button of the small size — a surface on hover, the radius of every
+   control — instead of a bare glyph or a 30 px box of their own. */
+:is(.admin--matui, .login-matui) .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--mat-control-h-sm); height: var(--mat-control-h-sm);
+  border-color: var(--mat-border-strong); border-radius: var(--mat-radius); background: var(--mat-surface); color: var(--mat-text); }
+:is(.admin--matui, .login-matui) .icon-btn:hover { background: var(--mat-surface-3); border-color: var(--mat-border-strong); }
+:is(.admin--matui, .login-matui) :is(.modal-close, .cm-modal-close, .optcolor .optcolor-clear) { display: inline-grid; place-items: center; width: var(--mat-control-h-sm); height: var(--mat-control-h-sm);
+  padding: 0; border: 0; border-radius: var(--mat-radius); background: transparent; color: var(--mat-text-muted); }
+:is(.admin--matui, .login-matui) :is(.modal-close, .cm-modal-close, .optcolor .optcolor-clear):hover { background: var(--mat-surface-3); color: var(--mat-text); }
+
+/* Chips. A tag in the picker = MatUi's chip (soft accent, round, its × a small round button); the small read-only tags of a list
+   (roles, the media's tags, "used on") = a pill; "+ add" = an outlined round icon button, not a dashed ring. */
+:is(.admin--matui, .login-matui) .tag-chip-item { min-height: 28px; padding: 0 4px 0 var(--mat-space-3); background: var(--mat-accent-soft-strong); color: var(--mat-accent-text); font-size: var(--mat-fs-sm); font-weight: 600; }
+:is(.admin--matui, .login-matui) .tag-x { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 50%; color: inherit; opacity: 1; }
+:is(.admin--matui, .login-matui) .tag-x:hover { background: var(--mat-accent-soft-strong); }
+:is(.admin--matui, .login-matui) .tag-entry { min-height: 28px; padding: 0 var(--mat-space-3); border-color: var(--mat-border-strong); font-size: var(--mat-fs-sm); }
+:is(.admin--matui, .login-matui) .tag-entry:focus { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); }
+:is(.admin--matui, .login-matui) .mini-chip { display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--mat-space-2); border-radius: var(--mat-radius-pill);
+  background: var(--mat-surface-3); color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 600; line-height: 1.2; vertical-align: middle; }
+:is(.admin--matui, .login-matui) .mini-chip-add { background: var(--mat-surface); border-color: var(--mat-border-strong); color: var(--mat-accent-text); }
+:is(.admin--matui, .login-matui) .mini-chip-add:hover { background: var(--mat-accent-soft); border-color: var(--mat-accent); color: var(--mat-accent-text); }
+:is(.admin--matui, .login-matui) .tag-add-chip { width: 28px; height: 28px; border: 1px solid var(--mat-border-strong); background: var(--mat-surface); color: var(--mat-text-muted); font-size: 16px; }
+:is(.admin--matui, .login-matui) .tag-add-chip:hover { border-color: var(--mat-accent); background: var(--mat-accent-soft); color: var(--mat-accent-text); }
+/* The placeholder chips over a code or mail field ({{name}} …): small secondary buttons in the mono face. They were styled only in
+   the cloud's own stylesheet, so the CMS's mail templates showed the browser's grey buttons. */
+:is(.admin--matui, .login-matui) .token-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 0 var(--mat-space-2); border: 1px solid var(--mat-border-strong); border-radius: var(--mat-radius);
+  background: var(--mat-surface); color: var(--mat-text); font-family: var(--mat-mono); font-size: var(--mat-fs-xs); cursor: pointer; }
+:is(.admin--matui, .login-matui) .token-chip:hover { background: var(--mat-accent-soft); border-color: var(--mat-accent); color: var(--mat-accent-text); }
+
+/* Ticks and choices: MatUi's 18 px box (.mat-check); the browser's 13 px one stood small beside every 14 px label (admin.css's
+   ".check input { width: auto }" kept it there, hence the weight). A MatUi switch hides its input, so the size does not show. */
+:is(.admin--matui, .login-matui) input:is([type=checkbox], [type=radio]) {
+  width: var(--mat-check-size, 18px); height: var(--mat-check-size, 18px); flex: none; accent-color: var(--mat-accent); vertical-align: middle; }
+
+/* A colour field (template designer, optional colour) is ONE field: the swatch and the hex inside a box of a field's height and corners
+   (it was a 52 px box; admin-fields.js no longer puts MatUi's colour picker into it, which drew a second frame). */
+html[data-theme] :is(.admin--matui, .login-matui) :is(.color-field, .optcolor) { min-height: var(--mat-control-h); padding: 0 4px 0 var(--mat-space-3); gap: var(--mat-space-2);
+  border: 1px solid var(--mat-border-strong); border-radius: var(--mat-radius); background: var(--mat-surface); }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.color-field, .optcolor):focus-within { border-color: var(--mat-accent); box-shadow: var(--mat-focus-ring); }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.color-field input[type=color], .optcolor .optcolor-pick) { width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 0 !important;
+  border-radius: var(--mat-radius-xs); border: 1px solid var(--mat-border-strong) !important; }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.color-field .hex, .optcolor .optcolor-hex) { min-height: calc(var(--mat-control-h) - 2px); font-family: var(--mat-mono); font-size: var(--mat-fs-md); color: var(--mat-text); }
+html[data-theme] :is(.admin--matui, .login-matui) :is(.color-field .hex, .optcolor .optcolor-hex):focus { box-shadow: none; }
+
+/* A row of figures is followed by the next card at the distance between cards (it was 8 px, cards 20). */
+:is(.admin--matui, .login-matui) .stat-grid { margin-bottom: var(--mat-space-5); }

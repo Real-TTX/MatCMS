@@ -10,8 +10,10 @@
 <p class="help">Gruppen für den geschützten Bereich (z. B. „Familie", „Trauzeugen"). Eine Seite kann eine Rolle verlangen; Mitglieder mit dieser Rolle sehen sie.</p>
 
 <div class="card">
-    <form method="post" asp-page-handler="Add" class="form-row" style="align-items:flex-end;gap:12px;">
-        <div class="form-field" style="flex:1;">
+    @* A field and its button in one row, bottoms aligned (the two-column .form-row stretched the button over half the card and
+       the field's margin put it below the input). *@
+    <form method="post" asp-page-handler="Add" class="ui-inline" style="align-items:flex-end;flex-wrap:nowrap;">
+        <div class="form-field" style="flex:0 1 760px;min-width:0;margin-bottom:0;">
             <label for="name">Neue Rolle</label>
             <input id="name" name="name" placeholder="z. B. Familie" required />
         </div>

@@ -72,11 +72,11 @@
             }
             <tr class="notify-add">
                 <td colspan="@(events.Length + 1)">
-                    <input type="email" name="newEmail" placeholder="@T["notify.addPlaceholder"]" aria-label="@T["notify.addPlaceholder"]" style="max-width:340px;" />
+                    <input type="email" name="newEmail" class="mat-input" placeholder="@T["notify.addPlaceholder"]" aria-label="@T["notify.addPlaceholder"]" style="max-width:340px;" />
                     <span class="help" style="display:inline;">@T["notify.addHint"]</span>
                 </td>
                 <td class="notify-cell">
-                    <button type="submit" class="btn btn-sm" title="@T["notify.add"]" aria-label="@T["notify.add"]">+</button>
+                    <button type="submit" class="btn btn-icon" title="@T["notify.add"]" aria-label="@T["notify.add"]"><i class="ti ti-plus" aria-hidden="true"></i></button>
                 </td>
             </tr>
         </tbody>

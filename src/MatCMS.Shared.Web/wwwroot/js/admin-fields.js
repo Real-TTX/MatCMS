@@ -17,7 +17,9 @@
     var M = window.MatUi;
     if (!M || !M.refresh) return;
     var doc = document;
-    var SKIP = "[data-native], .mat-picker, .mat-datetime, .mat-stepper, .mat-otp, .mat-calendar, .mat-slider, .CodeMirror, .lp-pop, [data-ui-lookup]";
+    // .color-field / .optcolor: a swatch and its hex text are ONE field already (the page keeps them in step); a colour picker in it
+    // drew a second frame inside the box.
+    var SKIP = "[data-native], .mat-picker, .mat-datetime, .mat-stepper, .mat-otp, .mat-calendar, .mat-slider, .CodeMirror, .lp-pop, [data-ui-lookup], .color-field, .optcolor";
 
     function skipped(el) {
         if (el.hasAttribute("data-native") || el.__matDone) return true;
@@ -34,9 +36,12 @@
         return w;
     }
 
-    // A small field where the page made a small one (toolbars, rows of a table, .btn-sm neighbours): MatUi's small size.
+    // A small field only where its neighbours are small: a row of a table, or beside a .btn-sm. A list's toolbar and a page head
+    // carry the normal search field and normal buttons — a small picker there made a bar of 32, 34 and 35 px controls.
     function size(el) {
-        return el.closest("td, .list-toolbar, .page-head, .toolbar, .ui-inline") ? " mat-picker--sm" : "";
+        if (el.closest("td")) return " mat-picker--sm";
+        var p = el.closest(".field, .form-field") || el;
+        return p.parentElement && p.parentElement.querySelector(":scope > .btn-sm, :scope > button.btn-sm") ? " mat-picker--sm" : "";
     }
 
     function resync(w) { if (w && w.parentNode) M.refresh(w.parentNode); }

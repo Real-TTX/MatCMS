@@ -12,7 +12,8 @@ das eine **interne** Operation desselben Plugins nennt (`Internal: true` — nur
 durch die Bereinigung, die das Plugin ohnehin benutzt.
 
 Ein Plugin **ohne eigenen Inhalt** (nur Einstellungen oder die Anzeige von etwas, das anderswo liegt) bekommt keine
-Schein-Operationen, sondern steht hier mit dem Grund.
+Schein-Operationen, sondern steht hier mit dem Grund (Spalte „Operationen“ = `keine`). `PluginOperationsRuleTests` schlägt fehl
+für ein Plugin, das weder Operationen beschreibt noch hier mit `keine` und Grund steht. Regel und Namen: `docs/plugin-system-v2.md` §3.2a.
 
 Antwortform: `{"status": "applied"|"skipped-exists"|"failed", "message": "…", "data"?: …, "undo"?: {"name": "<Operation>", "args": {…}}}`.
 Angesprochen wird eine Operation als `{Plugin-Key}.{Name}` (`leserstimmen.review.list`).

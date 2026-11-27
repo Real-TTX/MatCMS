@@ -23,7 +23,7 @@ public class PluginOperationsRuleTests
             .Where(f => f.EndsWith(".cs", StringComparison.Ordinal) || f.EndsWith(".csx", StringComparison.Ordinal))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"));
 
-    /// <summary>The plugins listed as having no operations: rows <c>| key | … | reason |</c> whose last cell says why.</summary>
+    /// <summary>The plugins listed as having no operations: rows <c>| key | keine | reason |</c> whose last cell says why.</summary>
     private static Dictionary<string, string> Exemptions(string root)
     {
         var file = Path.Combine(root, "OPERATIONS.md");
@@ -32,7 +32,7 @@ public class PluginOperationsRuleTests
         foreach (var line in File.ReadAllLines(file))
         {
             var cells = line.Trim().Trim('|').Split('|').Select(c => c.Trim().Trim('`').Trim()).ToList();
-            if (cells.Count < 2 || cells[0].Length == 0 || cells[0].StartsWith('-')) continue;
+            if (cells.Count < 3 || cells[0].Length == 0 || cells[0].StartsWith('-') || cells[1] != "keine") continue;
             var reason = cells[^1];
             if (reason.Length > 3 && reason is not ("—" or "-")) result[cells[0]] = reason;
         }

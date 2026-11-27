@@ -6,6 +6,15 @@ services:
       - 9100:8080
     environment:
       - MatCmsCloud__Docker__Endpoint=unix:///var/run/docker.sock
+      # The platform contract of the Mat apps (MatOS sets these; none is required, see README "MatOS"):
+      # - MAT_API_KEY=                     # the key of /api/*
+      # - MATIDENTITY_AUTHORITY=           # https://id.example.com: sign-in through MatIdentity (/login?local=1 stays)
+      # - MATIDENTITY_CLIENT_ID=matcmscloud
+      # - MATIDENTITY_CLIENT_SECRET=
+      # - MATIDENTITY_INTERNAL_URL=        # http://matidentity:2300 inside Docker
+      # - MATSMTP_HOST= / MATSMTP_PORT= / MATSMTP_USERNAME= / MATSMTP_PASSWORD= / MATSMTP_FROM= / MATSMTP_TLS=   # mail through MatSMTP
+      # - MAT_FRAME_ANCESTORS=             # origins that may frame the cloud
+      # - MATCMSCLOUD_ADMIN_PASSWORD=      # the password of "admin" in an empty database (else admin)
     volumes:
       - matcms-cloud-data:/app/appdata
       # Mounting the socket is all that is needed. The image's entrypoint detects it and grants

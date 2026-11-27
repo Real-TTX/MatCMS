@@ -38,6 +38,9 @@ When extending it, copy the sibling repo's patterns rather than inventing new on
 - `Services/CloudService.cs` — settings (token stored DataProtection-encrypted under `cloud.*` keys),
   `SendHeartbeatAsync`, `DisconnectAsync`, plus `CloudState` (singleton, what the admin UI reads) and
   `CloudConnectionService` (60 s worker; re-reads settings each cycle so connect/disconnect is live).
+- `Services/CloudBinding.cs` — the binding `cms.cloud` a broker (MatOS) made: `MAT_CMS_CLOUD_URL`, `_INTERNAL_URL`, `_KEY`.
+  `CloudService.EnsureBindingAsync` (before every heartbeat) enrols with the key at `/api/provides/cms.cloud/register` while the
+  site is not linked to that cloud, marks the link in `cloud.binding`, and forgets a bound link the cloud answers 401 for.
 - `Services/ContainerIdentity.cs` — reads the instance's own container id from `/proc/self/cgroup`
   and `/proc/self/mountinfo` (64-hex), falling back to the hostname **only when it looks like a
   12-hex short id** — otherwise a real host name like `web-01` would be reported as a container id.
@@ -50,6 +53,26 @@ When extending it, copy the sibling repo's patterns rather than inventing new on
 - UI: a **Cloud tab** on *Admin → Einstellungen* (`Pages/Admin/Settings/Index.cshtml` +
   `OnPostCloudConnect` (join code) / `CloudManual` / `CloudSync` / `CloudTest` / `CloudDisconnect`).
   Connecting sends a heartbeat immediately so the operator gets a verdict instead of waiting a minute.
+
+### MatOS and the platform contract (`Platform/`, `MatPlatform/`)
+
+The cloud is an app of MatDesign's platform contract (`docs/PLATFORM.md`, contract 2) so that MatOS installs and connects it without
+code that knows it. `MatPlatform/` is a **copy** of MatDesign's `src/MatPlatform` (`node tools/matplatform-copy.js` there; never edit it
+here). Every variable is optional: without them the cloud is exactly the app described below.
+
+- `Platform/CloudPlatform.cs` — the definition of `/api` (id `matcmscloud`, roles `admin`/`operator`, a few tiles, links), the
+  values of `/api/state` and `/api/health`, and what it provides: **`cms.cloud`** (a key capability; MatPlatform's generic key handler
+  keeps the keys in `appdata/matplatform/bindings.json`, hashes only).
+- `Platform/BindingRegistration.cs` — `POST /api/provides/cms.cloud/register`: a site bound by a broker enrols with the key as bearer
+  token (MatPlatform's `MatBindingAccess`) into the **default** profile (`InstanceService.RegisterBoundAsync`); body and answer are those of
+  `/api/instances/register`. The instance side is `../MatCMS/Services/CloudBinding.cs` + `CloudService.EnsureBindingAsync`.
+- `Platform/CloudIdentityUsers.cs` + `Services/IdentityAccounts.cs` — the sign-in through MatIdentity: by `sub` (`User.ExternalSubject`);
+  an account with the same address only after its own password and second factor (`LoginModel.TakeLinkAsync`, also from `Login2fa`);
+  else a new account (MatIdentity's `role`, else Admin for the first person through MatIdentity, Operator after). The cookie keeps
+  `mat_sub`/`mat_sid`/`mat_id_token`; `AuthService.ValidatePrincipalAsync` ends it after a back-channel logout (`sid` in memory,
+  `User.IdentitySignedOutAt` for `sub`). The 2FA policy does not apply to such a session (MatIdentity has its own second step).
+- `EmailService` — with `MATSMTP_*` every mail goes through MatSMTP (`MatSmtpSettings`), the SMTP tab shows it as fixed.
+- `DbSeeder` — `MATCMSCLOUD_ADMIN_PASSWORD` is the password of `admin` in an empty database.
 
 ### Schema changes: migrations, not a wipe
 

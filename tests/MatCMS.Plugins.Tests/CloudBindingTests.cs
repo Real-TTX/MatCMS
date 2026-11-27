@@ -39,3 +39,18 @@ public sealed class CloudBindingTests
         Assert.Equal("https://cloud.example.org", only.ServerUrl);
     }
 }
+
+/// <summary>The address a site reports to its cloud: MAT_PUBLIC_URL of a broker when nothing is configured, only a real http(s) address.</summary>
+public sealed class CloudPublicUrlTests
+{
+    private static IConfiguration Config(string? url) => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["MAT_PUBLIC_URL"] = url }).Build();
+
+    [Theory]
+    [InlineData("https://site.example.org/", "https://site.example.org")]
+    [InlineData("http://192.168.1.20:9101", "http://192.168.1.20:9101")]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData("site.example.org", null)]
+    [InlineData("ftp://site.example.org", null)]
+    public void Only_a_real_address_counts(string? value, string? expected) => Assert.Equal(expected, CloudService.PublicUrlOf(Config(value)));
+}

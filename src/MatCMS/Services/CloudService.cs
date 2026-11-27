@@ -687,6 +687,13 @@ public class CloudService
         return res.IsSuccessStatusCode ? await res.Content.ReadAsByteArrayAsync(ct) : null;
     }
 
+    /// <summary>MAT_PUBLIC_URL, the public address a broker (MatOS) set for this site, or null.</summary>
+    public static string? PublicUrlOf(IConfiguration configuration)
+    {
+        var url = configuration["MAT_PUBLIC_URL"]?.Trim().TrimEnd('/');
+        return Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.Scheme == "http" || u.Scheme == "https") ? url : null;
+    }
+
     private async Task<HeartbeatRequest> BuildBeatAsync(CancellationToken ct)
     {
         // The public URL has no fallback outside a request (the heartbeat runs on a timer), so an
@@ -702,9 +709,11 @@ public class CloudService
             // Via SiteContext, not the raw setting: an unset site name has a sensible fallback there,
             // whereas the raw value is empty and the cloud would list the site as "Neue Instanz".
             SiteName = _site.SiteName,
-            // Canonical URL wins; otherwise report where the site was last actually reached, so the
-            // cloud has something to link to and preview even on a site nobody configured a URL on.
-            Url = string.IsNullOrWhiteSpace(canonical) ? _state.ObservedBaseUrl : canonical,
+            // Canonical URL wins; then the address a broker such as MatOS gave the site (MAT_PUBLIC_URL, only ever a real address: its
+            // route); otherwise where the site was last actually reached, so the cloud has something to link to and preview even on a
+            // site nobody configured a URL on.
+            Url = !string.IsNullOrWhiteSpace(canonical) ? canonical
+                : PublicUrlOf(_services.GetRequiredService<IConfiguration>()) ?? _state.ObservedBaseUrl,
             HostName = Environment.MachineName,
             ContainerId = ContainerIdentity.Current,
             // We cannot read our own image from inside the container; the operator can surface it

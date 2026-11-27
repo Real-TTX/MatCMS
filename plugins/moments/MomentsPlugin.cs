@@ -23,6 +23,7 @@ public sealed class MomentsPlugin : IPlugin
         MomentsPublic.Configure(b);
         MomentsAdmin.Configure(b);
         MomentsMenu.Configure(b);
+        MomentsOps.Configure(b);
 
         // name, description, field labels and option texts are keys of the string tables (the block editor looks them up in the admin's language)
         b.Block(new BlockSpec(AccessBlock, "moments.block.name", "moments.block.description")

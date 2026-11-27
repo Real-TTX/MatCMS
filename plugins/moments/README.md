@@ -59,6 +59,30 @@ Paket: `./pack-native.ps1 -Path ./moments` → `dist/moments-<version>.zip`. Lä
   die Schlüssel selbst. Die Skripte (Hochladen, Herz, Nachladen, Zugangskarten) bekommen ihre Wörter vom Server (`data-`-Attribute).
   Was die Gastgeber selbst schreiben (Überschrift, Begrüßung, Anmeldetext, Menüpunkt) bleibt ihr Inhalt; die Vorgaben dafür sind deutsch.
 
+## Operationen (KI/MCP)
+
+Seit 1.9 beschreibt das Plugin, was es kann, als Plugin-Aktionen (`MomentsOps.cs`) – für den KI-Assistenten der Website, das MCP der
+Cloud und den MCP-Server der Website. Aufgerufen werden sie als `moments.<name>`; jede schreibende Aktion antwortet mit einem
+Rückgängig (eine interne Aktion, die nur der Host ausführt).
+
+| Aktion | schreibt | personenbezogen |
+| --- | --- | --- |
+| `album.list`, `album.read` | nein | nein |
+| `album.create`, `album.update` (umbenennen, Gäste-Album), `album.delete` (Fotos bleiben, ohne Album) | ja | nein |
+| `guest.list`, `guest.read` | nein | ja |
+| `guest.create`, `guest.update` (`active: false` = gesperrt) | ja | ja |
+| `photo.list`, `photo.read` | nein | ja |
+| `photo.update` (freigeben, ausblenden, Highlight, Album, Bildunterschrift) | ja | ja |
+
+Intern (nur als Rückgängig): `album.remove`, `album.restore`, `album.recreate`, `guest.remove`, `guest.restore`, `photo.restore`.
+
+- **Zugangscode, Benutzername und Passwort verlassen das Plugin nie** – keine Antwort enthält sie (nur `has_login`/`has_password`),
+  und keine Aktion setzt sie. Den Zugang geben die Gastgeber weiter (Zugangskarte im Admin: `admin_url`, `cards_url`).
+- Nichts wird endgültig gelöscht: ein Haushalt wird gesperrt, ein Foto ausgeblendet; ein gelöschtes Album kommt per Rückgängig mit
+  seinen Fotos wieder. Fotos und Haushalte löschen nur die Gastgeber im Admin.
+- Haushalte und Fotos sind personenbezogen: der KI-Assistent bekommt sie nicht (seine Antworten gehen an einen fremden Anbieter), die
+  Cloud nur mit dem passenden Recht. Antworten bleiben deutsch. Tests: `MomentsOpsTests`.
+
 ## Wie es gebaut ist (und warum)
 
 - **Ein Haushalt = ein Konto der Website** (`SiteMember`), angelegt beim ersten Anmelden mit `InviteAsync` an eine Adresse

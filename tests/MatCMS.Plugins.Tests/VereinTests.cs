@@ -1026,7 +1026,7 @@ public class VereinTests : IClassFixture<VereinApp>
         }))!;
         Assert.Equal("applied", made["status"]!.GetValue<string>());
         var newId = made["data"]!["id"]!.GetValue<long>();
-        Assert.Equal("event.remove", made["undo"]!["name"]!.GetValue<string>());
+        Assert.Equal("verein.event.remove", made["undo"]!["name"]!.GetValue<string>());   // the host names the undo with its plugin
         var read = (System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.read", new System.Text.Json.Nodes.JsonObject { ["id"] = newId }))!;
         Assert.Equal("", read["data"]!["link"]!.GetValue<string>());                         // no script address gets in
         Assert.Equal("skipped-exists", ((System.Text.Json.Nodes.JsonObject)(await ops.RunOperationAsync(scope.ServiceProvider, "event.create", new System.Text.Json.Nodes.JsonObject { ["title"] = "Umzug per KI", ["starts"] = day + "T13:00" }))!)["status"]!.GetValue<string>());

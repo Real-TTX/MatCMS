@@ -1332,6 +1332,15 @@ the admin UI uses. There is no second restore path and no second backup format.
   dedupe → `skipped-exists`), so a re-offer after a lost report is idempotent.
   **This bumped `CloudProtocol.Version` 14 → 15 — cloud and instances must deploy together.**
 - **Shop tools ride the same channel** (`Mcp/ContentTools.cs`: `create_product`, `create_coupon`, `list_shop_orders`, `update_shop_order`, `set_product_variants`, `create_shop_attribute`, `set_product_attributes`). They enqueue PLUGIN operations (`product.create`, `order.list`, `order.update`, `variant.set` …) that the instance's shop plugin answers; an operation that READS answers with `data`, which the instance's `ContentOpApplier` returns as the report's `ResultJson` (so `get_content_op` shows it as `result`). Orders hold personal data, so even `list_shop_orders` needs the restore right (not read scope). No REST twin yet: like the other content ops these are MCP-only.
+- **Every plugin operation, generically** (`Mcp/PluginOperationTools.cs` `list_plugin_operations` / `run_plugin_operation`, REST
+  `GET /api/v1/instances/{id}/plugin-operations`, `POST …/plugin-operations/{name}` with the arguments object as the body, and
+  `GET …/content-ops/{opId}` — the first REST twin of `get_content_op`; all through `Services/PluginOperationService.cs`). The site reports its
+  catalogue on the heartbeat only when it changed (`HeartbeatRequest.PluginOperations`, `MatCMS.Shared/PluginOperationInfo.cs`); the cloud
+  keeps the last one (`Instance.PluginOperationsJson` + `PluginOperationsAt`, migration `AddInstancePluginOperations`) — the list answers at
+  once, a run is a content op whose kind is the QUALIFIED name (`shop.product.create`). Rules: only a listed name (internal undo helpers are
+  never listed), writes AND personal data (reads of orders included) need `CanRestore`, a core content-op kind is refused, a write is queued
+  as overwrite (so "Backup vor KI-Änderung" applies). A site that never reported a catalogue (older version) is told so — no protocol bump,
+  the field is additive. The hand-written shop tools above stay for the clients that use them.
 - **MCP reads + edits (Stage 2, Increment 2 — built).** Reading existing content does NOT parse a backup in
   the cloud (that would duplicate the content format the instance owns — the exact coupling the repo avoids).
   Instead **reads flow through the same content-op channel**: `list_pages` / `get_page` enqueue a `pages.list`
@@ -1339,7 +1348,7 @@ the admin UI uses. There is no second restore path and no second backup format.
   returns it in `ContentOpReport.ResultJson` (additive field), which the cloud stores on `ContentOp.ResultJson`
   (migration `AddContentOpResult`) and `get_content_op` hands back to the client. Editing: `update_page_blocks`
   enqueues a `page.updateBlocks` op (`Overwrite=true`, restore-gated) — the instance re-validates the new
-  blocks and REPLACES the page's top-level blocks. Reads/edits are therefore **asynchronous** (one heartbeat
+  blocks and edits the page (since protocol 19 a PATCH by block id — see "MCP/API safety rules" below). Reads/edits are therefore **asynchronous** (one heartbeat
   round-trip): the tools return an `opId`, the client polls `get_content_op`.
 - **MCP posts + safety (Stage 2, Increment 3 — built).** `create_post` enqueues a `post.create` op; the
   instance applies it add-only, and — because `Post.ContentHtml`/excerpt are AI-supplied HTML rendered raw —
@@ -1361,6 +1370,39 @@ the admin UI uses. There is no second restore path and no second backup format.
   `Admin → Aufräumen` page), so "unused" is judged with the full content model, never a parsed backup;
   `apply_cleanup` re-checks "still unused" before deleting and rides `BackupBeforeAiChange` for a pre-backup. See
   `docs/mcp-stage2-content-channel.md`.
+- **MCP/API safety rules (2026-11-27, from a review of the MCP surface)** — each one closed a real hole, keep them:
+  - **Profile reads are not "any key"**: the join code (an enrolment secret — with AutoApprove it registers an approved site
+    that receives the whole configuration) is shown only to `CanManageProfiles`; a key scoped to instances sees only their
+    profiles and, in them, only its instances (`ProfileOpsService.ListAsync/GetAsync/EffectiveAsync/RecommendedAsync(id, viewer)`,
+    `viewer == null` = the admin UI). REST and MCP pass the key.
+  - **`get_content_op` hands out a result only with the right its op needed**: without `CanRestore` only `pages.list`,
+    `page.read`, `cleanup.analyze` (`MatCMS.Shared/ContentOpRules.ResultNeedsOnlyReadScope`) — an `order.list` answer holds
+    customers' data and was readable by any in-scope key by its op id.
+  - **`set_setting` refuses `code.*`, `security.*`, `sso.*`, `smtp.*`, `mail.transport`, `members.selfRegistration`,
+    `site.canonicalUrl`, `site.behindHttpsProxy`, `site.domainRoutes`, `ContactRecipient`** (`ContentOpRules.IsRefusedSetting`, ONE
+    list for both sides; the cloud refuses early, `ContentOpApplier` refuses again — the site is the boundary). A model reading
+    untrusted page text must not plant a script, change who can sign in, or send mail (reset links point at the canonical
+    address) somewhere else; people set those in the site's admin, the profile rollout or a restore. The cloud's OWN address
+    push is its own op `site.address` (`InstanceService.EnqueueAddressAsync`: https origin only, two keys only; a site below
+    protocol 19 still gets the two `setting.set` ops). A generic operation tool must never let a client queue a core kind.
+  - **`update_page_blocks` is a PATCH by block id** (protocol 19, `CloudProtocol.BlockPatchSince`; refused for an older site,
+    which would still replace the page): `page.read` hands out each top-level block's `id`, `editable` text fields and
+    `children` count; a block sent with its id keeps every field it does not send (only validated text fields are written over
+    its data, under the field's own id in any casing; "" clears; an id may come as a string; a doubled id is reported) and its
+    children; a block without id is new; unnamed blocks stay unless `removeMissing` — a payload WITHOUT the key (an older cloud)
+    means the old replace, or every edit of such a cloud would double the page. The raw-HTML block is not in
+    `BlockGenerator.AllowedBlocks` any more (neither created nor edited — the assistant's rule). It used to replace the
+    page with what `BlockGenerator.ValidateBlocks` kept — every picture, link, list, nested block and everything after block 12
+    was lost on a read → edit round trip. `create_page`'s `showInNav` now adds a header menu entry (the menus are MenuItems only).
+  - **Who asked is written down**: `ContentOp.RequestedBy` (`mcp:<key name>`, in the instance log line), restores requested over
+    REST/MCP log `InstanceEventKind.RestoreRequested` with `api:`/`mcp:<key name>`, removals log the caller in the cloud's own log
+    (the instance's events go with its record). `McpContext.Actor` is the MCP spelling.
+  - **Connector keys belong to their client**: `ApiKey.OAuthClientId` is set when `/oauth/token` mints a key and the key's name
+    names the admin who approved it; revoking or deleting the client (Admin → ChatGPT-Connector) revokes its keys. Keys minted
+    before this carry only the client's name and are matched by that name (`Connector: {client} · `). The plugin bundle download (`…/plugins/{key}/download`) asks
+    `ProfileOpsService.MayReadAsync` too. The metadata no longer advertises
+    `none` as a token-endpoint auth method (it never worked). Migration `McpAuditAndConnectorKeys`.
+  Tests: `ProfileReadAccessTests` (cloud), `ContentOpChannelTests` (site).
 
 ## Backlog
 

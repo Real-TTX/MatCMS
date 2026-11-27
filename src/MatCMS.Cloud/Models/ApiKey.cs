@@ -32,8 +32,8 @@ public class ApiKey
     /// Whether this key may MANAGE PROFILES over the API (create/edit profiles and their payloads —
     /// settings, users, plugins, components, templates — and assign instances to a profile). Off by
     /// default: a profile change pushes configuration to every instance assigned to it, so it is as
-    /// consequential as a restore and must be granted on purpose. Reading profiles needs only a valid
-    /// key; writing needs this right. Instance↔profile assignment ALSO honours the key's instance scope.
+    /// consequential as a restore and must be granted on purpose. Reading profiles needs a valid key (the join code
+    /// only with this right, a scoped key only its instances' profiles); writing needs this right. Instance↔profile assignment ALSO honours the key's instance scope.
     /// </summary>
     public bool CanManageProfiles { get; set; }
 
@@ -63,6 +63,12 @@ public class ApiKey
     /// so a mis-created key is inert rather than accidentally global.</para>
     /// </summary>
     public bool AllInstances { get; set; }
+
+    /// <summary>The connector client (<see cref="OAuthClient"/>) whose sign-in minted this key, or null for a key made in the admin.
+    /// Revoking or deleting that client revokes its keys too: before, a connector key outlived its client for ever, so
+    /// "Connector widerrufen" did not take ChatGPT's access away. No foreign key on purpose — the key row (and its trail)
+    /// stays when the client is deleted.</summary>
+    public int? OAuthClientId { get; set; }
 
     public List<ApiKeyInstance> Instances { get; set; } = new();
 

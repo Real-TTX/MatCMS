@@ -126,6 +126,8 @@ public class InstanceTools
         var row = await store.FindAsync(instance.Id, backupId, ct: ct);
         if (row is null) throw new McpException("Backup nicht gefunden.");
 
+        // Logged first: RequestRestoreAsync saves the shared context, so the line and the mark are stored together.
+        instances.Log(instance, InstanceEventKind.RestoreRequested, $"Wiederherstellung von Backup {row.Id} angefordert von {me.Actor}.");
         await store.RequestRestoreAsync(row, ct);
         return new { ok = true, id = row.Id, message = "Wiederherstellung vorgemerkt — die Instanz spielt sie beim nächsten Kontakt ein." };
     }

@@ -30,6 +30,19 @@ Ein Diskussionsforum für eine MatCMS-Seite – die Grundfunktionen eines klassi
   (`--forum-accent` → `--accent` …). Datenschutz: Löschen eines Kontos lässt die Beiträge stehen, nimmt aber den Namen weg
   („Gelöschtes Mitglied“) und löscht Profil, Abos, Gelesen-Stände und Meldungen; der Export liefert Beiträge, Signatur und Abos.
 
+**Operationen (KI/MCP)** (1.5, `ForumOps.cs`): Was der Admin tut, als beschriebene Plugin-Operationen für den KI-Assistenten, die Cloud und MCP
+(Aufruf als `forum.<name>`). Jede schreibende antwortet mit einem `undo` auf eine interne Operation (`board.remove`, `board.restore`,
+`thread.restore`, `report.restore`, `member.restore`), alles läuft über `ForumStore` mit den Regeln der Admin-Formulare.
+
+- Foren: `board.list`, `board.read` (mit den neuesten Themen), `board.create`, `board.update` (Titel, Adresse, Beschreibung, Kategorie, Lese-/Schreibrecht,
+  Rolle, gesperrt, Reihenfolge), `board.delete` (nur ein LEERES Forum; abschalten = `locked` oder `read: "mods"`).
+- Themen: `thread.list` (je Forum, Suche, `limit`/`offset`), `thread.read` (mit Beiträgen als BBCode, seitenweise, höchstens 50), `thread.update`
+  (umbenennen, anheften, schließen, verschieben; keine Mail).
+- Personenbezogen (nie für den KI-Assistenten): `report.list`, `report.update` (erledigt/offen), `member.list`, `member.update` (sperren, entsperren,
+  Signatur entfernen).
+- Bewusst nicht: Themen/Beiträge schreiben (braucht ein Konto als Verfasser), Themen oder Beiträge löschen und ein Forum mit Themen löschen (nicht
+  rückgängig zu machen). Tests: `ForumOpsTests`.
+
 **Bauen und paketieren**: `./pack-native.ps1 -Path ./forum` → `dist/forum-<version>.zip`. Im Admin unter Plugins importieren;
 es läuft erst mit „Native Plugins erlauben“. Tests: `dotnet test tests/MatCMS.Plugins.Tests --filter Forum` (lädt die gebaute
 DLL in die ganze Anwendung).

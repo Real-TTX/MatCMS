@@ -41,6 +41,11 @@ Gespeichert wird getrennt: `SiteSettings` `plugin.leserstimmen.<sammlung>` (JSON
   der Block der Sprache der Seite (`/en/…`: Formular, Durchschnitt „4.8 out of 5“, Monate, Danke-Meldung). Die Anrede
   Sie/du gibt es nur im Deutschen. Was im Block eingetragen ist (Überschrift, Button-Text …), steht so da, wie es eingetragen
   ist; leer gelassen kommt der Standard in der Sprache der Seite. Die Benachrichtigungs-Mail ist in der Standardsprache der Seite.
+- **Plugin-Operationen** (seit 1.5, für KI-Assistent, Cloud und MCP; Regel in `../OPERATIONS.md`): `review.list` und
+  `review.read` (nur Veröffentlichtes, nie die E-Mail), `review.pending` (wartende mit Absenderdaten, PersonalData — nie
+  für den KI-Assistenten), `review.create` (wie „Von Hand hinzufügen“), `review.update` (auch Freigeben/Verbergen),
+  `review.delete`; jede Änderung lässt sich rückgängig machen (intern `review.remove`/`review.restore`). Zu lange Texte
+  werden abgelehnt statt gekürzt.
 - Konfiguration: `autoPublish=true` (ohne Freigabe).
 - Design: alle Farben aus den Template-Variablen (`--accent`, `--ink`, `--bg` …). Ein Template passt es
   über `--mls-*` an, **mit `body`-Präfix** (`body .mls{…}`), weil das Plugin-CSS im `<head>` später kommt.

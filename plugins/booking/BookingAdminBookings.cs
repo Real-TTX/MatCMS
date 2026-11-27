@@ -118,7 +118,8 @@ public static class BookingAdminBookings
 
     // ---- one booking ----------------------------------------------------------------------------------------------
 
-    private static async Task<string> SendAsync(IPluginContext ctx, BookingStore store, Booking b, string template, string? key, string? reason, CancellationToken ct)
+    /// <summary>Sends a guest mail of a booking (also used by the operations, so an AI's move mails exactly what the admin's button would).</summary>
+    internal static async Task<string> SendAsync(IPluginContext ctx, BookingStore store, Booking b, string template, string? key, string? reason, CancellationToken ct)
     {
         var unit = await store.UnitAsync(b.UnitId, ct);
         var house = unit is null ? null : await store.PropertyAsync(unit.PropertyId, ct);

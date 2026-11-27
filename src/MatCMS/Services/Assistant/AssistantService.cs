@@ -72,7 +72,7 @@ public sealed class AssistantService
             ["files"] = new JsonArray(attached.Select(f => (JsonNode)new JsonObject
             {
                 ["name"] = f.Name, ["kind"] = f.Kind, ["url"] = f.MediaUrl, ["modelFile"] = f.ModelFile,
-                ["chars"] = f.Text?.Length ?? 0, ["error"] = f.Error,
+                ["chars"] = f.Text?.Length ?? 0, ["error"] = f.Error, ["textFile"] = f.TextFile, ["lines"] = f.Lines,
             }).ToArray()),
         };
         _db.AiSteps.Add(new AiStep { ConversationId = conv.Id, Run = conv.Runs, Kind = "user", Text = message, DataJson = data.ToJsonString() });
@@ -90,8 +90,11 @@ public sealed class AssistantService
         {
             sb.Append("\n\n[Anhang: ").Append(f.Name);
             if (f.Error is not null) sb.Append(" – nicht verwendbar: ").Append(f.Error);
+            else if (f.Kind == "table") sb.Append(" – Tabelle mit ").Append(f.Lines).Append(" Zeilen")
+                .Append(f.Text?.EndsWith("[gekürzt]") == true ? $"; unten steht nur der Anfang, den Rest liest du mit read_attachment {{\"file\": \"{f.Name}\", \"from\": Zeile}}" : "");
             else if (f.Kind == "image") sb.Append(" – Bild").Append(f.MediaUrl is null ? "" : $", liegt in der Mediathek als {f.MediaUrl} (so auf einer Seite verwendbar)");
             else if (f.MediaUrl is not null) sb.Append(" – Dokument, in der Mediathek als ").Append(f.MediaUrl).Append(" (verlinkbar)");
+            if (f.Kind != "table" && f.Text?.EndsWith("[gekürzt]") == true) sb.Append($"; gekürzt – weiter mit read_attachment {{\"file\": \"{f.Name}\", \"from\": Zeile}}");
             sb.Append(']');
         }
         foreach (var f in files.Where(f => !string.IsNullOrWhiteSpace(f.Text)))

@@ -145,7 +145,7 @@ public static class HostingApi
                 return Results.Json(new { error = "Dieser Schlüssel darf keine Instanzen entfernen (fehlendes Restore-Recht)." }, statusCode: StatusCodes.Status403Forbidden);
             var inst = await instances.FindForKeyAsync(publicId, key!);
             if (inst is null) return NotFoundInstance();
-            var r = await removals.RemoveByModeAsync(inst, mode, ctx.RequestAborted);
+            var r = await removals.RemoveByModeAsync(inst, mode, ctx.RequestAborted, by: "api:" + key!.Name);
             if (!r.Ok) return Results.Json(new { ok = false, error = r.Message }, statusCode: StatusCodes.Status409Conflict);
             return r.Removed ? Results.Ok(new { ok = true, removed = true, message = r.Message })
                              : Results.Json(new { ok = true, removed = false, message = r.Message }, statusCode: StatusCodes.Status202Accepted);

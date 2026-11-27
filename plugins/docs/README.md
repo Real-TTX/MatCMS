@@ -18,6 +18,10 @@ Eine Dokumentation bzw. ein Wiki für eine MatCMS-Website. Referenziert nur `Mat
 - **API / Operationen** (zum Befüllen): `page.list/read/upsert/delete`, `version.list`; HTTP `GET|PUT /api/v1/docs/pages`, `GET|DELETE /api/v1/docs/pages/{id}`,
   `GET /api/v1/docs/versions` (Site-API-Schlüssel `docs:read`/`docs:write`). Eine Seite heißt nach ihrem Pfad (`erste-schritte/docker`) je Sprache/Version;
   `translationOf` = Pfad derselben Seite in der Standardsprache. Elternseiten zuerst schreiben.
+- **Operationen (KI/MCP)** (1.5): `docs.page.list/read/upsert/delete`, `docs.version.list` für den KI-Assistenten, das MCP der Cloud und den eigenen
+  MCP-Server der Website. Sie antworten in der Form jeder Operation (`status` applied|failed, `message`, `data` = die Antwort der API) – ein Fehler ist
+  „failed“ mit seinem Text, nie der Zahlen-Status der API. Jedes Schreiben trägt ein `undo`: eine neue Seite wird wieder entfernt (`page.remove`), eine
+  geänderte bekommt alle Felder zurück, eine gelöschte kommt mit ihren Unterseiten darunter wieder (`page.restore`); beide nur intern (der Host).
 
 ## Editor im Backoffice (1.3)
 - **Visuell | Markdown**: eine Markdown-Seite wird wahlweise visuell (WYSIWYG) oder als reines Markdown bearbeitet; der Schalter wandelt in beide

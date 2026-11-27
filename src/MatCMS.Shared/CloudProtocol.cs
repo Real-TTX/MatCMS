@@ -15,7 +15,12 @@ public static class CloudProtocol
     /// <summary>Contract version. Bump on <b>every</b> change to the payloads in this file: the cloud
     /// badges an instance reporting an older one as "veraltet", and both sides read this constant, so
     /// one edit covers both.</summary>
-    public const int Version = 18;
+    public const int Version = 19;
+
+    /// <summary>From this version on a site edits a page's blocks BY ID (page.updateBlocks keeps what it is not told to change,
+    /// page.read hands out ids). The cloud refuses update_page_blocks for an older site: it would still replace the whole
+    /// page with what the text validator lets through and lose pictures, links and nested blocks.</summary>
+    public const int BlockPatchSince = 19;
 
     /// <summary>Header carrying the instance's bearer token.</summary>
     public const string TokenHeader = "X-MatCMS-Instance-Token";
@@ -150,6 +155,11 @@ public sealed class HeartbeatRequest
     /// <see cref="StatKinds.WireTopPerKind"/> keys per kind. Sent only to a cloud that said it takes them
     /// (<see cref="HeartbeatResponse.StatsAccepted"/>), and throttled once caught up. Null = nothing this beat.</summary>
     public List<StatDayReport>? Stats { get; set; }
+
+    /// <summary>The operations the site's loaded plugins offer (<see cref="PluginOperationInfo"/>, internal ones left out), so the cloud's MCP can
+    /// list and run them generically. Sent on the first beat after a start and whenever the catalogue changed (a plugin switched on/off or
+    /// updated); null = unchanged since the last beat the cloud took. The cloud keeps the last one it got. An older site never sends it.</summary>
+    public List<PluginOperationInfo>? PluginOperations { get; set; }
 }
 
 /// <summary>One log entry as it travels on the heartbeat — a lean projection of the instance's own

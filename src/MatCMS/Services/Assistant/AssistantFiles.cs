@@ -18,7 +18,10 @@ namespace MatCMS.Services.Assistant;
 /// <param name="ModelFile">For a picture: the scaled-down copy the model looks at, relative to <c>ai-files</c>.</param>
 /// <param name="Text">For a document: the text read out of it (bounded), or null.</param>
 /// <param name="Error">Why it could not be used, or null.</param>
-public sealed record AttachedFile(string Name, string Kind, string? MediaUrl, string? ModelFile, string? Text, string? Error);
+/// <param name="TextFile">Where the WHOLE text is kept for <c>read_attachment</c> (relative to <c>ai-files</c>), or null. <see cref="Text"/> is what rides in
+/// the message — for a table only its beginning, so a 2000-row price list does not ride along on every call of the run.</param>
+/// <param name="Lines">How many lines the whole text has.</param>
+public sealed record AttachedFile(string Name, string Kind, string? MediaUrl, string? ModelFile, string? Text, string? Error, string? TextFile = null, int Lines = 0);
 
 /// <summary>
 /// Takes in what an editor attaches to a message. Pictures go into the media library — so the assistant can PUT them on a
@@ -34,9 +37,15 @@ public sealed class AssistantFiles
 
     public const int MaxFiles = 6;
     public const int MaxTextChars = 60_000;
+
+    /// <summary>How much of a TABLE (xlsx, csv, tsv) rides in the message; the rest is read with <c>read_attachment</c>.</summary>
+    public const int MaxInlineTableChars = 12_000;
+
+    /// <summary>The most text kept of one attachment for <c>read_attachment</c>.</summary>
+    public const int MaxStoredChars = 3_000_000;
     private const long MaxImageBytes = 15L * 1024 * 1024, MaxDocBytes = 25L * 1024 * 1024, MaxTextBytes = 3L * 1024 * 1024;
     private static readonly string[] ImageExt = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
-    private static readonly string[] TextExt = [".txt", ".md", ".markdown", ".csv", ".json", ".html", ".htm", ".xml"];
+    private static readonly string[] TextExt = [".txt", ".md", ".markdown", ".json", ".html", ".htm", ".xml"];
 
     public AssistantFiles(AppDbContext db, IWebHostEnvironment env)
     {
@@ -56,10 +65,13 @@ public sealed class AssistantFiles
             {
                 if (ImageExt.Contains(ext)) result.Add(await ImageAsync(conversationId, f, name, ext, ct));
                 else if (ext == ".svg") result.Add(await SvgAsync(f, name, ct));
-                else if (ext == ".pdf") result.Add(await DocumentAsync(f, name, ext, "pdf", ReadPdf, ct));
-                else if (ext == ".docx") result.Add(await DocumentAsync(f, name, ext, "document", ReadDocx, ct));
-                else if (TextExt.Contains(ext)) result.Add(await TextAsync(f, name, ct));
-                else result.Add(new(name, "text", null, null, null, "Dateityp wird nicht unterstützt (Bilder inkl. SVG, PDF, DOCX, TXT, MD, CSV, JSON, HTML)."));
+                else if (ext == ".pdf") result.Add(await DocumentAsync(conversationId, f, name, ext, "pdf", ReadPdf, ct));
+                else if (ext == ".docx") result.Add(await DocumentAsync(conversationId, f, name, ext, "document", ReadDocx, ct));
+                else if (ext == ".xlsx") result.Add(await TableAsync(conversationId, f, name, SpreadsheetText.ReadXlsx, ct));
+                else if (ext is ".csv" or ".tsv") result.Add(await TableAsync(conversationId, f, name, ReadDelimited, ct));
+                else if (ext is ".xls" or ".ods" or ".numbers") result.Add(new(name, "table", null, null, null, "Dieses Tabellenformat wird nicht gelesen – bitte als .xlsx oder .csv speichern."));
+                else if (TextExt.Contains(ext)) result.Add(await TextAsync(conversationId, f, name, ct));
+                else result.Add(new(name, "text", null, null, null, "Dateityp wird nicht unterstützt (Bilder inkl. SVG, PDF, DOCX, XLSX, CSV, TXT, MD, JSON, HTML)."));
             }
             catch (Exception ex)
             {
@@ -109,22 +121,117 @@ public sealed class AssistantFiles
     public Task<string> SaveSvgAsync(string cleanSvg, string name, CancellationToken ct) =>
         SaveToLibraryAsync(System.Text.Encoding.UTF8.GetBytes(cleanSvg), name.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ? name : name + ".svg", ".svg", "image/svg+xml", ct);
 
-    private async Task<AttachedFile> DocumentAsync(IFormFile f, string name, string ext, string kind, Func<byte[], string> read, CancellationToken ct)
+    private async Task<AttachedFile> DocumentAsync(int conversationId, IFormFile f, string name, string ext, string kind, Func<byte[], string> read, CancellationToken ct)
     {
         if (f.Length > MaxDocBytes) return new(name, kind, null, null, null, "Datei zu groß (höchstens 25 MB).");
         await using var buffer = new MemoryStream();
         await f.CopyToAsync(buffer, ct);
         var bytes = buffer.ToArray();
-        var text = Bound(read(bytes));
+        var full = Clean(read(bytes));
         var url = await SaveToLibraryAsync(bytes, name, ext, f.ContentType, ct);
-        return new(name, kind, url, null, text, text.Trim().Length == 0 ? "Kein Text gefunden (gescanntes Dokument?)." : null);
+        var (file, lines) = await KeepTextAsync(conversationId, full, ct);
+        return new(name, kind, url, null, Bound(full, MaxTextChars), full.Trim().Length == 0 ? "Kein Text gefunden (gescanntes Dokument?)." : null, file, lines);
     }
 
-    private static async Task<AttachedFile> TextAsync(IFormFile f, string name, CancellationToken ct)
+    private async Task<AttachedFile> TextAsync(int conversationId, IFormFile f, string name, CancellationToken ct)
     {
         if (f.Length > MaxTextBytes) return new(name, "text", null, null, null, "Datei zu groß (höchstens 3 MB).");
         using var reader = new StreamReader(f.OpenReadStream(), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-        return new(name, "text", null, null, Bound(await reader.ReadToEndAsync(ct)), null);
+        var full = Clean(await reader.ReadToEndAsync(ct));
+        var (file, lines) = await KeepTextAsync(conversationId, full, ct);
+        return new(name, "text", null, null, Bound(full, MaxTextChars), null, file, lines);
+    }
+
+    /// <summary>A table (xlsx, csv, tsv): read into "Zeile n: a | b | c" lines, NOT stored in the media library (a price list has no business
+    /// on the site), the whole text kept for <c>read_attachment</c> and only its beginning in the message.</summary>
+    private async Task<AttachedFile> TableAsync(int conversationId, IFormFile f, string name, Func<byte[], string> read, CancellationToken ct)
+    {
+        if (f.Length > MaxDocBytes) return new(name, "table", null, null, null, "Datei zu groß (höchstens 25 MB).");
+        await using var buffer = new MemoryStream();
+        await f.CopyToAsync(buffer, ct);
+        var full = Clean(read(buffer.ToArray()));
+        if (full.Trim().Length == 0) return new(name, "table", null, null, null, "Die Tabelle ist leer.");
+        var (file, lines) = await KeepTextAsync(conversationId, full, ct);
+        return new(name, "table", null, null, Bound(full, MaxInlineTableChars), null, file, lines);
+    }
+
+    /// <summary>A CSV or TSV as table lines. The separator is guessed from the first line (";" — what a German Excel writes —, tab, ","),
+    /// quoted cells may hold the separator, doubled quotes and line breaks.</summary>
+    public static string ReadDelimited(byte[] bytes)
+    {
+        var text = DecodeText(bytes);
+        var firstLine = text.Split('\n', 2)[0];
+        var sep = new[] { ';', '\t', ',' }.OrderByDescending(c => firstLine.Count(x => x == c)).First();
+        var sb = new StringBuilder();
+        var row = new List<string>();
+        var cell = new StringBuilder();
+        var quoted = false;
+        var number = 0;
+        void EndRow()
+        {
+            row.Add(cell.ToString());
+            cell.Clear();
+            number++;
+            if (row.Any(c => c.Trim().Length > 0))
+                sb.Append("Zeile ").Append(number).Append(": ").Append(string.Join(" | ", row.Select(c => c.Replace("|", "/").Replace('\n', ' ').Trim()))).Append('\n');
+            row.Clear();
+        }
+        for (var i = 0; i < text.Length && number < SpreadsheetText.MaxRows; i++)
+        {
+            var ch = text[i];
+            if (quoted)
+            {
+                if (ch == '"' && i + 1 < text.Length && text[i + 1] == '"') { cell.Append('"'); i++; }
+                else if (ch == '"') quoted = false;
+                else cell.Append(ch);
+            }
+            else if (ch == '"' && cell.ToString().Trim().Length == 0) { cell.Clear(); quoted = true; }
+            else if (ch == sep) { row.Add(cell.ToString()); cell.Clear(); }
+            else if (ch == '\n') EndRow();
+            else if (ch != '\r') cell.Append(ch);
+        }
+        if (cell.Length > 0 || row.Count > 0) EndRow();
+        return sb.ToString();
+    }
+
+    /// <summary>UTF-8 (with or without BOM), else Windows-1252 — what an older Excel writes a CSV in; a "Ã¤" in every umlaut otherwise.</summary>
+    private static string DecodeText(byte[] bytes)
+    {
+        try { return new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes).TrimStart('﻿'); }
+        catch (DecoderFallbackException) { return Encoding.Latin1.GetString(bytes); }
+    }
+
+    /// <summary>Keeps the whole text of an attachment for <c>read_attachment</c> (deleted with the conversation). Returns its path relative to
+    /// <c>ai-files</c> and its number of lines.</summary>
+    private async Task<(string? file, int lines)> KeepTextAsync(int conversationId, string text, CancellationToken ct)
+    {
+        if (text.Trim().Length == 0) return (null, 0);
+        var dir = Path.Combine(StoragePaths.AiFiles(_env), conversationId.ToString());
+        Directory.CreateDirectory(dir);
+        var file = Guid.NewGuid().ToString("N") + ".txt";
+        var kept = text.Length > MaxStoredChars ? text[..MaxStoredChars] : text;
+        await File.WriteAllTextAsync(Path.Combine(dir, file), kept, Encoding.UTF8, ct);
+        return ($"{conversationId}/{file}", kept.Count(c => c == '\n') + 1);
+    }
+
+    /// <summary>Lines of a kept attachment text: <paramref name="from"/> (1-based) and up to <paramref name="count"/> lines or
+    /// <paramref name="maxChars"/> characters. Null when the file is gone or outside <c>ai-files</c>.</summary>
+    public (List<string> lines, int total)? ReadKeptLines(string? textFile, int from, int count, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(textFile)) return null;
+        var root = Path.GetFullPath(StoragePaths.AiFiles(_env));
+        var path = Path.GetFullPath(Path.Combine(root, textFile));
+        if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(path)) return null;
+        var all = File.ReadAllLines(path, Encoding.UTF8);
+        var result = new List<string>();
+        var chars = 0;
+        for (var i = Math.Max(1, from) - 1; i < all.Length && result.Count < count; i++)
+        {
+            if (chars + all[i].Length > maxChars && result.Count > 0) break;
+            result.Add(all[i]);
+            chars += all[i].Length + 1;
+        }
+        return (result, all.Length);
     }
 
     /// <summary>Stores the file in the uploads folder and the media library, exactly like an upload in the editor (tagged so
@@ -155,7 +262,7 @@ public sealed class AssistantFiles
             try { text = ContentOrderTextExtractor.GetText(page); }
             catch { text = page.Text; }
             sb.Append(text.Trim()).Append("\n\n");
-            if (sb.Length > MaxTextChars) break;
+            if (sb.Length > MaxStoredChars) break;
         }
         return sb.ToString();
     }
@@ -178,16 +285,14 @@ public sealed class AssistantFiles
                 else if (n.Name == w + "br") sb.Append('\n');
             }
             sb.Append('\n');
-            if (sb.Length > MaxTextChars) break;
+            if (sb.Length > MaxStoredChars) break;
         }
         return sb.ToString();
     }
 
-    private static string Bound(string text)
-    {
-        var t = Regex.Replace(text.Replace("\r\n", "\n"), @"\n{3,}", "\n\n").Trim();
-        return t.Length > MaxTextChars ? t[..MaxTextChars] + "\n…[gekürzt]" : t;
-    }
+    private static string Clean(string text) => Regex.Replace(text.Replace("\r\n", "\n"), @"\n{3,}", "\n\n").Trim();
+
+    private static string Bound(string text, int max) => text.Length > max ? text[..max] + "\n…[gekürzt]" : text;
 
     /// <summary>The model's copy of a picture as an attachment, or null when it is gone.</summary>
     public Shared.AiAttachment? ModelAttachment(string? modelFile, string name)

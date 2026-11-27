@@ -130,8 +130,11 @@ public class InstanceRemovalService
     /// so what protects the site is the cloud label, the "looks like MatCMS" check and the record being deleted LAST,
     /// not a stale-page compare.
     /// </summary>
-    public async Task<Outcome> RemoveByModeAsync(Instance item, string? mode, CancellationToken ct = default)
+    public async Task<Outcome> RemoveByModeAsync(Instance item, string? mode, CancellationToken ct = default, string? by = null)
     {
+        // Who asked goes into the cloud's own log: the instance's events go with its record, so they cannot carry it.
+        if (by is not null)
+            _log.LogWarning("Removal of instance {Name} ({PublicId}) requested by {By}, mode {Mode}.", item.Name, item.PublicId, by, mode);
         if (!IsKnownMode(mode))
             return new Outcome(false, $"Unbekannter Modus. Erlaubt: {ModeUnregister}, {ModeKeepData}, {ModeFull}, {ModeBackupFirst}.", false);
         // A second answer must not overtake a removal that is waiting on its backup.

@@ -65,6 +65,40 @@ Admin unter Admin → Verein. Erster Einsatz: Schalksteinnarren Besigheim e.V.
 - **Datenschutz**: Löschen eines Kontos entfernt Eintrag, Rückmeldungen und Uploads; Antworten auf Dokumente bleiben als Zählung, ohne Namen und
   Adresse. Der Export liefert Eintrag, Antworten, Rückmeldungen, Uploads.
 
+**Operationen (KI/MCP)** (1.21)
+
+Das Plugin beschreibt, was es kann, als Plugin-Aktionen (`VereinOps.cs`, die Termine in `VereinEvents.cs`) – für den KI-Assistenten der
+Website, das MCP der Cloud und den MCP-Server der Website. Aufgerufen werden sie als `verein.<name>`; jede schreibende Aktion antwortet
+mit einem Rückgängig (eine interne Aktion, die nur der Host ausführt).
+
+| Aktion | schreibt | personenbezogen |
+| --- | --- | --- |
+| `role.list` (Rollen mit Vorstand ja/nein, eigene Felder, erlaubte Zielgruppen und Arten) | nein | nein |
+| `event.list`, `event.read` | nein | nein |
+| `event.create`, `event.update` (`cancelled` = absagen) | ja | nein |
+| `member.list`, `member.read` | nein | ja |
+| `member.create`, `member.update` (`active: false` = ehemalig) | ja | ja |
+| `meeting.list`, `meeting.read` | nein | nein |
+| `meeting.create`, `meeting.update` (`status: cancelled` = absagen; Protokoll als Entwurf oder veröffentlicht) | ja | nein |
+| `doc.list`, `doc.read` (Zahl der Antworten, keine Namen) | nein | nein |
+| `doc.create`, `doc.update` (`archived` = ins Archiv) | ja | nein |
+| `template.list`, `template.read` | nein | nein |
+| `template.create`, `template.update`, `template.delete` | ja | nein |
+| `upload.list` | nein | ja |
+| `upload.update` (freigeben, `shared: false` = nur für Uploader und Vorstand, Termin zuordnen) | ja | ja |
+
+Intern (nur als Rückgängig): `event.remove/restore`, `member.remove/restore`, `meeting.remove/restore`, `doc.remove/restore`,
+`template.remove/restore/recreate`, `upload.restore`.
+
+- **Keine Aktion schickt eine E-Mail, legt ein Konto an oder berührt ein Passwort.** `member.create` trägt immer *ohne Zugang* ein
+  (Platzhalter-Nummer wie bei Kindern); den Zugang richtet der Vorstand im Admin ein. Einladungen zu Sitzungen, Benachrichtigungen zu
+  Dokumenten und Erinnerungen bleiben Knöpfe im Admin. Kalender-Link und Profilbild-Datei stehen in keiner Antwort.
+- **Ein Dokument mit Antworten behält Titel, Text, Art und Zielgruppe** (die Antworten sind der Nachweis); Frist und Archiv lassen sich
+  ändern, das Rückgängig eines Anlegens löscht es dann nicht mehr.
+- Werte werden wie in den Formularen des Admins bereinigt; eine unbekannte Zielgruppe, Art oder ein falsches Datum wird mit der Liste
+  des Erlaubten abgelehnt, damit ein Agent sich korrigieren kann. Mitglieder und Uploads sind personenbezogen: der KI-Assistent bekommt
+  sie nicht, die Cloud nur mit dem passenden Recht. Antworten bleiben deutsch. Tests: `VereinOpsTests`.
+
 **Bauen und paketieren**: `./pack-native.ps1 -Path ./verein` → `dist/verein-<version>.zip`. Im Admin unter Plugins importieren; es läuft erst mit
 „Native Plugins erlauben“. Tests: `dotnet test tests/MatCMS.Plugins.Tests --filter Verein` (lädt die gebaute DLL in die ganze Anwendung).
 

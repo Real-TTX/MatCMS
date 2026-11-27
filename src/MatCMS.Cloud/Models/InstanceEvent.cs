@@ -64,7 +64,12 @@ public enum InstanceEventKind
     // Hosting increment 5: moving between hosts.
     MigrationStarted = 30,
     MigrationSucceeded = 31,
-    MigrationFailed = 32
+    MigrationFailed = 32,
+
+    /// <summary>A live restore was requested from OUTSIDE (operator API or MCP), with the key that asked. The admin page's own
+    /// restore needs no line: a person clicked it there. Without this a restore that overwrote a site could not be traced to
+    /// the key behind it.</summary>
+    RestoreRequested = 33
 }
 
 /// <summary>Audit trail per instance: what happened, and whether a notification went out for it.

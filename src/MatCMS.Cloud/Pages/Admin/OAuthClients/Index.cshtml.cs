@@ -33,12 +33,10 @@ public class IndexModel : PageModel
     {
         var client = await _db.OAuthClients.FindAsync(id);
         if (client is null) return RedirectToPage();
-        if (!client.Revoked)
-        {
-            client.RevokedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-        }
-        TempData["Flash"] = "Connector widerrufen.";
+        if (!client.Revoked) client.RevokedAt = DateTime.UtcNow;
+        var keys = await RevokeMintedKeysAsync(client.Id);
+        await _db.SaveChangesAsync();
+        TempData["Flash"] = keys == 0 ? "Connector widerrufen." : $"Connector widerrufen, {keys} damit ausgestellte Schlüssel gesperrt.";
         return RedirectToPage();
     }
 
@@ -46,9 +44,25 @@ public class IndexModel : PageModel
     {
         var client = await _db.OAuthClients.FindAsync(id);
         if (client is null) return RedirectToPage();
+        var keys = await RevokeMintedKeysAsync(client.Id);
         _db.OAuthClients.Remove(client);
         await _db.SaveChangesAsync();
-        TempData["Flash"] = "Connector gelöscht.";
+        TempData["Flash"] = keys == 0 ? "Connector gelöscht." : $"Connector gelöscht, {keys} damit ausgestellte Schlüssel gesperrt.";
         return RedirectToPage();
+    }
+
+    // Every sign-in through a connector mints a full-access operator key; taking the connector away must take those keys
+    // away too, or "widerrufen" only stops NEW sign-ins while the client keeps its access. Revoked, not deleted: a key
+    // that could restore a site keeps its row as a trail (API-Schlüssel shows it). Keys minted before keys remembered their
+    // client carry only the client's name in their own name ("Connector: {name} · {date}", no OAuthClientId) — those are
+    // matched by that name, which only the token endpoint writes.
+    private async Task<int> RevokeMintedKeysAsync(int clientId)
+    {
+        var client = await _db.OAuthClients.AsNoTracking().FirstAsync(c => c.Id == clientId);
+        var legacyPrefix = $"Connector: {client.Name} · ";
+        var minted = await _db.ApiKeys.Where(k => k.RevokedAt == null
+            && (k.OAuthClientId == clientId || (k.OAuthClientId == null && k.Name.StartsWith(legacyPrefix)))).ToListAsync();
+        foreach (var k in minted) k.RevokedAt = DateTime.UtcNow;
+        return minted.Count;
     }
 }

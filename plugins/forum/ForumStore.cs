@@ -226,6 +226,16 @@ internal sealed class ForumStore
         return (rows.Select(ToThread).ToList(), total);
     }
 
+    /// <summary>One window of threads — of one board (pinned first, like the board's page) or of all boards (by last activity, like the admin's list).</summary>
+    public async Task<(IReadOnlyList<ForumThread> Items, long Total)> ThreadsWindowAsync(long boardId, int offset, int take, CancellationToken ct = default)
+    {
+        var q = boardId > 0 ? DataQuery.Everything.Eq("board_id", boardId) : DataQuery.Everything;
+        var total = await Threads.CountAsync(q, ct);
+        var ordered = boardId > 0 ? q.OrderBy("sticky", true).OrderBy("last_post_at", true) : q.OrderBy("last_post_at", true);
+        var rows = await Threads.QueryAsync(ordered.OrderBy("id", true).Page(Math.Max(0, offset), take), ct);
+        return (rows.Select(ToThread).ToList(), total);
+    }
+
     public async Task<(IReadOnlyList<ForumPost> Items, long Total)> ThreadPostsAsync(long threadId, int page, int size, CancellationToken ct = default)
     {
         var q = DataQuery.Everything.Eq("thread_id", threadId);
@@ -538,6 +548,11 @@ internal sealed class ForumStore
 
     public async Task<IReadOnlyList<ForumReport>> ReportsAsync(bool open, CancellationToken ct = default) =>
         (await Reports.QueryAsync(DataQuery.Everything.Eq("done", !open ? true : false).OrderBy("created_at", true).Page(0, 300), ct)).Select(ToReport).ToList();
+
+    public async Task<ForumReport?> ReportByIdAsync(long id, CancellationToken ct = default) => await Reports.GetAsync(id, ct) is { } r ? ToReport(r) : null;
+
+    public Task SetReportDoneAsync(long id, bool done, CancellationToken ct = default) =>
+        Reports.UpdateAsync(id, new Dictionary<string, object?> { ["done"] = done }, ct);
 
     public Task<long> OpenReportCountAsync(CancellationToken ct = default) => Reports.CountAsync(DataQuery.Everything.Eq("done", false), ct);
 

@@ -57,6 +57,10 @@ public class CloudState
     public string? StatsHaveUntil { get; set; }
     public DateTime? StatsLastSentUtc { get; set; }
 
+    // The plugin operation catalogue towards the cloud (HeartbeatRequest.PluginOperations): the fingerprint of what the cloud last TOOK (a
+    // beat that answered 2xx). In-memory: after a restart the first beat sends the catalogue again.
+    public string? PluginOperationsSentHash { get; set; }
+
     public bool IsPending => string.Equals(Status, "Pending", StringComparison.OrdinalIgnoreCase);
     public bool OutOfSync => ConfigRevision > 0 && AppliedRevision != ConfigRevision;
 
@@ -322,6 +326,7 @@ public class CloudService
             var answer = await res.Content.ReadFromJsonAsync<HeartbeatResponse>(ct);
             _state.Connected = true;
             _state.LastError = null;
+            if (beat.PluginOperations is { } sentOps) _state.PluginOperationsSentHash = PluginOperationInfo.Hash(sentOps);
             _state.Status = answer?.Status;
             _state.LatestVersion = answer?.LatestVersion;
             _state.UpdateAvailable = answer?.UpdateAvailable ?? false;
@@ -674,8 +679,17 @@ public class CloudService
                     StatusCode = l.StatusCode
                 })
                 .ToListAsync(ct),
-            Stats = await BuildStatsAsync(ct)
+            Stats = await BuildStatsAsync(ct),
+            PluginOperations = OperationsForBeat(),
         };
+    }
+
+    /// <summary>The plugin operation catalogue for this beat — see <see cref="HeartbeatRequest.PluginOperations"/>: null while it is what the
+    /// cloud already took, so the 60-second beat does not carry a few kilobytes of descriptions every time.</summary>
+    private List<PluginOperationInfo>? OperationsForBeat()
+    {
+        var ops = _services.GetRequiredService<Plugins.PluginContributions>().Catalog();
+        return PluginOperationInfo.Hash(ops) == _state.PluginOperationsSentHash ? null : ops;
     }
 
     /// <summary>The statistics days the cloud lacks — see <see cref="HeartbeatRequest.Stats"/>. From the day before

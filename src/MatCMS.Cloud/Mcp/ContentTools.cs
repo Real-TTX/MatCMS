@@ -40,8 +40,8 @@ public class ContentTools
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("The page title shown to visitors, e.g. \"Über uns\".")] string title,
         [Description("URL slug, lowercase, no spaces, e.g. \"ueber-uns\". Must be unique on the site.")] string slug,
-        [Description("A JSON array of blocks: [{\"type\":\"hero\",\"data\":{\"title\":\"…\",\"text\":\"…\"}}, …]. Use block types the site knows (e.g. hero, richtext, cards). Unknown types/fields are dropped by the instance.")] string blocksJson,
-        [Description("Whether to add the page to the site navigation (default true).")] bool showInNav = true,
+        [Description("A JSON array of blocks: [{\"type\":\"hero\",\"data\":{\"heading\":\"…\",\"subheading\":\"…\"}}, …]. Only text fields are taken; use block types and field ids the site knows (get_page on an existing page lists each block's editable fields). Unknown types/fields are dropped by the instance.")] string blocksJson,
+        [Description("Whether to add the page to the site's header menu (default true; an entry for the same address is not added twice).")] bool showInNav = true,
         [Description("Optional navigation label; falls back to the title.")] string? navLabel = null,
         CancellationToken ct = default)
     {
@@ -72,7 +72,7 @@ public class ContentTools
         });
 
         var op = await instances.EnqueueContentOpAsync(instance, "page.create", payload,
-            overwrite: false, reason: "KI: Seite anlegen", ct);
+            overwrite: false, reason: "KI: Seite anlegen", ct, by: me.Actor);
         return new
         {
             ok = true,
@@ -108,7 +108,7 @@ public class ContentTools
             publish,
         });
         var op = await instances.EnqueueContentOpAsync(instance, "post.create", payload,
-            overwrite: false, reason: "KI: Beitrag anlegen", ct);
+            overwrite: false, reason: "KI: Beitrag anlegen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Beitrag eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
@@ -155,7 +155,7 @@ public class ContentTools
             compare_cents = compareCents is > 0 ? compareCents : null,
         });
         var op = await instances.EnqueueContentOpAsync(instance, "product.create", payload,
-            overwrite: false, reason: "KI: Produkt anlegen", ct);
+            overwrite: false, reason: "KI: Produkt anlegen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Produkt eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
@@ -197,7 +197,7 @@ public class ContentTools
             note = (note ?? "").Trim(),
         });
         var op = await instances.EnqueueContentOpAsync(instance, "coupon.create", payload,
-            overwrite: false, reason: "KI: Gutschein anlegen", ct);
+            overwrite: false, reason: "KI: Gutschein anlegen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Gutschein eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
@@ -217,7 +217,7 @@ public class ContentTools
     {
         var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
         var payload = JsonSerializer.Serialize(new { number = (number ?? "").Trim(), status = (status ?? "").Trim(), since = (since ?? "").Trim(), limit });
-        var op = await instances.EnqueueContentOpAsync(instance, "order.list", payload, overwrite: false, reason: "KI: Bestellungen lesen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "order.list", payload, overwrite: false, reason: "KI: Bestellungen lesen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
     }
 
@@ -241,7 +241,7 @@ public class ContentTools
         if (a is not ("paid" or "ship" or "complete" or "cancel" or "note" or "tracking")) throw new McpException("action muss paid, ship, complete, cancel, note oder tracking sein.");
         if (string.IsNullOrWhiteSpace(number)) throw new McpException("number fehlt.");
         var payload = JsonSerializer.Serialize(new { number = number.Trim(), action = a, tracking = (tracking ?? "").Trim(), carrier = (carrier ?? "").Trim(), text = (text ?? "").Trim(), notify });
-        var op = await instances.EnqueueContentOpAsync(instance, "order.update", payload, overwrite: true, reason: "KI: Bestellung bearbeiten", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "order.update", payload, overwrite: true, reason: "KI: Bestellung bearbeiten", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Bestellung-Aktion eingereiht — wird beim nächsten Kontakt ausgeführt. Ergebnis via get_content_op." };
     }
 
@@ -267,7 +267,7 @@ public class ContentTools
             if (v["deltaCents"] is { } d) { v["delta_cents"] = d.DeepClone(); v.Remove("deltaCents"); }
         var payload = new System.Text.Json.Nodes.JsonObject { ["product"] = (product ?? "").Trim(), ["variants"] = list, ["replace"] = replace };
         if (options is System.Text.Json.Nodes.JsonObject) payload["options"] = options;
-        var op = await instances.EnqueueContentOpAsync(instance, "variant.set", payload.ToJsonString(), overwrite: true, reason: "KI: Varianten setzen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "variant.set", payload.ToJsonString(), overwrite: true, reason: "KI: Varianten setzen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Varianten eingereiht — wird beim nächsten Kontakt gesetzt. Ergebnis via get_content_op." };
     }
 
@@ -294,7 +294,7 @@ public class ContentTools
             name = name.Trim(), kind = k, options = (options ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
             unit = (unit ?? "").Trim(), filterable, category = (category ?? "").Trim()
         });
-        var op = await instances.EnqueueContentOpAsync(instance, "attribute.create", payload, overwrite: false, reason: "KI: Eigenschaft anlegen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "attribute.create", payload, overwrite: false, reason: "KI: Eigenschaft anlegen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Eigenschaft eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
@@ -314,7 +314,7 @@ public class ContentTools
         catch (JsonException) { throw new McpException("valuesJson ist kein gültiges JSON."); }
         if (values is not System.Text.Json.Nodes.JsonObject obj || obj.Count == 0) throw new McpException("valuesJson muss ein nicht leeres Objekt sein.");
         var payload = new System.Text.Json.Nodes.JsonObject { ["product"] = (product ?? "").Trim(), ["values"] = obj };
-        var op = await instances.EnqueueContentOpAsync(instance, "product.attributes", payload.ToJsonString(), overwrite: true, reason: "KI: Eigenschaften setzen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "product.attributes", payload.ToJsonString(), overwrite: true, reason: "KI: Eigenschaften setzen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Eigenschaften eingereiht — wird beim nächsten Kontakt gesetzt. Ergebnis via get_content_op." };
     }
 
@@ -347,13 +347,13 @@ public class ContentTools
             submitLabel,
         });
         var op = await instances.EnqueueContentOpAsync(instance, "form.create", payload,
-            overwrite: false, reason: "KI: Formular anlegen", ct);
+            overwrite: false, reason: "KI: Formular anlegen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Formular eingereiht — wird beim nächsten Kontakt angelegt. Ergebnis via get_content_op." };
     }
 
     [McpServerTool(Name = "set_setting"), Description(
         "Set ONE site setting (key/value) on a connected site — e.g. \"site.title\", \"seo.description\". " +
-        "The instance refuses cloud-link keys (cloud.*) for safety. Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
+        "Refused: cloud-link keys (cloud.*) and, because a model reading untrusted page text must not plant a script or change who can sign in, code.* (head/body code), security.*, sso.*, smtp.*, mail.transport, members.selfRegistration, site.canonicalUrl, site.behindHttpsProxy, site.domainRoutes and ContactRecipient (mail routes and the address reset links point to) — those are set by a person in the site's admin or the profile. Queued and applied on the next heartbeat (~a minute); check get_content_op(opId). Requires a key with the restore right.")]
     public static async Task<object> SetSetting(
         McpContext me, InstanceService instances,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
@@ -363,9 +363,11 @@ public class ContentTools
     {
         var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
         if (string.IsNullOrWhiteSpace(key)) throw new McpException("key ist erforderlich.");
+        if (MatCMS.Shared.ContentOpRules.IsRefusedSetting(key))
+            throw new McpException($"„{key.Trim()}“ (Code, Sicherheit, Anmeldung, Mail, Adresse) wird über diesen Weg nicht gesetzt – bitte im Admin der Website oder im Profil.");
         var payload = JsonSerializer.Serialize(new { key = key.Trim(), value = value ?? "" });
         var op = await instances.EnqueueContentOpAsync(instance, "setting.set", payload,
-            overwrite: true, reason: "KI: Einstellung setzen", ct);
+            overwrite: true, reason: "KI: Einstellung setzen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Einstellung eingereiht — wird beim nächsten Kontakt gesetzt. Ergebnis via get_content_op." };
     }
 
@@ -384,6 +386,11 @@ public class ContentTools
 
         var op = await instances.FindContentOpAsync(instance.Id, opId, ct);
         if (op is null) throw new McpException("Vorgang nicht gefunden.");
+        // The result of a write or of an order read is the restore right's, like queuing it was: without this a key that
+        // may only read the site could fetch a list_shop_orders answer (customers' names and addresses) by its opId.
+        // A plain plugin read the site listed (Writes false, not PersonalData — PluginOperationService) counts like a page read.
+        if (!key.CanRestore && !PluginOperationService.ResultReadableWithoutRestore(instance, op.Kind))
+            throw new McpException("Dieser Schlüssel darf das Ergebnis dieses Vorgangs nicht lesen (fehlendes Wiederherstellen-Recht).");
         return new
         {
             opId = op.Id,
@@ -417,12 +424,12 @@ public class ContentTools
         CancellationToken ct)
     {
         var instance = await ResolveReadableAsync(me, instances, instanceId, ct);
-        var op = await instances.EnqueueContentOpAsync(instance, "pages.list", "{}", overwrite: false, reason: "KI: Seiten lesen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "pages.list", "{}", overwrite: false, reason: "KI: Seiten lesen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
     }
 
     [McpServerTool(Name = "get_page"), Description(
-        "Ask a connected site for one page's blocks (to inspect before editing). QUEUED like list_pages: returns an opId; poll get_content_op(opId) whose `result` holds { title, slug, blocks:[{type,data}] } once the site has answered (~a minute).")]
+        "Ask a connected site for one page's blocks (to inspect before editing). QUEUED like list_pages: returns an opId; poll get_content_op(opId) whose `result` holds { title, slug, published, blocks:[{id, type, editable:[text field ids], children, data}] } once the site has answered (~a minute). Edit with update_page_blocks by block id.")]
     public static async Task<object> GetPage(
         McpContext me, InstanceService instances,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
@@ -431,20 +438,28 @@ public class ContentTools
     {
         var instance = await ResolveReadableAsync(me, instances, instanceId, ct);
         var payload = JsonSerializer.Serialize(new { slug = (slug ?? "").Trim() });
-        var op = await instances.EnqueueContentOpAsync(instance, "page.read", payload, overwrite: false, reason: "KI: Seite lesen", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "page.read", payload, overwrite: false, reason: "KI: Seite lesen", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Angefragt — Ergebnis via get_content_op(opId)." };
     }
 
     [McpServerTool(Name = "update_page_blocks"), Description(
-        "Replace the blocks of an EXISTING page on a connected site (overwrite). Read it first with get_page, edit the blocks, then send the full new block list here. The site re-validates the blocks (unknown types/fields dropped) and replaces the page's content. QUEUED and applied on the next heartbeat; check get_content_op(opId). Requires a key with the restore right (this overwrites live content).")]
+        "Edit the blocks of an EXISTING page on a connected site. Read it first with get_page: every block there has an `id` and lists its `editable` text fields. " +
+        "Send the blocks in the order you want them: a block WITH its id keeps everything you do not send (pictures, links, lists, layout, nested blocks) and only the text fields you send are changed — send just the fields you change; its type stays. " +
+        "A block WITHOUT an id is added as a new block (only text fields, known types). Existing blocks you do not list are KEPT (moved after the listed ones) unless removeMissing is true, which deletes them. " +
+        "QUEUED and applied on the next heartbeat; check get_content_op(opId) — outcome \"partial\" lists what was not taken over. Requires a key with the restore right (this changes live content).")]
     public static async Task<object> UpdatePageBlocks(
         McpContext me, InstanceService instances,
         [Description("The instance id, as returned by list_instances.")] string instanceId,
         [Description("The slug of the existing page to update.")] string slug,
-        [Description("The FULL new JSON array of blocks (replaces all current blocks): [{\"type\":…,\"data\":{…}}, …].")] string blocksJson,
-        CancellationToken ct)
+        [Description("JSON array: [{\"id\":12,\"data\":{\"heading\":\"New heading\"}}, {\"type\":\"richtext\",\"data\":{\"body\":\"<p>…</p>\"}}, …]. id = an existing block from get_page; no id = a new block.")] string blocksJson,
+        [Description("Delete the existing blocks this list does not name (default false: they are kept).")] bool removeMissing = false,
+        CancellationToken ct = default)
     {
         var instance = await ResolveWritableAsync(me, instances, instanceId, ct);
+        // An older site still REPLACES the page with what its text validator keeps — it would drop pictures, links and nested
+        // blocks. Refused rather than sent: the description promises that nothing unnamed is lost.
+        if (instance.ProtocolVersion < MatCMS.Shared.CloudProtocol.BlockPatchSince)
+            throw new McpException("Diese Website ist zu alt für das blockweise Bearbeiten (sie würde die Seite ersetzen und Bilder, Links und verschachtelte Blöcke verlieren). Bitte erst die Website aktualisieren.");
 
         JsonElement blocks;
         try { blocks = JsonSerializer.Deserialize<JsonElement>(blocksJson); }
@@ -452,9 +467,9 @@ public class ContentTools
         if (blocks.ValueKind != JsonValueKind.Array)
             throw new McpException("blocksJson muss ein JSON-Array sein.");
 
-        var payload = JsonSerializer.Serialize(new { slug = (slug ?? "").Trim(), blocks });
+        var payload = JsonSerializer.Serialize(new { slug = (slug ?? "").Trim(), blocks, removeMissing });
         var op = await instances.EnqueueContentOpAsync(instance, "page.updateBlocks", payload,
-            overwrite: true, reason: "KI: Seitenblöcke ändern", ct);
+            overwrite: true, reason: "KI: Seitenblöcke ändern", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Änderung eingereiht — wird beim nächsten Kontakt angewendet. Ergebnis via get_content_op." };
     }
 
@@ -466,7 +481,7 @@ public class ContentTools
         CancellationToken ct)
     {
         var instance = await ResolveReadableAsync(me, instances, instanceId, ct);
-        var op = await instances.EnqueueContentOpAsync(instance, "cleanup.analyze", "{}", overwrite: false, reason: "KI: Aufräumen analysieren", ct);
+        var op = await instances.EnqueueContentOpAsync(instance, "cleanup.analyze", "{}", overwrite: false, reason: "KI: Aufräumen analysieren", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Analyse angefragt — Ergebnis via get_content_op(opId)." };
     }
 
@@ -490,7 +505,7 @@ public class ContentTools
             strayFiles = strayFiles ?? [],
         });
         var op = await instances.EnqueueContentOpAsync(instance, "cleanup.apply", payload,
-            overwrite: true, reason: "KI: Aufräumen anwenden", ct);
+            overwrite: true, reason: "KI: Aufräumen anwenden", ct, by: me.Actor);
         return new { ok = true, opId = op.Id, queued = true, message = "Aufräumen eingereiht — wird beim nächsten Kontakt angewendet. Ergebnis via get_content_op." };
     }
 }

@@ -306,6 +306,15 @@ public class Instance
     /// past it.</summary>
     public string? StatsHaveUntil { get; set; }
 
+    /// <summary>The plugin operations the site last reported (<see cref="MatCMS.Shared.HeartbeatRequest.PluginOperations"/>, a JSON list of
+    /// <see cref="MatCMS.Shared.PluginOperationInfo"/>), null = the site never reported one (an older site). The site sends it only when it
+    /// changed, so this is kept until the next one arrives. What <c>list_plugin_operations</c> answers with and what
+    /// <c>run_plugin_operation</c> checks a name against.</summary>
+    public string? PluginOperationsJson { get; set; }
+
+    /// <summary>When <see cref="PluginOperationsJson"/> arrived.</summary>
+    public DateTime? PluginOperationsAt { get; set; }
+
     /// <summary>
     /// What the instance said went wrong, if it answered at all. Set means the request is over and
     /// failed: the cloud stops asking, says why, and offers to ask again.

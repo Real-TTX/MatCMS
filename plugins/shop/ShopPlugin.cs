@@ -169,6 +169,8 @@ public sealed class ShopPlugin : IPlugin
         b.Operation(ShopAiOps.ProductRemove, ShopAiOps.RemoveProductAsync);
         b.Operation(ShopAiOps.CategoryRestore, ShopAiOps.RestoreCategoryAsync);
         b.Operation(ShopAiOps.CategoryRemove, ShopAiOps.RemoveCategoryAsync);
+        // Coupons, attributes and shipping rates (list, change, switch off) and the undo of every write above that had none.
+        ShopOpsMore.Register(b);
 
         // A first shipping rate, so a shop that sells something physical is not stuck on "no shipping" before anybody has looked at the tab. Editable, deletable.
         b.Lifecycle.OnInstall(async ctx =>

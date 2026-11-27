@@ -295,21 +295,66 @@ public sealed class PluginContributions
         return rows?.Select(o => new MatCMS.Content.SelectOption(o.Value, o.Label)).ToList() ?? new();
     }
 
-    /// <summary>True when a loaded plugin offers an operation of this name.</summary>
-    public bool HasOperation(string name) => _registry.Operations.Any(o => o.Name == name);
+    /// <summary>
+    /// The operation a caller means: the QUALIFIED name (<c>shop.product.create</c>) first, else a short name (<c>product.create</c>) when exactly
+    /// one loaded plugin declares it — what every caller sent before names were qualified, and what the cloud's older tools still send. A short
+    /// name two plugins share resolves to nothing (<see cref="RunOperationAsync"/> then names the qualified ones).
+    /// </summary>
+    public PluginRegistry.OperationEntry? FindOperation(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var ops = _registry.Operations;
+        if (ops.FirstOrDefault(o => o.QualifiedName == name) is { } exact) return exact;
+        var bare = ops.Where(o => o.Name == name).Take(2).ToList();
+        return bare.Count == 1 ? bare[0] : null;
+    }
+
+    /// <summary>True when a loaded plugin offers an operation of this name (qualified, or a short name only one plugin declares).</summary>
+    public bool HasOperation(string name) => FindOperation(name) is not null;
+
+    /// <summary>Every operation of the loaded plugins an outside caller may ask for — the cloud's MCP, the site's own MCP server, the assistant:
+    /// all but the INTERNAL ones (undo helpers only the host runs). Sorted by plugin and name.</summary>
+    public IReadOnlyList<PluginRegistry.OperationEntry> PublicOperations =>
+        _registry.Operations.Where(o => o.Spec?.Internal != true)
+            .OrderBy(o => o.Owner, StringComparer.Ordinal).ThenBy(o => o.Name, StringComparer.Ordinal).ToList();
 
     /// <summary>The operations the site's AI assistant may use: described ones, neither internal nor carrying customers' data (every answer the
     /// assistant reads goes to an outside model provider).</summary>
     public IReadOnlyList<PluginRegistry.OperationEntry> AssistantOperations =>
-        _registry.Operations.Where(o => o.Spec is { Internal: false, PersonalData: false }).ToList();
+        PublicOperations.Where(o => o.Spec is { PersonalData: false }).ToList();
 
-    /// <summary>Runs the operation of this name. Throws when none is loaded; what the handler throws propagates (the caller reports the op failed).
-    /// An INTERNAL operation (an undo) runs only when the host itself asks (<paramref name="allowInternal"/>).</summary>
+    /// <summary>The catalogue an outside caller lists (the cloud's MCP via the heartbeat, the site's own MCP server): one entry per public
+    /// operation, under its qualified name. An operation declared WITHOUT a description is listed as writing and carrying personal data — the
+    /// strictest reading, since nothing says otherwise.</summary>
+    public List<MatCMS.Shared.PluginOperationInfo> Catalog() =>
+        PublicOperations.Select(o => new MatCMS.Shared.PluginOperationInfo
+        {
+            Name = o.QualifiedName, Plugin = o.Owner, PluginName = o.Info.Name,
+            Description = o.Spec?.Description ?? "", Arguments = o.Spec?.Arguments ?? "{}",
+            Writes = o.Spec?.Writes ?? true, PersonalData = o.Spec?.PersonalData ?? true,
+        }).ToList();
+
+    /// <summary>Runs the operation of this name (see <see cref="FindOperation"/>). Throws when none is loaded or a short name is ambiguous; what
+    /// the handler throws propagates (the caller reports the op failed). An INTERNAL operation (an undo) runs only when the host itself asks
+    /// (<paramref name="allowInternal"/>).</summary>
     public async Task<JsonNode?> RunOperationAsync(IServiceProvider sp, string name, JsonNode? args, CancellationToken ct = default, bool allowInternal = false)
     {
-        var op = _registry.Operations.FirstOrDefault(o => o.Name == name) ?? throw new InvalidOperationException($"Keine geladene Plugin-Aktion '{name}'.");
+        var op = FindOperation(name);
+        if (op is null)
+        {
+            var same = _registry.Operations.Where(o => o.Name == name).Select(o => o.QualifiedName).ToList();
+            throw new InvalidOperationException(same.Count > 1
+                ? $"Die Plugin-Aktion '{name}' gibt es mehrfach – nenne sie mit dem Plugin: {string.Join(", ", same)}."
+                : $"Keine geladene Plugin-Aktion '{name}'.");
+        }
         if (op.Spec?.Internal == true && !allowInternal) throw new InvalidOperationException($"Die Plugin-Aktion '{name}' ist nur intern nutzbar.");
         var ctx = PluginRequestContext.ForBackground(op.Info, sp, _registry);
-        return await op.Handler(ctx, args, ct);
+        var answer = await op.Handler(ctx, args, ct);
+        // An answer's undo names an operation of the SAME plugin by its short name. Qualified here, so the undo later runs exactly that
+        // plugin's operation, however many plugins declare the short name by then.
+        if (answer is JsonObject o && o["undo"] is JsonObject undo && undo["name"] is JsonValue v && v.TryGetValue<string>(out var undoName)
+            && _registry.Operations.Any(x => x.Owner == op.Owner && x.Name == undoName))
+            undo["name"] = op.Owner + "." + undoName;
+        return answer;
     }
 }

@@ -13,6 +13,9 @@
         ["endDone"] = T["assistant.endDone"], ["endWaiting"] = T["assistant.endWaiting"], ["endStopped"] = T["assistant.endStopped"],
         ["endError"] = T["assistant.endError"], ["endCancelled"] = T["assistant.endCancelled"], ["goOn"] = T["assistant.goOn"],
         ["goOnText"] = T["assistant.goOnText"], ["titleDone"] = T["assistant.titleDone"],
+        ["endPlan"] = T["assistant.endPlan"], ["planGo"] = T["assistant.planGo"], ["planGoText"] = T["assistant.planGoText"], ["planChange"] = T["assistant.planChange"],
+        ["planChangeText"] = T["assistant.planChangeText"], ["planCount"] = T["assistant.planCount"], ["progress"] = T["assistant.progress"],
+        ["batchSummary"] = T["assistant.batchSummary"], ["batchSkipped"] = T["assistant.batchSkipped"], ["batchFailed"] = T["assistant.batchFailed"], ["batchItems"] = T["assistant.batchItems"],
     };
     var c = Model.Conversation;
 }
@@ -78,7 +81,7 @@
                 <div class="ai-files" id="ai-files"></div>
                 <textarea id="ai-input" rows="3" placeholder="@T["assistant.placeholder"]" @(Model.Enabled ? "" : "disabled")></textarea>
                 <div class="ai-compose-bar">
-                    <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.txt,.md,.csv,.json,.html,.htm,.xml" />
+                    <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.docx,.xlsx,.csv,.tsv,.txt,.md,.json,.html,.htm,.xml" />
                     <button type="button" class="btn btn-ghost btn-sm" id="ai-attach" title="@T["assistant.attachHelp"]" @(Model.Enabled ? "" : "disabled")><i class="ti ti-paperclip"></i> @T["assistant.attach"]</button>
                     @if (Model.Profiles.Profiles.Count > 0)
                     {

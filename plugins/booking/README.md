@@ -3,7 +3,47 @@
 Ferienhäuser, Villen und Apartments für eine MatCMS-Seite, gebaut nur gegen `MatCMS.Plugin.Abstractions`. Key `booking`, Admin unter
 Admin → Buchungen. Entwurf und Phasen: [`docs/booking-plugin.md`](../../docs/booking-plugin.md). Erste Seiten: Villa Nika, Villa Sogi.
 
-## Stand: 0.14 — Englisch auch bei Beträgen, Daten und Fehlern
+## Stand: 0.15 — Operationen für KI und MCP
+
+- **0.15**: das Plugin beschreibt, was es kann, als Plugin-Operationen (siehe „Operationen (KI/MCP)“ unten) — der KI-Assistent der Seite, das MCP
+  der Cloud und der eigene MCP-Server der Seite können Objekte, Einheiten, Saisons mit Preistabelle und Gebühren pflegen, Preise prüfen und (mit dem
+  Recht auf personenbezogene Daten) Anfragen und Buchungen lesen und weiterschalten.
+
+## Operationen (KI/MCP)
+
+`BookingOps.cs` (Einrichtung, Preis) und `BookingOpsStays.cs` (Anfragen/Buchungen). Deklariert mit kurzen Namen (`house.list`); ein Host mit
+Namensraum nennt sie `booking.house.list`. Beschreibungen sind deutsch (die KI liest sie), Beträge immer ganze Cent, Daten `JJJJ-MM-TT`.
+
+| Operation | Schreibt | Personenbezogen |
+|---|---|---|
+| `house.list`, `house.read` (mit Einheiten, Saisons, Gebühren) | nein | nein |
+| `house.create`, `house.update` | ja | nein |
+| `unit.list`, `unit.read` (mit Saisonpreisen) | nein | nein |
+| `unit.create`, `unit.update` (`active: false` schaltet ab — gelöscht wird nie) | ja | nein |
+| `season.list` (mit Preistabelle) | nein | nein |
+| `season.create`, `season.update` (je mit `rates` für die Preistabelle), `season.delete` | ja | nein |
+| `fee.list` | nein | nein |
+| `fee.create`, `fee.update`, `fee.delete` | ja | nein |
+| `price.check` (dieselbe Rechnung wie `GET /buchung/preis`) | nein | nein |
+| `stay.list`, `stay.read` | nein | **ja** |
+| `stay.move` (`offer`, `confirmed`, `declined`, `cancelled`) | ja | **ja** |
+
+- **Dieselben Regeln wie die Formulare des Admins**: Längen, Grenzen (Personen 1–50, Puffer 0–14, Mindestnächte 1–60, Rang 0–99), Ländercodes der
+  Meldefelder, Bilder nur aus der Mediathek oder https, „ganzes Haus“ nur aus Einheiten desselben Objekts (eine Ebene). Eine falsche Eingabe antwortet
+  `failed` mit dem Grund und schreibt nichts — auch eine Preistabelle wird erst geprüft, dann geschrieben.
+- **Jede Änderung hat ein Rückgängig** (`undo`): interne Operationen `house|unit|season|fee.remove` (für eben Angelegtes) und `….restore` (mit dem
+  Stand davor; eine gelöschte Saison oder Gebühr kommt als neue Zeile mit denselben Werten zurück, eine Saison mit ihrer ganzen Preistabelle). Die
+  internen kann nur der Host selbst ausführen. `unit.remove` lehnt ab, sobald die Einheit belegte Nächte hat, `house.remove`, solange es Einheiten gibt.
+- **Anfragen und Buchungen** (`PersonalData`, also nie für den KI-Assistenten, dessen Antworten an einen Modell-Anbieter gehen): `stay.move` geht
+  nur durch `BookingFlow.MoveAsync`/`OfferAsync` (erlaubte Wechsel, Nächte freigeben, Verlauf mit „(über eine Aktion)“), schickt beim Angebot IMMER die
+  Angebotsmail (wie der Knopf im Admin), sonst nur mit `notify: true`, und meldet den Stand gleich an die Zentrale eines Verbunds. Ein Wechsel ist
+  nicht rückgängig zu machen (kein `undo`). Meldedaten der Reisenden kommen nie heraus.
+- **Nicht über Operationen**: Zugang (Türcode, Schlüsselbox) und WLAN einer Einheit — Gäste sehen sie erst am Tag vor der Anreise, und eine Antwort
+  an den Assistenten geht nach außen. Ebenso nicht: Sperren, iCal-Kanäle, Zahlungen, Check-in, Verbund-Einstellungen.
+- Tests: `BookingOpsTests` (alle Operationen mit ihren Kennzeichen, Rundlauf anlegen → lesen → ändern → rückgängig mit Preisprüfung bei jedem Schritt,
+  abgelehnte Eingaben, interne nur für den Host, eine Anfrage durch Angebot, Bestätigung und Stornierung).
+
+## Stand davor: 0.14 — Englisch auch bei Beträgen, Daten und Fehlern
 
 - **0.14**: Beträge und Daten folgen der Sprache (`B.Money(t, …)`/`B.Date(t, …)`: englisch „€1,200.50“ und „12/01/2027“, deutsch unverändert
   „1.200,50 €“ und „12.01.2027“; die Sprache liest `B.English` aus der Texttabelle, Schlüssel `booking.fmt.lang`). Fehler beim Abruf von Kalendern

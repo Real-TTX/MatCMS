@@ -48,6 +48,7 @@ public sealed class BookingPlugin : IPlugin
         BookingIcal.Configure(b);
         BookingCleaning.Configure(b);
         BookingFederation.Configure(b);
+        BookingOps.Register(b);
         b.Job("guest-mails", JobSchedule.EveryInterval(TimeSpan.FromHours(1)), BookingGuestMails.RunAsync);
         b.Job("checkin-purge", JobSchedule.EveryInterval(TimeSpan.FromHours(24)), async (ctx, ct) => await BookingCheckin.PurgeAsync(ctx, ct));
 

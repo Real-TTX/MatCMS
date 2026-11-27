@@ -688,7 +688,7 @@ public static class VereinAdmin
 
     // ---- meetings -----------------------------------------------------------------------------------------------
 
-    private static readonly string[] MeetingKinds = { "Vorstandssitzung", "Mitgliederversammlung", "Jahreshauptversammlung", "Besprechung", "Sonstiges" };
+    internal static readonly string[] MeetingKinds = { "Vorstandssitzung", "Mitgliederversammlung", "Jahreshauptversammlung", "Besprechung", "Sonstiges" };
 
     /// <summary>A meeting's kind is STORED as the German word; only its label follows the admin's language (an unknown kind shows as stored).</summary>
     internal static string MeetingKindLabel(IPluginContext ctx, string kind) => Array.IndexOf(MeetingKinds, kind) switch

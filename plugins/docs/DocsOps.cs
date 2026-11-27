@@ -12,27 +12,32 @@ namespace MatCMS.Plugin.Docs;
 internal static class DocsOps
 {
     public static readonly PluginOperationSpec List = new("page.list",
-        "Lists the documentation pages of one language and version as a tree in reading order: path, title, published, depth.",
+        "Die Doku-Seiten einer Sprache und Version als Baum in Lesereihenfolge: id, Pfad, Titel, veröffentlicht, Tiefe, Kurztext, Adresse.",
         """{"locale":"de","version":""}""", Writes: false);
     public static readonly PluginOperationSpec Read = new("page.read",
-        "Reads one documentation page with its Markdown text, by path (and language/version) or id.",
+        "Eine Doku-Seite mit ihrem Markdown-Text lesen, nach Pfad (und Sprache/Version) oder id.",
         """{"path":"installation/docker","locale":"de"}""", Writes: false);
     public static readonly PluginOperationSpec Upsert = new("page.upsert",
-        "Creates or updates the documentation page at a path (slugs joined by '/'). The parent path must exist; a path of one segment is a section. " +
-        "body is Markdown (## headings, ```code```, tables, > [!NOTE] boxes, [text](doc:other/path) links between pages). Optional: summary, icon (Tabler name), sort, published, " +
-        "locale, version, translationOf (path of the same page in the site's default language, to link the translation).",
-        """{"path":"installation/docker","title":"Docker","summary":"Run it in a container.","body":"## Start\n\n```bash\ndocker compose up -d\n```","sort":20,"published":true,"locale":"de"}""");
+        "Legt die Doku-Seite unter einem Pfad (Slugs mit '/' verbunden) an oder ändert sie. Der Elternpfad muss existieren; ein Pfad aus einem Teil ist ein Bereich. " +
+        "body ist Markdown (## Überschriften, ```Code```, Tabellen, > [!NOTE]-Kästen, [Text](doc:anderer/pfad) als Link zwischen Seiten). Optional: summary, icon (Tabler-Name), sort, published, " +
+        "locale, version, translationOf (Pfad derselben Seite in der Standardsprache, verknüpft die Übersetzung). Nicht genannte Felder bleiben.",
+        """{"path":"installation/docker","title":"Docker","summary":"Im Container starten.","body":"## Start\n\n```bash\ndocker compose up -d\n```","sort":20,"published":true,"locale":"de"}""");
     public static readonly PluginOperationSpec Delete = new("page.delete",
-        "Deletes a documentation page by path or id; its sub-pages move up one level.", """{"path":"installation/docker","locale":"de"}""");
-    public static readonly PluginOperationSpec VersionList = new("version.list", "Lists the documentation's versions (empty when it has none).", "{}", Writes: false);
+        "Löscht eine Doku-Seite nach Pfad oder id; ihre Unterseiten rücken eine Ebene auf (Rückgängig stellt sie wieder her).", """{"path":"installation/docker","locale":"de"}""");
+    public static readonly PluginOperationSpec VersionList = new("version.list", "Die Versionen der Doku (leer, solange sie keine hat).", "{}", Writes: false);
+    public static readonly PluginOperationSpec PageRestore = new("page.restore", "Stellt eine Doku-Seite wieder her, wie sie vor einer Änderung oder dem Löschen war (Rückgängig).", Internal: true);
+    public static readonly PluginOperationSpec PageRemove = new("page.remove", "Entfernt eine eben angelegte Doku-Seite (Rückgängig).", Internal: true);
 
     public static void Register(IPluginBuilder b)
     {
-        b.Operation(List, (ctx, args, ct) => ListAsync(ctx, args as JsonObject, ct));
-        b.Operation(Read, (ctx, args, ct) => ReadAsync(ctx, args as JsonObject, ct));
-        b.Operation(Upsert, async (ctx, args, ct) => await UpsertAsync(ctx, args as JsonObject ?? new JsonObject(), ct));
-        b.Operation(Delete, (ctx, args, ct) => DeleteAsync(ctx, args as JsonObject, ct));
-        b.Operation(VersionList, async (ctx, _, ct) => await VersionsJsonAsync(ctx, ct));
+        // The operations answer in the shape every caller of an operation reads ({status, message, data, undo}); the API below keeps its own.
+        b.Operation(List, async (ctx, args, ct) => Op(await ListAsync(ctx, args as JsonObject, ct), d => $"{(d["pages"] as JsonArray)?.Count ?? 0} Seite(n)"));
+        b.Operation(Read, async (ctx, args, ct) => Op(await ReadAsync(ctx, args as JsonObject, ct), d => d["title"]?.GetValue<string>() ?? ""));
+        b.Operation(Upsert, (ctx, args, ct) => UpsertOpAsync(ctx, args as JsonObject ?? new JsonObject(), ct));
+        b.Operation(Delete, (ctx, args, ct) => DeleteOpAsync(ctx, args as JsonObject, ct));
+        b.Operation(VersionList, async (ctx, _, ct) => Op(await VersionsJsonAsync(ctx, ct), d => $"{(d["versions"] as JsonArray)?.Count ?? 0} Version(en)"));
+        b.Operation(PageRestore, (ctx, args, ct) => RestoreOpAsync(ctx, args as JsonObject, ct));
+        b.Operation(PageRemove, (ctx, args, ct) => RemoveOpAsync(ctx, args as JsonObject, ct));
 
         var read = new ApiRouteOptions { Access = ApiAccess.Read };
         var write = new ApiRouteOptions { Access = ApiAccess.Write };
@@ -213,4 +218,108 @@ internal static class DocsOps
         ["versions"] = new JsonArray((await new DocsStore(ctx.Data).VersionsAsync(ct))
             .Select(v => (JsonNode)new JsonObject { ["name"] = v.Name, ["label"] = v.Label, ["default"] = v.IsDefault }).ToArray())
     };
+
+    // ---- the operations' answers and their undo ------------------------------------------------------------------
+
+    private static JsonObject Answer(string status, string message, JsonNode? data = null, JsonNode? undo = null)
+    {
+        var o = new JsonObject { ["status"] = status, ["message"] = message };
+        if (data is not null) o["data"] = data;
+        if (undo is not null) o["undo"] = undo;
+        return o;
+    }
+
+    private static JsonObject Undo(string name, JsonNode args) => new() { ["name"] = name, ["args"] = args };
+
+    /// <summary>An API answer as an operation's: an error (<c>{error, status: 404}</c>) is "failed" with its text, anything else "applied" with the answer as data.
+    /// (The API's numeric <c>status</c> must never reach a caller that reads <c>status</c> as the outcome.)</summary>
+    private static JsonObject Op(JsonNode? answer, Func<JsonObject, string> message)
+    {
+        if (answer is not JsonObject o) return Answer("failed", "Keine Antwort.");
+        if (o["error"] is { } e) return Answer("failed", e.GetValue<string>());
+        return Answer("applied", message(o), o.DeepClone());
+    }
+
+    /// <summary>A page row as the undo carries it — every stored field, so a restore writes back exactly what was there.</summary>
+    private static JsonObject PageJson(DocPage p) => new()
+    {
+        ["id"] = p.Id, ["parentId"] = p.ParentId, ["slug"] = p.Slug, ["title"] = p.Title, ["locale"] = p.Locale, ["version"] = p.Version, ["format"] = p.Format,
+        ["body"] = p.Body, ["summary"] = p.Summary, ["icon"] = p.Icon, ["sort"] = p.Sort, ["published"] = p.Published, ["groupKey"] = p.GroupKey,
+        ["created"] = p.CreatedAt.ToString("o", CultureInfo.InvariantCulture), ["updatedBy"] = p.UpdatedBy
+    };
+
+    private static DocPage? PageFrom(JsonNode? n)
+    {
+        if (n is not JsonObject o) return null;
+        long L(string k) => o[k] is JsonValue v && v.TryGetValue<long>(out var x) ? x : o[k] is JsonValue w && w.TryGetValue<int>(out var i) ? i : 0;
+        string S(string k) => o[k] is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
+        return new DocPage
+        {
+            Id = L("id"), ParentId = L("parentId"), Slug = S("slug"), Title = S("title"), Locale = S("locale"), Version = S("version"), Format = S("format") == "html" ? "html" : "md",
+            Body = S("body"), Summary = S("summary"), Icon = S("icon"), Sort = L("sort"), Published = o["published"] is JsonValue pv && pv.TryGetValue<bool>(out var pub) && pub,
+            GroupKey = S("groupKey"), UpdatedBy = S("updatedBy"),
+            CreatedAt = DateTime.TryParse(S("created"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var c) ? c : DateTime.MinValue
+        };
+    }
+
+    /// <summary><c>page.upsert</c>: the page at the path as it is BEFORE the write is kept for the undo (a new page is removed again, a changed one written back).</summary>
+    private static async Task<JsonNode?> UpsertOpAsync(IPluginContext ctx, JsonObject a, CancellationToken ct)
+    {
+        DocPage? before = null;
+        var (locale, version, _, scopeError) = await ScopeAsync(ctx, a, ct);
+        var segs = Segments(Str(a, "path"));
+        if (scopeError is null && segs.Count > 0) before = (await new DocsStore(ctx.Data).TreeAsync(locale, version, ct)).ByPath(segs)?.Page;
+        var r = await UpsertAsync(ctx, a, ct);
+        if (r["error"] is { } e) return Answer("failed", e.GetValue<string>());
+        var id = r["id"]!.GetValue<long>();
+        var path = r["path"]?.GetValue<string>() ?? "";
+        return before is null
+            ? Answer("applied", $"Seite „{path}“ angelegt.", r.DeepClone(), Undo("page.remove", new JsonObject { ["id"] = id }))
+            : Answer("applied", $"Seite „{path}“ geändert.", r.DeepClone(), Undo("page.restore", new JsonObject { ["page"] = PageJson(before) }));
+    }
+
+    /// <summary><c>page.delete</c>: the page and the sub-pages that move up are remembered, so the undo puts the page back and its sub-pages under it.</summary>
+    private static async Task<JsonNode?> DeleteOpAsync(IPluginContext ctx, JsonObject? a, CancellationToken ct)
+    {
+        var (node, _, _, _, error) = await FindAsync(ctx, a, ct);
+        if (error is not null || node is null) return Answer("failed", error?["error"]?.GetValue<string>() ?? "Keine solche Seite.");
+        await new DocsStore(ctx.Data).DeleteAsync(node.Page, ct);
+        return Answer("applied", $"Seite „{node.Path}“ gelöscht.", new JsonObject { ["deleted"] = node.Path },
+            Undo("page.restore", new JsonObject
+            {
+                ["page"] = PageJson(node.Page), ["children"] = new JsonArray(node.Children.Select(c => (JsonNode)c.Page.Id).ToArray())
+            }));
+    }
+
+    /// <summary>
+    /// The undo of a change or a deletion. A page that still exists gets its stored fields back; a deleted one is written anew (a new id — the row's id
+    /// was never what names a page) under its old parent where that is still there, with a free slug, and the sub-pages that moved up when it was deleted
+    /// go back under it.
+    /// </summary>
+    private static async Task<JsonNode?> RestoreOpAsync(IPluginContext ctx, JsonObject? a, CancellationToken ct)
+    {
+        if (PageFrom(a?["page"]) is not { } p) return Answer("failed", "page fehlt.");
+        var store = new DocsStore(ctx.Data);
+        if (p.Id > 0 && await store.GetAsync(p.Id, ct) is not null)
+        {
+            await store.SaveAsync(p, ct);
+            return Answer("applied", $"Seite „{p.Title}“ wiederhergestellt.");
+        }
+        var parent = p.ParentId > 0 && await store.GetAsync(p.ParentId, ct) is { } pp && pp.Locale == p.Locale && pp.Version == p.Version ? pp.Id : 0;
+        var slug = await store.FreeSlugAsync(p.Slug, parent, p.Locale, p.Version, 0, ct);
+        var newId = await store.SaveAsync(p with { Id = 0, ParentId = parent, Slug = slug }, ct);
+        foreach (var child in (a?["children"] as JsonArray ?? new JsonArray()).Select(c => c is JsonValue v && v.TryGetValue<long>(out var x) ? x : 0))
+            if (await store.GetAsync(child, ct) is { } kid && kid.ParentId == p.ParentId && kid.Locale == p.Locale && kid.Version == p.Version)
+                await store.SaveAsync(kid with { ParentId = newId }, ct);
+        return Answer("applied", $"Seite „{p.Title}“ wiederhergestellt.", new JsonObject { ["id"] = newId });
+    }
+
+    private static async Task<JsonNode?> RemoveOpAsync(IPluginContext ctx, JsonObject? a, CancellationToken ct)
+    {
+        var store = new DocsStore(ctx.Data);
+        if (!long.TryParse(Str(a, "id"), NumberStyles.None, CultureInfo.InvariantCulture, out var id) || await store.GetAsync(id, ct) is not { } p)
+            return Answer("applied", "Die Seite gibt es schon nicht mehr.");
+        await store.DeleteAsync(p, ct);
+        return Answer("applied", $"Seite „{p.Title}“ entfernt.");
+    }
 }

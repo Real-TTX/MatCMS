@@ -182,7 +182,11 @@ internal static class ShopEvents
             MaxUses = o["max_uses"] is JsonValue mu && mu.TryGetValue<int>(out var u) && u > 0 ? u : 0,
             OncePerCustomer = o["once_per_customer"] is JsonValue oc && oc.TryGetValue<bool>(out var once) && once, Active = true
         }, ct);
-        return saved.Ok ? Answer("applied", $"Gutschein {code} angelegt ({ShopCoupons.Describe(ctx, new Coupon { Kind = kind, Value = value }, cfg.Currency)}).")
-                        : Answer("skipped-exists", $"Es gibt schon einen Gutschein {code}.");
+        if (!saved.Ok) return Answer("skipped-exists", $"Es gibt schon einen Gutschein {code}.");
+        var done = Answer("applied", $"Gutschein {code} angelegt ({ShopCoupons.Describe(ctx, new Coupon { Kind = kind, Value = value }, cfg.Currency)}).");
+        done["data"] = new JsonObject { ["id"] = saved.Id, ["code"] = code };
+        // The undo: the coupon goes again (or is only switched off, once an order carries it).
+        done["undo"] = ShopOpsMore.Undo("coupon.remove", new JsonObject { ["id"] = saved.Id });
+        return done;
     }
 }

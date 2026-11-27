@@ -53,6 +53,9 @@ public sealed class BotPlugin : IPlugin
         // counters need neither — a visitor there is a hash of address, browser and day, never an account.
         b.On(HostEvents.MemberErase, async (ctx, payload) => { await new BotStore(ctx.Data).EraseMemberAsync(IdOf(payload)); });
         b.On(HostEvents.MemberExport, ExportAsync);
+
+        // For AI agents (assistant, MCP): usage and limits, and — as personal data — the stored conversations (BotOps).
+        BotOps.Register(b);
     }
 
     private static long IdOf(JsonNode? payload) => payload?["id"] is JsonValue v && v.TryGetValue<long>(out var id) ? id : 0;

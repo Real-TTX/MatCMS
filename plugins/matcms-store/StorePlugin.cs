@@ -68,6 +68,8 @@ public sealed class StorePlugin : IPlugin
         b.Sitemap(SitemapAsync);
         b.LinkTargets("store.links.group", LinksAsync);
         b.On("site.search", SiteSearchAsync);
+        // The catalogue for AI agents (assistant, MCP): read, withdraw, moderate reviews, read publishers — never publish a version (StoreOps).
+        StoreOps.Register(b);
         b.On("host.member.erase", StoreReviews.EraseAsync);
         b.On("host.member.export", StoreReviews.ExportAsync);
         b.Job("download-marks", JobSchedule.Daily(new TimeOnly(3, 17)), ctx => new StoreDb(ctx.Data).PruneDownloadMarksAsync(CancellationToken.None));

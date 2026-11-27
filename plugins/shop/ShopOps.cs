@@ -13,10 +13,11 @@ internal static class ShopOps
 {
     public const int MaxOrders = 100;
 
-    private static JsonObject Answer(string status, string message, JsonNode? data = null)
+    private static JsonObject Answer(string status, string message, JsonNode? data = null, JsonNode? undo = null)
     {
         var o = new JsonObject { ["status"] = status, ["message"] = message };
         if (data is not null) o["data"] = data;
+        if (undo is not null) o["undo"] = undo;
         return o;
     }
 
@@ -135,6 +136,8 @@ internal static class ShopOps
             wanted.Add((name, Cents(node, "delta_cents", "delta") ?? 0, stock, Str(node, "sku"), ShopPublic.SafeUrl(Str(node, "image"))));
         }
 
+        // The undo (ShopOpsMore.RestoreVariantsAsync): the variants and the option list as they are before this writes.
+        var undo = ShopOpsMore.Undo("variant.restore", await ShopOpsMore.VariantsBeforeAsync(store, product, ct));
         var existing = (await store.VariantsAsync(product.Id, false, ct)).ToList();
         int added = 0, updated = 0, off = 0;
         foreach (var w in wanted)
@@ -155,7 +158,7 @@ internal static class ShopOps
             var parsed = opts.Take(ShopVariants.MaxOptions).Select(kv => new VariantOption(kv.Key.Trim(), ShopVariants.Split(kv.Value is JsonArray a ? string.Join(",", a.Select(x => x?.ToString() ?? "")) : kv.Value?.ToString()))).Where(x => x.Values.Count > 0 && x.Name.Length > 0).ToList();
             await store.SaveProductAsync(product with { VariantOptions = ShopVariants.OptionsToJson(parsed) }, ct);
         }
-        return Answer("applied", $"„{product.Title}“: {added} Variante(n) neu, {updated} aktualisiert" + (off > 0 ? $", {off} abgeschaltet." : "."));
+        return Answer("applied", $"„{product.Title}“: {added} Variante(n) neu, {updated} aktualisiert" + (off > 0 ? $", {off} abgeschaltet." : "."), undo: undo);
     }
 
     // ---- attributes ---------------------------------------------------------------------------------------------
@@ -181,12 +184,13 @@ internal static class ShopOps
         }
         if (kind == AttributeKind.Choice && ShopAttributes.SplitOptions(options).Count == 0) return Answer("failed", "Eine Auswahl-Eigenschaft braucht options.");
         var sort = (await store.AttributesAsync(ct)).Count;
-        await store.SaveAttributeAsync(new ShopAttribute
+        var newId = await store.SaveAttributeAsync(new ShopAttribute
         {
             Slug = slug, Name = name.Length > 80 ? name[..80] : name, Kind = kind, Options = kind == AttributeKind.Choice ? options : "", Unit = kind == AttributeKind.Number ? Str(o, "unit") : "",
             Filterable = Flag(o, "filterable", true), Category = category, Sort = sort
         }, ct);
-        return Answer("applied", $"Eigenschaft „{name}“ ({kind}) angelegt.");
+        return Answer("applied", $"Eigenschaft „{name}“ ({kind}) angelegt.", new JsonObject { ["id"] = newId, ["slug"] = slug },
+            ShopOpsMore.Undo("attribute.remove", new JsonObject { ["id"] = newId }));
     }
 
     /// <summary>Gives a product its values: <c>values</c> is an object attribute address → value (a choice may be a list; true/false for yes/no). An unknown attribute or a value that is no option of a choice is reported, not stored.</summary>
@@ -199,6 +203,11 @@ internal static class ShopOps
         if (o["values"] is not JsonObject values || values.Count == 0) return Answer("failed", "values fehlt oder ist leer.");
         var cats = await store.CategoriesAsync(ct);
         var notes = new List<string>(); var set = 0;
+        // The undo (ShopOpsMore.RestoreProductAttributesAsync): the product's values of every attribute named here, as they are before this writes.
+        var named = new List<long>();
+        foreach (var key in values.Select(kv => kv.Key).ToList())
+            if (await store.AttributeBySlugAsync(PluginText.Slugify(key), ct) is { } attribute) named.Add(attribute.Id);
+        var undo = await ShopOpsMore.ProductValuesUndoAsync(store, product.Id, named, ct);
         foreach (var (key, node) in values)
         {
             if (await store.AttributeBySlugAsync(PluginText.Slugify(key), ct) is not { } attr) { notes.Add($"„{key}“ ist keine Eigenschaft"); continue; }
@@ -215,6 +224,7 @@ internal static class ShopOps
             await store.SetProductAttrAsync(product.Id, attr.Id, stored, ct);
             set++;
         }
-        return Answer(set > 0 ? "applied" : "failed", $"„{product.Title}“: {set} Eigenschaft(en) gesetzt" + (notes.Count > 0 ? "; " + string.Join("; ", notes) : "") + ".");
+        return Answer(set > 0 ? "applied" : "failed", $"„{product.Title}“: {set} Eigenschaft(en) gesetzt" + (notes.Count > 0 ? "; " + string.Join("; ", notes) : "") + ".",
+            undo: set > 0 ? undo : null);
     }
 }

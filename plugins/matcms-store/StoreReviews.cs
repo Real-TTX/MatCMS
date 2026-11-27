@@ -26,9 +26,9 @@ internal static class StoreReviews
         .Text("status", def: Visible).Int("reported", def: "0").Text("answer", def: "").Timestamp("answered").Timestamp("created").Timestamp("updated")
         .UniqueIndex("item_id", "member_id").Index("item_id").Index("member_id"));
 
-    private static IDataTable Table(IPluginContext ctx) => ctx.Data.Table("reviews");
+    internal static IDataTable Table(IPluginContext ctx) => ctx.Data.Table("reviews");
 
-    private static Review R(DataRow r) => new(r.Id, r.Int("item_id"), r.Int("member_id"), r.Text("name"), (int)Math.Clamp(r.Int("stars"), 1, 5), r.Text("text"),
+    internal static Review R(DataRow r) => new(r.Id, r.Int("item_id"), r.Int("member_id"), r.Text("name"), (int)Math.Clamp(r.Int("stars"), 1, 5), r.Text("text"),
         r.Text("status"), r.Int("reported"), r.Text("answer"), r.Timestamp("answered"), r.Timestamp("created"), r.Timestamp("updated"));
 
     public static bool Enabled(IPluginContext ctx) => ctx.Settings.GetBool(StoreSettings.Reviews);

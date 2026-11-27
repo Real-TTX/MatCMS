@@ -12,6 +12,11 @@ namespace MatCMS.Plugin.Shop;
 [JsonSerializable(typeof(Product))]
 [JsonSerializable(typeof(Brand))]
 [JsonSerializable(typeof(Category))]
+// The undo records of the operations (ShopOpsMore): the stored row as it was.
+[JsonSerializable(typeof(Coupon))]
+[JsonSerializable(typeof(Variant))]
+[JsonSerializable(typeof(ShopAttribute))]
+[JsonSerializable(typeof(ShippingRate))]
 internal sealed partial class ShopJson : JsonSerializerContext
 {
 }

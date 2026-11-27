@@ -41,6 +41,17 @@ public class User
     /// is consumed by removing its hash. Null/empty = none left.</summary>
     public string? RecoveryCodes { get; set; }
 
+    // --- Sign-in through MatIdentity (MatDesign docs/PLATFORM.md "Sign-in with MatIdentity") ---------------
+    // Both null for every account that never signed in through MatIdentity; the migration is purely additive.
+
+    /// <summary>The subject (claim <c>sub</c>) of the MatIdentity person this account belongs to. Set when the person first signs in
+    /// through MatIdentity, or when an existing account proved itself with its password (the pending link). Unique when set.</summary>
+    public string? ExternalSubject { get; set; }
+
+    /// <summary>When MatIdentity signed this person out everywhere (back-channel logout with <c>sub</c> alone): a cookie issued before it
+    /// is rejected at its next request (<see cref="Services.AuthService.ValidatePrincipalAsync"/>).</summary>
+    public DateTime? IdentitySignedOutAt { get; set; }
+
     public const string RoleAdmin = "Admin";
     public const string RoleOperator = "Operator";
 }

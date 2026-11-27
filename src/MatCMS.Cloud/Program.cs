@@ -3,6 +3,8 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using MatCMS.Cloud.Data;
 using MatCMS.Cloud.Mcp;
+using MatCMS.Cloud.Platform;
+using MatPlatform;
 using MatCMS.Cloud.Services;
 using MatCMS.Shared;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -70,7 +72,21 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "keys")))
     .SetApplicationName("MatCMS.Cloud");
 
-// --- Authentication: cookie based, login only via /login ---
+// --- The Mat platform contract (MatDesign docs/PLATFORM.md, contract 2) -------------------------------
+// /api, /api/health, /api/state with MAT_API_KEY or a token of MatIdentity; what the cloud provides (cms.cloud: a MatCMS site that a broker
+// such as MatOS binds gets a key and enrols itself, Platform/BindingRegistration) and consumes (identity.oidc, mail.smtp). MatPlatform is a copy
+// (MatPlatform/, never edited here). Without any of its variables the cloud runs exactly as before.
+var platform = builder.AddMatPlatform<MatCMS.Cloud.Platform.CloudPlatform>(MatCMS.Cloud.Platform.CloudPlatform.Describe, o =>
+{
+    o.DefaultLanguage = "de";
+    o.DataDirectory = dataDir;
+    o.ConnectionsAccess = http => Task.FromResult(http.User.IsInRole("Admin"));
+});
+
+// The mail through MatSMTP (MATSMTP_*): set = every mail of the cloud goes through it, its own SMTP settings are shown as fixed.
+builder.Services.AddSingleton(MatPlatform.MatSmtpSettings.From(builder.Configuration));
+
+// --- Authentication: cookie based, login via /login; with MATIDENTITY_AUTHORITY through MatIdentity ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -82,6 +98,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.Name = "matcmscloud.auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        // A session that came through MatIdentity ends when MatIdentity ends it (back-channel logout).
+        options.Events.OnValidatePrincipal = AuthService.ValidatePrincipalAsync;
+    })
+    // Sign-in through MatIdentity, only when MATIDENTITY_AUTHORITY is set (nothing changes without it); with it also the back-channel logout.
+    .AddMatIdentitySignIn<MatCMS.Cloud.Platform.CloudIdentityUsers>(platform, o =>
+    {
+        o.CookieScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        o.LoginPath = "/login";
+        o.AccessDeniedPath = "/login?local=1&denied=1";
     });
 
 builder.Services.AddAuthorization(options =>
@@ -402,7 +427,9 @@ app.Use(async (ctx, next) =>
     var p = ctx.Request.Path.Value ?? "/";
     if (p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
         && ctx.User?.Identity?.IsAuthenticated == true
-        && !p.StartsWith("/admin/account/twofactor", StringComparison.OrdinalIgnoreCase))
+        && !p.StartsWith("/admin/account/twofactor", StringComparison.OrdinalIgnoreCase)
+        // MatIdentity has its own second step: a person who came through it is not sent to the cloud's enrolment.
+        && !AuthService.IsIdentitySession(ctx.User))
     {
         var cloud = ctx.RequestServices.GetRequiredService<CloudContext>();
         if (cloud.Flag(SettingKeys.Require2fa))
@@ -452,6 +479,11 @@ MatCMS.Shared.Web.Pwa.MapPwa(app, ctx =>
     return new MatCMS.Shared.Web.PwaInfo(name, MatCMS.Shared.Web.Pwa.ShortName(name), "cloud", "/", string.IsNullOrEmpty(lang) ? "de" : lang);
 });
 app.MapRazorPages();
+
+// The platform contract (/api, /api/health, /api/state, /api/bindings, /api/connections, POST /signout-backchannel with MatIdentity) and what the
+// cloud does for the consumers of cms.cloud.
+app.MapMatPlatform();
+app.MapCmsCloudProvider();
 
 // --- Remote MCP server (/mcp) ---------------------------------------------
 // Key-authenticated like /api/v1, but anonymous at the transport level: an AI client (ChatGPT, Claude)

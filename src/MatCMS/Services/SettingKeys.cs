@@ -287,6 +287,10 @@ public static class SettingKeys
     /// tell a NEW run from the same report being repeated every minute.</summary>
     public const string CloudSyncRunAt = "cloud.syncRunAt";
 
+    /// <summary>The cloud address this link was made at through the binding cms.cloud (MatOS), empty for a link made by hand
+    /// (<see cref="CloudBinding"/>, <c>CloudService.EnsureBindingAsync</c>).</summary>
+    public const string CloudBinding = "cloud.binding";
+
     // Note: TopBarLink1/2 are intentionally NOT here — the top bar moved to the "toolbar" menu.
     // The constants remain for the one-time migration in DbSeeder.
     public static readonly string[] All =
@@ -335,7 +339,7 @@ public static class SettingKeys
     /// of any generic save path — the token needs encrypting, so CloudService owns these. Also the
     /// deny-list for pushed settings: a profile must never be able to rewrite the cloud link.</summary>
     public static readonly string[] Cloud =
-        [CloudUrl, CloudPublicUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt];
+        [CloudUrl, CloudPublicUrl, CloudInstanceId, CloudToken, CloudAppliedRevision, CloudSyncError, CloudSyncReport, CloudSeeded, CloudSyncRunAt, CloudBinding];
 
     /// <summary>
     /// Keys no OUTSIDE source may write: a cloud rollout, a content operation (MCP `set_setting`) or a restored backup.

@@ -34,6 +34,14 @@
         {
             <div class="alert alert-error">@Model.Error</div>
         }
+        @if (Model.PendingLink is not null)
+        {
+            <div class="alert alert-info">@T["login.linkIntro"]</div>
+        }
+        else if (Model.LinkExpired)
+        {
+            <div class="alert alert-error">@T["login.linkExpired"]</div>
+        }
         <form method="post">
             <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
             <div class="form-field">
@@ -49,6 +57,17 @@
             </label>
             <button type="submit" class="btn btn-block">@T["login.submit"]</button>
         </form>
+        @if (Model.PendingLink is not null)
+        {
+            <form method="post" asp-page-handler="CancelLink">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button type="submit" class="btn btn-ghost btn-block">@T["login.linkCancel"]</button>
+            </form>
+        }
+        else if (Model.IdentityEnabled)
+        {
+            <a class="btn btn-ghost btn-block" href="@Model.IdentitySignInUrl">@T["login.identity"]</a>
+        }
     </div>
 </body>
 </html>

@@ -33,6 +33,12 @@ public class IndexModel : PageModel
         _config = config;
     }
 
+    /// <summary>MatSMTP sets the mail (MATSMTP_*): the SMTP fields are fixed, only the sender name is the cloud's.</summary>
+    public bool MailRelayed => _mail.IsRelayed;
+
+    /// <summary>Where the mail goes while <see cref="MailRelayed"/>.</summary>
+    public string? MailRelay => _mail.RelayDescription;
+
     // ---- Sicherung: backups of this cloud's configuration (CloudConfigBackupService — the same as REST and MCP) ----
 
     public List<CloudConfigBackupService.Info> ConfigBackups { get; private set; } = new();
@@ -165,6 +171,14 @@ public class IndexModel : PageModel
         string? host, string? port, string? user, string? password, bool clearPassword,
         string? fromEmail, string? fromName, bool ssl)
     {
+        // Fixed while MatSMTP sets the mail: only the sender name may change (the stored server settings stay as they are).
+        if (_mail.IsRelayed)
+        {
+            await _cloud.SaveAsync(new Dictionary<string, string?> { [SettingKeys.SmtpFromName] = fromName?.Trim() });
+            TempData["Flash"] = "Absendername gespeichert.";
+            return RedirectToPage(new { tab = "smtp" });
+        }
+
         await _cloud.SaveAsync(new Dictionary<string, string?>
         {
             [SettingKeys.SmtpHost] = host?.Trim(),

@@ -156,13 +156,21 @@ public class CloudService
         if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || (parsed.Scheme != "http" && parsed.Scheme != "https"))
             return (false, "Die Cloud-URL muss mit http:// oder https:// beginnen.");
         if (string.IsNullOrWhiteSpace(joinCode)) return (false, "Bitte den Join-Code angeben.");
+        return await EnrollAsync(url, "/api/instances/register", joinCode.Trim(), bearer: null, ct);
+    }
 
+    /// <summary>
+    /// The enrolment itself: the join code in the body (<c>/api/instances/register</c>), or the key of a binding of <c>cms.cloud</c> as the
+    /// bearer token (<c>/api/provides/cms.cloud/register</c>, see <see cref="EnsureBindingAsync"/>). Same body, same answer.
+    /// </summary>
+    private async Task<(bool ok, string? error)> EnrollAsync(string url, string path, string? joinCode, string? bearer, CancellationToken ct)
+    {
         try
         {
             var beat = await BuildBeatAsync(ct);
             var request = new RegisterRequest
             {
-                JoinCode = joinCode.Trim(),
+                JoinCode = joinCode,
                 ProtocolVersion = CloudProtocol.Version,
                 Version = beat.Version,
                 SiteName = beat.SiteName,
@@ -176,10 +184,13 @@ public class CloudService
             client.Timeout = TimeSpan.FromSeconds(20);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("MatCMS-Instance");
 
-            var res = await client.PostAsJsonAsync($"{url}/api/instances/register", request, ct);
+            if (bearer is not null)
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearer);
+
+            var res = await client.PostAsJsonAsync($"{url}{path}", request, ct);
             if (!res.IsSuccessStatusCode)
                 return (false, res.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                    ? "Der Join-Code wurde von der Cloud abgelehnt."
+                    ? bearer is null ? "Der Join-Code wurde von der Cloud abgelehnt." : "Der Schlüssel der Verbindung wurde von der Cloud abgelehnt."
                     : $"Die Cloud antwortete mit HTTP {(int)res.StatusCode}.");
 
             var answer = await res.Content.ReadFromJsonAsync<RegisterResponse>(ct);
@@ -194,6 +205,48 @@ public class CloudService
         {
             _log.LogInformation(ex, "Cloud registration failed");
             return (false, $"Die Cloud war nicht erreichbar: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The connection a broker made (MatDesign docs/PLATFORM.md "Bindings"): MatOS bound this site to a MatCMS.Cloud it installed beside it
+    /// (the capability <c>cms.cloud</c>) and gave it <see cref="CloudBinding"/>'s variables. Called before every heartbeat: while the site is
+    /// not linked to that cloud it enrols itself with the key (into the cloud's default profile), so nobody has to copy a join code. The
+    /// variables win over a link made by hand to another cloud; a link made by hand to the same cloud is kept. Without the variables nothing
+    /// changes. Never throws.
+    /// </summary>
+    public async Task EnsureBindingAsync(CancellationToken ct = default)
+    {
+        var binding = CloudBinding.From(_services.GetRequiredService<IConfiguration>());
+        if (binding is null) return;
+
+        try
+        {
+            var settings = await GetSettingsAsync();
+            var mark = (await _db.SiteSettings.AsNoTracking().FirstOrDefaultAsync(s => s.Key == SettingKeys.CloudBinding, ct))?.Value ?? "";
+            if (settings.Configured && string.Equals(mark, binding.ServerUrl, StringComparison.OrdinalIgnoreCase)) return;
+            if (settings.Configured && binding.Names(settings.Url))
+            {
+                await UpsertAsync(SettingKeys.CloudBinding, binding.ServerUrl);
+                await _db.SaveChangesAsync(ct);
+                return;
+            }
+
+            var (ok, error) = await EnrollAsync(binding.ServerUrl, CloudBinding.RegisterPath, joinCode: null, bearer: binding.Key, ct);
+            if (!ok)
+            {
+                _state.LastError = error;
+                _log.LogInformation("Joining the cloud of the binding failed: {Error}", error);
+                return;
+            }
+
+            await UpsertAsync(SettingKeys.CloudBinding, binding.ServerUrl);
+            await _db.SaveChangesAsync(ct);
+            _log.LogInformation("Joined the cloud {Url} through the binding cms.cloud", binding.ServerUrl);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Joining the cloud of the binding failed");
         }
     }
 
@@ -316,6 +369,16 @@ public class CloudService
                     System.Net.HttpStatusCode.Forbidden => "Diese Instanz wurde in der Cloud abgelehnt.",
                     _ => $"Cloud antwortete mit HTTP {(int)res.StatusCode}."
                 };
+
+                // A link the binding made and the cloud no longer knows (its data was reset, the site was removed there): forget it, so the
+                // next cycle joins again with the key instead of beating against a 401 forever.
+                if (res.StatusCode == System.Net.HttpStatusCode.Unauthorized && CloudBinding.From(_services.GetRequiredService<IConfiguration>()) is not null
+                    && await _db.SiteSettings.AnyAsync(s => s.Key == SettingKeys.CloudBinding && s.Value != "", ct))
+                {
+                    await UpsertAsync(SettingKeys.CloudToken, "");
+                    await UpsertAsync(SettingKeys.CloudBinding, "");
+                    await _db.SaveChangesAsync(ct);
+                }
                 return;
             }
 
@@ -884,8 +947,10 @@ public class CloudConnectionService : BackgroundService
             try
             {
                 using var scope = _scopes.CreateScope();
-                await scope.ServiceProvider.GetRequiredService<CloudService>()
-                    .SendHeartbeatAsync(stoppingToken);
+                var cloud = scope.ServiceProvider.GetRequiredService<CloudService>();
+                // A cloud bound by MatOS (cms.cloud): join it first when not linked yet.
+                await cloud.EnsureBindingAsync(stoppingToken);
+                await cloud.SendHeartbeatAsync(stoppingToken);
             }
             catch (OperationCanceledException) { return; }
             catch (Exception ex) { _log.LogWarning(ex, "Cloud heartbeat cycle failed"); }

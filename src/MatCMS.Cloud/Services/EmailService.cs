@@ -4,6 +4,7 @@ using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MatCMS.Cloud.Data;
+using MatPlatform;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 
@@ -14,23 +15,34 @@ namespace MatCMS.Cloud.Services;
 /// connection modes work: implicit SSL/TLS (SMTPS, port 465, e.g. IONOS) and STARTTLS (587/25) —
 /// the built-in System.Net.Mail.SmtpClient can't do implicit SSL. Never throws to the caller;
 /// failures come back as (false, error) so a notification loop is never taken down by a mail server.
+/// With the MATSMTP_* variables (MatDesign docs/PLATFORM.md "Mail through MatSMTP", set by MatOS) EVERY mail goes through MatSMTP
+/// instead, with its relay user and sender address; the stored settings stay stored and apply again when the variables are gone.
 /// </summary>
 public class EmailService
 {
     private readonly AppDbContext _db;
     private readonly SecretProtector _secrets;
     private readonly ILogger<EmailService> _log;
+    private readonly MatSmtpSettings _relay;
 
-    public EmailService(AppDbContext db, SecretProtector secrets, ILogger<EmailService> log)
+    public EmailService(AppDbContext db, SecretProtector secrets, ILogger<EmailService> log, MatSmtpSettings relay)
     {
         _db = db;
         _secrets = secrets;
         _log = log;
+        _relay = relay;
     }
 
+    /// <summary>True while the MATSMTP_* variables set the mail: the SMTP settings are shown as fixed.</summary>
+    public bool IsRelayed => _relay.IsConfigured;
+
+    /// <summary>Where the mail goes while it is relayed (the sender and MatSMTP's address), for the fixed settings; null without MatSMTP.</summary>
+    public string? RelayDescription => _relay.IsConfigured ? $"{_relay.FromAddress} → {_relay.Host}:{_relay.Port}" : null;
+
+    /// <param name="Mode">The TLS mode when it is known exactly (MatSMTP says it); null = derived from the port and <paramref name="Ssl"/>.</param>
     public sealed record SmtpConfig(
         string Host, int Port, string User, string Password,
-        string FromEmail, string FromName, bool Ssl)
+        string FromEmail, string FromName, bool Ssl, SecureSocketOptions? Mode = null)
     {
         public bool IsConfigured => !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(FromEmail);
     }
@@ -45,6 +57,16 @@ public class EmailService
         string G(string k) => map.TryGetValue(k, out var v) ? (v ?? "") : "";
         if (!int.TryParse(G(SettingKeys.SmtpPort), out var port) || port <= 0) port = 587;
         var ssl = G(SettingKeys.SmtpSsl).Trim().ToLowerInvariant();
+
+        // MatSMTP (the relay of the Mat apps): its host, port, relay user, TLS mode and sender win; only the sender NAME stays the cloud's.
+        if (_relay.IsConfigured)
+        {
+            return new SmtpConfig(
+                _relay.Host!, _relay.Port, _relay.Username ?? "", _relay.Password ?? "",
+                _relay.FromAddress ?? G(SettingKeys.SmtpFromEmail).Trim(), G(SettingKeys.SmtpFromName).Trim(),
+                _relay.UseTls || _relay.UseStartTls,
+                _relay.UseTls ? SecureSocketOptions.SslOnConnect : _relay.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None);
+        }
 
         return new SmtpConfig(
             G(SettingKeys.SmtpHost).Trim(), port, G(SettingKeys.SmtpUser),
@@ -120,9 +142,9 @@ public class EmailService
 
             // Pick the right TLS mode: port 465 = implicit SSL on connect; otherwise STARTTLS
             // (opportunistic when the SSL switch is off, so a plain server still works).
-            var secure = cfg.Port == 465
+            var secure = cfg.Mode ?? (cfg.Port == 465
                 ? SecureSocketOptions.SslOnConnect
-                : cfg.Ssl ? SecureSocketOptions.StartTls : SecureSocketOptions.StartTlsWhenAvailable;
+                : cfg.Ssl ? SecureSocketOptions.StartTls : SecureSocketOptions.StartTlsWhenAvailable);
 
             var logger = new ProtocolLogger(traceStream) { RedactSecrets = true };
             using var client = new SmtpClient(logger);

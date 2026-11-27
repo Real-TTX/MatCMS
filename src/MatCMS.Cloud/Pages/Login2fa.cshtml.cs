@@ -22,13 +22,15 @@ public class Login2faModel : PageModel
     private readonly AuthService _auth;
     private readonly TwoFactorService _twoFactor;
     private readonly IDataProtectionProvider _dp;
+    private readonly ILogger<Login2faModel> _log;
 
-    public Login2faModel(AppDbContext db, AuthService auth, TwoFactorService twoFactor, IDataProtectionProvider dp)
+    public Login2faModel(AppDbContext db, AuthService auth, TwoFactorService twoFactor, IDataProtectionProvider dp, ILogger<Login2faModel> log)
     {
         _db = db;
         _auth = auth;
         _twoFactor = twoFactor;
         _dp = dp;
+        _log = log;
     }
 
     [BindProperty] public string Code { get; set; } = "";
@@ -75,7 +77,9 @@ public class Login2faModel : PageModel
 
         _twoFactor.ClearFailures(user.Id);
         TwoFactorLoginCookie.Delete(HttpContext);
-        await _auth.SignInAsync(HttpContext, user, pending.Remember);
+        // A pending link of MatIdentity is taken only now, after the account's second factor.
+        var identity = await LoginModel.TakeLinkAsync(HttpContext, _db, user, _log);
+        await _auth.SignInAsync(HttpContext, user, pending.Remember, identity);
         return Redirect(Url.IsLocalUrl(pending.ReturnUrl) ? pending.ReturnUrl : "/admin");
     }
 }

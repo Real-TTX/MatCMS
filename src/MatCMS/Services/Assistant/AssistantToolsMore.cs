@@ -20,7 +20,6 @@ public sealed partial class AssistantTools
     /// files' static fields are initialised is not defined.</summary>
     private static (string Name, string Args, string What, bool Writes)[] MoreCatalog =>
     [
-        ("plugin_action", "{\"name\": \"post.create\", \"args\": {…}}", "Eine Aktion eines Plugins ausführen (Blogbeiträge, Shop-Produkte, Kategorien …) – die verfügbaren stehen unten unter „Plugin-Aktionen“ mit ihren Argumenten.", true),
         ("list_components", "{}", "Die eigenen Komponenten (Blocktypen dieser Website): Typ, Name, Felder.", false),
         ("read_component", "{\"component\": \"typ\"}", "Eine Komponente mit Feldern und HTML-Vorlage lesen.", false),
         ("create_component", "{\"name\", \"type\"?, \"description\"?, \"fields\": [{\"id\": \"titel\", \"label\": \"Titel\", \"type\": \"text|textarea|richtext|image|url\"}], \"html\": \"<section class=…>{{titel}}</section>\"}", "Neuen Blocktyp anlegen: HTML mit {{feldId}}-Platzhaltern (Werte werden maskiert, richtext roh). Kein <script>, keine on…-Attribute. Danach als Block mit type = Typ nutzbar.", true),
@@ -39,51 +38,6 @@ public sealed partial class AssistantTools
     private const int MaxComponentHtml = 50000, MaxPluginCode = 200000;
 
     private static readonly string[] FieldTypes = ["text", "textarea", "richtext", "image", "url"];
-
-    // ============================================================================================== plugin actions
-
-    private Plugins.PluginContributions Plugins => _services.GetRequiredService<Plugins.PluginContributions>();
-
-    /// <summary>The plugin actions as prompt text — only the described ones that carry no customers' data.</summary>
-    public string PluginActionsText()
-    {
-        var ops = Plugins.AssistantOperations;
-        if (ops.Count == 0) return "";
-        var sb = new System.Text.StringBuilder("\n## Plugin-Aktionen (mit plugin_action ausführen)\n");
-        foreach (var o in ops.OrderBy(o => o.Owner).ThenBy(o => o.Name))
-            sb.Append("- ").Append(o.Name).Append(" (").Append(o.Info.Name).Append(')').Append(o.Spec!.Writes ? " [ändert]" : "")
-              .Append(" — ").Append(o.Spec.Description).Append(" Argumente: ").Append(o.Spec.Arguments).Append('\n');
-        return sb.ToString();
-    }
-
-    private async Task<ToolOutcome> PluginActionAsync(JsonObject args, CancellationToken ct)
-    {
-        var name = Str(args["name"]).Trim();
-        var op = Plugins.AssistantOperations.FirstOrDefault(o => o.Name == name)
-            ?? throw new ToolError($"Unbekannte Plugin-Aktion „{name}“", $"Die Aktion \"{name}\" gibt es nicht (oder ihr Plugin ist aus). Verfügbar: {string.Join(", ", Plugins.AssistantOperations.Select(o => o.Name))}.");
-        if (op.Spec!.Writes) RequireUnlocked($"die Plugin-Aktion „{name}“ ausführen");
-        var input = args["args"] is JsonObject a ? a.DeepClone() : new JsonObject();
-        var answer = await Plugins.RunOperationAsync(_services, name, input, ct);
-        var o = answer as JsonObject ?? new JsonObject { ["status"] = "applied", ["message"] = answer?.ToString() ?? "" };
-        var status = Str(o["status"]) is { Length: > 0 } s ? s : "applied";
-        var message = Str(o["message"]);
-        if (status == "failed") throw new ToolError($"{name}: fehlgeschlagen", message.Length > 0 ? message : "Die Aktion ist fehlgeschlagen.");
-        var result = new JsonObject { ["status"] = status, ["message"] = message };
-        if (o["data"] is { } data) result["data"] = data.DeepClone();
-        var warnings = new List<string>();
-        var changed = op.Spec.Writes && status == "applied";
-        if (changed)
-        {
-            if (o["undo"] is JsonObject undo && Str(undo["name"]).Length > 0)
-            {
-                Journal("op", name + "#" + Guid.NewGuid().ToString("N")[..8], undo.ToJsonString());
-                await _db.SaveChangesAsync(ct);
-            }
-            else warnings.Add($"Die Aktion {name} lässt sich nicht automatisch rückgängig machen.");
-        }
-        var summary = $"{op.Info.Name}: {(message.Length > 0 ? message : name)}";
-        return Ok(summary.Length > 200 ? summary[..200] + "…" : summary, result, warnings, null, changed: changed);
-    }
 
     // ============================================================================================== components
 
@@ -331,7 +285,7 @@ public sealed partial class AssistantTools
             var o = new JsonObject
             {
                 ["key"] = p.Key, ["name"] = p.Name, ["kind"] = p.Kind, ["enabled"] = p.Enabled, ["version"] = p.Version, ["description"] = Cap(p.Description, 300),
-                ["actions"] = string.Join(", ", registry.Operations.Where(op => op.Owner == p.Key && op.Spec is { Internal: false }).Select(op => op.Name)),
+                ["actions"] = string.Join(", ", registry.Operations.Where(op => op.Owner == p.Key && op.Spec is { Internal: false }).Select(op => op.QualifiedName)),
             };
             if (errors.TryGetValue(p.Id, out var e)) o["error"] = Cap(e, 500);
             return (JsonNode)o;

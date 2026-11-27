@@ -155,6 +155,11 @@ public sealed class HeartbeatRequest
     /// <see cref="StatKinds.WireTopPerKind"/> keys per kind. Sent only to a cloud that said it takes them
     /// (<see cref="HeartbeatResponse.StatsAccepted"/>), and throttled once caught up. Null = nothing this beat.</summary>
     public List<StatDayReport>? Stats { get; set; }
+
+    /// <summary>The operations the site's loaded plugins offer (<see cref="PluginOperationInfo"/>, internal ones left out), so the cloud's MCP can
+    /// list and run them generically. Sent on the first beat after a start and whenever the catalogue changed (a plugin switched on/off or
+    /// updated); null = unchanged since the last beat the cloud took. The cloud keeps the last one it got. An older site never sends it.</summary>
+    public List<PluginOperationInfo>? PluginOperations { get; set; }
 }
 
 /// <summary>One log entry as it travels on the heartbeat — a lean projection of the instance's own

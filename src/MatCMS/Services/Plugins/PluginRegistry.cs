@@ -106,7 +106,13 @@ public sealed class PluginRegistry
 
     /// <summary>A named operation (cloud / MCP).</summary>
     /// <summary><c>Spec</c>: the description, when the plugin gave one (only then is it offered to the AI assistant).</summary>
-    public sealed record OperationEntry(string Owner, PluginInfo Info, string Name, PluginOperationHandler Handler, PluginOperationSpec? Spec = null);
+    public sealed record OperationEntry(string Owner, PluginInfo Info, string Name, PluginOperationHandler Handler, PluginOperationSpec? Spec = null)
+    {
+        /// <summary>The name every outside caller uses: <c>{plugin}.{name}</c> (<c>shop.product.create</c>, <c>docs.page.read</c>). Plugins declare
+        /// short names, and two plugins — or a plugin and the core's content ops (<c>page.read</c>) — may declare the same one; the
+        /// qualified name is never ambiguous.</summary>
+        public string QualifiedName => Owner + "." + Name;
+    }
 
     /// <summary>One plugin's registrations. Built privately during a load, then published whole.</summary>
     public sealed class Slice

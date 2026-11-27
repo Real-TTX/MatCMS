@@ -81,6 +81,7 @@ public sealed class AssistantAgent
         _tools.ConversationId = conv.Id;
         _tools.Run = run;
         _tools.Scope = new AssistantScope(conv.ScopePageId, conv.ScopeBlockId, conv.ScopeLocked);
+        _tools.PlanApproved = await PreviousRunEndedWithPlanAsync(conv.Id, run, ct);
         var history = ReadHistory(conv.HistoryJson);
         (string State, string Text) end = ("stalled", "Die KI hat aufgehört, ohne den Auftrag abzuschließen.");
         try
@@ -187,6 +188,14 @@ public sealed class AssistantAgent
                 await SaveHistoryAsync(conv, history, ct);
                 if (closing) await StepAsync(conv.Id, run, "assistant", parsed.Message, meta, ct);
 
+                // A proposed plan ends the run: the editor reads it and answers (the page offers "Plan ausführen"). Nothing else is written meanwhile.
+                if (_tools.PlanProposed)
+                {
+                    if (!closing && parsed.Message.Length == 0) await StepAsync(conv.Id, run, "assistant", "Hier ist mein Plan – soll ich so vorgehen?", meta, ct);
+                    end = ("plan", "Der Plan wartet auf deine Freigabe.");
+                    break;
+                }
+
                 // "done" with actions that all went through ends the run; a refusal or a warning gets the model one more look.
                 finished = parsed.Done && !problems;
                 if (finished) end = ("done", "Fertig.");
@@ -274,6 +283,16 @@ public sealed class AssistantAgent
         }
         else lines.Add("Der Nutzer arbeitet an der ganzen Website.");
         return string.Join("\n", lines);
+    }
+
+    /// <summary>The run before this one ended with a plan (its "end" step says "plan"): the editor's message now is the answer to it, so the
+    /// bulk writes the plan announced may go ahead (<see cref="AssistantTools.PlanApproved"/>). The answer itself may still say "no" or "change
+    /// this" — the model reads it; the code only knows the editor has SEEN the plan.</summary>
+    private async Task<bool> PreviousRunEndedWithPlanAsync(int conversationId, int run, CancellationToken ct)
+    {
+        var last = await _db.AiSteps.AsNoTracking().Where(s => s.ConversationId == conversationId && s.Run == run - 1 && s.Kind == "end")
+            .OrderByDescending(s => s.Id).Select(s => s.DataJson).FirstOrDefaultAsync(ct);
+        return last is not null && JsonNode.Parse(last)?["state"]?.GetValue<string>() == "plan";
     }
 
     private async Task<(int index, List<AiAttachment> images)> AttachmentsOfRunAsync(int conversationId, int run, CancellationToken ct)

@@ -47,7 +47,7 @@ public sealed partial class AssistantTools
 
     /// <summary>The tools as the prompt describes them: name, arguments, what it does. The order is the order a sensible
     /// run uses them in.</summary>
-    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog = [.. PageCatalog, .. FormCatalog, .. MoreCatalog];
+    public static readonly (string Name, string Args, string What, bool Writes)[] Catalog = [.. PageCatalog, .. FormCatalog, .. PluginCatalog, .. MoreCatalog];
 
     private static (string Name, string Args, string What, bool Writes)[] PageCatalog =>
     [
@@ -74,6 +74,8 @@ public sealed partial class AssistantTools
 
     public async Task<ToolOutcome> RunAsync(string tool, JsonObject args, CancellationToken ct)
     {
+        if (PlanProposed && IsWrite(tool))
+            return Fail("Plan wartet auf Freigabe", "Du hast in diesem Auftrag einen Plan vorgeschlagen. Ändere jetzt nichts, sondern beende mit \"done\": true und warte auf die Antwort des Nutzers.");
         try
         {
             return tool switch
@@ -98,6 +100,9 @@ public sealed partial class AssistantTools
                 "create_form" => await CreateFormAsync(args, ct),
                 "update_form" => await UpdateFormAsync(args, ct),
                 "plugin_action" => await PluginActionAsync(args, ct),
+                "plugin_batch" => await PluginBatchAsync(args, ct),
+                "propose_plan" => ProposePlan(args),
+                "read_attachment" => await ReadAttachmentAsync(args, ct),
                 "list_components" => await ListComponentsAsync(ct),
                 "read_component" => await ReadComponentAsync(args, ct),
                 "create_component" => await CreateComponentAsync(args, ct),

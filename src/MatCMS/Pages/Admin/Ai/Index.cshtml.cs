@@ -3,6 +3,7 @@ using MatCMS.Data;
 using MatCMS.Models;
 using MatCMS.Services;
 using MatCMS.Services.Assistant;
+using MatCMS.Services.Mcp;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -38,6 +39,9 @@ public class IndexModel : PageModel
     }
 
     public bool Enabled { get; private set; }
+    /// <summary>An MCP log (an outside AI client's calls, <see cref="SiteMcpServer"/>) is read and undone here, never typed into.</summary>
+    public bool IsMcpLog => Conversation?.IsMcp == true;
+    public bool ComposeEnabled => Enabled && !IsMcpLog;
     public AiConversation? Conversation { get; private set; }
     public List<ConversationRow> Conversations { get; private set; } = new();
     public string ScopeText { get; private set; } = "";
@@ -53,7 +57,7 @@ public class IndexModel : PageModel
     public OwnAi.ProfileSet Profiles { get; private set; } = new(new(), "");
     public bool CloudAi { get; private set; }
 
-    public sealed record ConversationRow(int Id, string Title, string Scope, DateTime UpdatedAt, int Runs, int Changes, int Tokens, string CreatedBy);
+    public sealed record ConversationRow(int Id, string Title, string Scope, DateTime UpdatedAt, int Runs, int Changes, int Tokens, string CreatedBy, bool Mcp = false);
 
     public async Task OnGetAsync(int? id, int? pageId, int? blockId, string? tab)
     {
@@ -78,7 +82,7 @@ public class IndexModel : PageModel
         var pageTitles = await _db.Pages.AsNoTracking().Select(p => new { p.Id, p.Title }).ToDictionaryAsync(p => p.Id, p => p.Title);
         Conversations = convs.Select(c => new ConversationRow(c.Id, c.Title.Length > 0 ? c.Title : _t["assistant.untitled"],
             c.ScopePageId is int pid && pageTitles.TryGetValue(pid, out var pt) ? pt : _t["assistant.scopeSite"],
-            c.UpdatedAt, c.Runs, changeCounts.TryGetValue(c.Id, out var n) ? n : 0, c.Tokens, c.CreatedBy)).ToList();
+            c.UpdatedAt, c.Runs, changeCounts.TryGetValue(c.Id, out var n) ? n : 0, c.Tokens, c.CreatedBy, c.IsMcp)).ToList();
     }
 
     private async Task<(string text, string? url)> DescribeScopeAsync(int? pageId, int? blockId)

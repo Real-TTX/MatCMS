@@ -23,10 +23,18 @@ public sealed class SiteApiKeyService
     /// <summary>The word a right is stored as.</summary>
     public static string Word(ApiAccess a) => a switch { ApiAccess.Write => "write", ApiAccess.PersonalData => "personal", _ => "read" };
 
-    /// <summary>The rights of a key, cleaned: <c>{plugin}:{read|write|personal}</c>, lower case, no duplicates, nothing else.</summary>
+    /// <summary>
+    /// The site's OWN areas a key may be given (for the MCP server, <c>/mcp</c>), each as <c>core.{area}:{read|write}</c>. The dot keeps them apart
+    /// from plugin keys, which are slugs and never hold one. There is no "personal" for these: what a core area carries is the site's content.
+    /// </summary>
+    public static readonly string[] CoreAreas = ["core.pages", "core.media", "core.forms", "core.design", "core.settings"];
+
+    /// <summary>The rights of a key, cleaned: <c>{plugin}:{read|write|personal}</c> or <c>core.{area}:{read|write}</c>, lower case, no duplicates,
+    /// nothing else.</summary>
     public static string CleanRights(IEnumerable<string> rights) => string.Join(",", rights
         .Select(r => r.Trim().ToLowerInvariant())
-        .Where(r => System.Text.RegularExpressions.Regex.IsMatch(r, "^[a-z][a-z0-9_-]{0,63}:(read|write|personal)$"))
+        .Where(r => System.Text.RegularExpressions.Regex.IsMatch(r, "^[a-z][a-z0-9_-]{0,63}:(read|write|personal)$")
+                 || (System.Text.RegularExpressions.Regex.IsMatch(r, "^core\\.[a-z]+:(read|write)$") && CoreAreas.Contains(r[..r.IndexOf(':')])))
         .Distinct().OrderBy(r => r, StringComparer.Ordinal));
 
     /// <summary>Whether a key's rights allow <paramref name="access"/> on <paramref name="plugin"/>. Write includes read; personal stands alone.</summary>

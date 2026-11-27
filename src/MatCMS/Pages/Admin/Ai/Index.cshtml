@@ -31,7 +31,11 @@
 
 @* ============ CHAT ============ *@
 <div class="tab-panel" data-panel="chat" hidden="@(Model.Tab != "chat")">
-    @if (!Model.Enabled)
+    @if (Model.IsMcpLog)
+    {
+        <div class="alert alert-info"><i class="ti ti-plug-connected"></i> @T["assistant.mcpLog", c!.CreatedBy.StartsWith("api:") ? c.CreatedBy[4..] : c.CreatedBy] <a href="/admin/apikeys">@T["apikeys.title"] →</a></div>
+    }
+    else if (!Model.Enabled)
     {
         <div class="alert alert-info">@T["assistant.disabledLong"] <a href="/admin/settings?tab=ai">@T["settings.tabAi"] →</a></div>
     }
@@ -79,10 +83,10 @@
             <form class="ai-compose" id="ai-compose" method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="ai-files" id="ai-files"></div>
-                <textarea id="ai-input" rows="3" placeholder="@T["assistant.placeholder"]" @(Model.Enabled ? "" : "disabled")></textarea>
+                <textarea id="ai-input" rows="3" placeholder="@T["assistant.placeholder"]" @(Model.ComposeEnabled ? "" : "disabled")></textarea>
                 <div class="ai-compose-bar">
                     <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.pdf,.docx,.xlsx,.csv,.tsv,.txt,.md,.json,.html,.htm,.xml" />
-                    <button type="button" class="btn btn-ghost btn-sm" id="ai-attach" title="@T["assistant.attachHelp"]" @(Model.Enabled ? "" : "disabled")><i class="ti ti-paperclip"></i> @T["assistant.attach"]</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="ai-attach" title="@T["assistant.attachHelp"]" @(Model.ComposeEnabled ? "" : "disabled")><i class="ti ti-paperclip"></i> @T["assistant.attach"]</button>
                     @if (Model.Profiles.Profiles.Count > 0)
                     {
                         <select id="ai-profile" class="ai-profile" data-url="@Url.Page("Index", "Profile")" title="@T["assistant.profile"]" aria-label="@T["assistant.profile"]">
@@ -99,7 +103,7 @@
                     <span class="muted ai-hint">@T["assistant.hint"]</span>
                     <span class="ai-scope-gap"></span>
                     <button type="button" class="btn btn-ghost btn-sm" id="ai-stop" hidden>@T["assistant.stop"]</button>
-                    <button type="submit" class="btn btn-sm" id="ai-send" @(Model.Enabled ? "" : "disabled")>@T["assistant.send"]</button>
+                    <button type="submit" class="btn btn-sm" id="ai-send" @(Model.ComposeEnabled ? "" : "disabled")>@T["assistant.send"]</button>
                 </div>
             </form>
         </section>
@@ -147,7 +151,7 @@
                 @foreach (var row in Model.Conversations)
                 {
                     <tr>
-                        <td><a href="@Url.Page("Index", new { id = row.Id })">@row.Title</a></td>
+                        <td><a href="@Url.Page("Index", new { id = row.Id })">@row.Title</a>@if (row.Mcp) { <text> </text><span class="badge" title="@T["assistant.mcpBadgeHelp"]">MCP</span> }</td>
                         <td>@row.Scope</td>
                         <td>@row.Runs</td>
                         <td>@row.Changes</td>

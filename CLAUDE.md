@@ -227,7 +227,7 @@ members (`AddAdminMenu`, `AddBlock`, …) stay for the plugins already written a
 - **Plugin API endpoints for other programs** (`IPluginBuilder.Api(method, pattern, handler, ApiRouteOptions)`, served by `Services/Plugins/PluginApiEndpoint.cs` at
   `/api/v1/{plugin}/{path}`; `GET /api/v1` lists them with `allowed` for the calling key). Auth is a **site API key** (`SiteApiKey`, Admin → API-Schlüssel,
   `SiteApiKeyService`): `msk_…`, shown ONCE, stored as SHA-256 only, Bearer or `X-Api-Key`, rights `{plugin}:{read|write|personal}` (write implies read,
-  personal stands ALONE — orders/customer data), optional expiry, revoke. 600 calls/min per key, JSON body ≤ 4 MB (`RequestData.Json()`), answers `no-store`.
+  personal stands ALONE — orders/customer data; `core.{area}:{read|write}` for the site's MCP server, see "The site's own MCP server"), optional expiry, revoke. 600 calls/min per key, JSON body ≤ 4 MB (`RequestData.Json()`), answers `no-store`.
   The handler never sees the key — only its name (`RequestData.ApiCaller`), which goes into history as `api:{name}`. Antiforgery off, the route is exempt
   from maintenance mode (an ERP sync must keep running). Keys are **not in backups** (a restored copy elsewhere must not accept the live site's ERP).
   The shop's ERP endpoints: `plugins/shop/ShopApi.cs`, documented for customers in `docs/shop-api.md`.
@@ -652,6 +652,38 @@ through the cloud relay — the key never lives on the site.
   never scaled (`ThumbnailService`) or read as a bitmap (`LoadImageAsync`, the shop's invoice logo stays a raster picture).
 - Tests: `AssistantTests` (the whole app in memory, `FakeAi` in place of the relay), `OwnAiTests` (shared provider clients, the KI tab,
   encryption, backup exclusion).
+
+## The site's own MCP server (`/mcp`)
+
+An AI client (Claude Code, Claude Desktop, Cursor …) works on a site WITHOUT a cloud and at once — the cloud's MCP reaches a site only through
+queued content ops (`ContentOpApplier`, a minute late, add-only, default language, nested blocks lost). `Services/Mcp/SiteMcpServer.cs` +
+`SiteMcpCatalog.cs`, package `ModelContextProtocol.AspNetCore` (the cloud's), **stateless** streamable HTTP (no session in memory: works behind
+the edge and across restarts).
+- **Off until the site's admin switches it on** (`mcp.enabled`, Admin → API-Schlüssel → "MCP-Server"; in `SettingKeys.Protected` AND
+  `NotInBackup` — no rollout, content op or restore opens it, a restored copy starts closed). Off = `/mcp` answers 404 (with a body: an EMPTY
+  error answer to a POST is re-executed as the status page and ends as a bare 400). `mcp` is in `DomainRoutes.SystemSegments` and
+  `PluginRoutePattern.Reserved`, and exempt from maintenance mode.
+- **Auth = the site API keys** (`SiteApiKey`, Bearer `msk_…`), checked on EVERY request by the middleware in `SiteMcpServer.Map`, the key handed
+  to the handlers in `HttpContext.Items`; the per-minute counter is `/api/v1`'s (`PluginApiEndpoint.CountCall`, one counter per key). Core rights
+  sit beside the plugin rights: `core.{pages|media|forms|design|settings}:{read|write}` (`SiteApiKeyService.CoreAreas`; the dot keeps them
+  apart from plugin keys, which are slugs). `tools/list` shows only what the key may call (`WithListToolsHandler`), and a call is checked again.
+- **One write path: the assistant's tools.** Every tool forwards to `AssistantTools.RunAsync` with the assistant's argument names (`run_plugin_operation`
+  → `plugin_action`), so `AssistantBlocks` stays THE boundary (every field kind, nested blocks, all languages, SafeHtml/SafeSvg/AssistantMarkup).
+  Never route MCP writes through `ContentOpApplier`/`BlockGenerator`. New: `block_catalog` (= `AssistantBlocks.CatalogText`) and `upload_media`
+  (base64, `AssistantTools.UploadMediaAsync` → `MediaUpload`, an identical file is reused and then not journalled). Not offered (v1): plugin code,
+  form submissions, members, backups. Descriptions are English, answers keep the assistant's German texts. Every tool carries
+  readOnly/destructive/idempotent hints; the server instructions name the site (`ConfigureSessionOptions`, per request).
+- **Undo and log:** `AiChange` has a foreign key to `AiConversation`, so every key gets a conversation of its own (`AiConversation.Source` = "mcp",
+  `ApiKeyId`; a new one after 2 h without a call). Every WRITE call is one run with an `action` step (the assistant's shape, `via: "mcp"`), written
+  one after another (`WriteGate`). The admin reads it in KI-Assistent → Verlauf (badge "MCP"), the compose box is off there and
+  `AssistantService.SendAsync` refuses such a conversation (it would hand an outside client's history to the assistant); "Rückgängig" works as
+  for a run. The client has `undo_last_change` (the key's newest undoable run).
+- **Plugin operations** (`list_plugin_operations`, `run_plugin_operation`): the described, non-internal ones (`PluginContributions.ExternalOperations`),
+  each by the plugin's right — reading `{plugin}:read`, writing `{plugin}:write`, customers' data `{plugin}:personal` (+ write when it writes;
+  `SiteMcpServer.MayRun`). The assistant itself keeps its narrower set (`AssistantTools.OperationFilter` null = `AssistantOperations`). A
+  personal answer is never copied into the log; a personal READ is logged without it.
+- Still open: OAuth (the web connectors of claude.ai/ChatGPT take no fixed key), plugin code over MCP.
+- Tests: `SiteMcpTests` (the SDK's own client against `AppFactory`).
 
 ## The AI bot (plugin `bot`)
 

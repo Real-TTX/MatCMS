@@ -323,6 +323,12 @@ public sealed class PluginContributions
     public IReadOnlyList<PluginRegistry.OperationEntry> AssistantOperations =>
         PublicOperations.Where(o => o.Spec is { PersonalData: false }).ToList();
 
+    /// <summary>The DESCRIBED public operations — what the site's MCP server may offer a program with a site API key, each narrowed further by the
+    /// key's rights (<c>SiteMcpServer.MayRun</c>: customers' data only with the plugin's "personal" right). An undescribed one has nothing to show a
+    /// client about its arguments or whether it writes.</summary>
+    public IReadOnlyList<PluginRegistry.OperationEntry> ExternalOperations =>
+        PublicOperations.Where(o => o.Spec is not null).ToList();
+
     /// <summary>The catalogue an outside caller lists (the cloud's MCP via the heartbeat, the site's own MCP server): one entry per public
     /// operation, under its qualified name. An operation declared WITHOUT a description is listed as writing and carrying personal data — the
     /// strictest reading, since nothing says otherwise.</summary>

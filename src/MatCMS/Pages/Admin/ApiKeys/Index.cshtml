@@ -85,6 +85,34 @@
     <a class="btn" asp-page="Create">@T["apikeys.create"]</a>
 </div>
 
+@* The site's own MCP server: an AI client (Claude, ChatGPT, Cursor …) works on the site with a key from the list above — no cloud needed. *@
+<div class="card" style="margin-top:24px;" id="mcp">
+    <h2>@T["apikeys.mcpTitle"]</h2>
+    <form method="post" asp-page-handler="Mcp" style="margin:0 0 4px;">
+        <label class="check">
+            <input type="checkbox" name="on" value="true" @(Model.McpEnabled ? "checked" : "") onchange="this.form.requestSubmit()" /> @T["apikeys.mcpSwitch"]
+        </label>
+    </form>
+    <div class="help" style="margin-bottom:12px;">@T["apikeys.mcpHelp"]</div>
+    @if (Model.McpEnabled)
+    {
+        var mcpUrl = Model.Origin + "/mcp";
+        <div class="form-field">
+            <label for="mcp-url">@T["apikeys.mcpAddress"]</label>
+            <input id="mcp-url" class="mono" readonly value="@mcpUrl" onclick="this.select()" />
+            <div class="help">@T["apikeys.mcpAddressHint"]</div>
+        </div>
+        <details>
+            <summary class="muted">@T["apikeys.mcpConnect"]</summary>
+            <p class="help">Claude Code</p>
+            <pre class="code-block" style="white-space:pre-wrap;font-size:12px;">claude mcp add --transport http matcms @mcpUrl --header "Authorization: Bearer msk_…"</pre>
+            <p class="help">@T["apikeys.mcpConnectJson"]</p>
+            <pre class="code-block" style="white-space:pre-wrap;font-size:12px;">{ "mcpServers": { "matcms": { "type": "http", "url": "@mcpUrl", "headers": { "Authorization": "Bearer msk_…" } } } }</pre>
+            <p class="help">@T["apikeys.mcpConnectWeb"]</p>
+        </details>
+    }
+</div>
+
 @* What a key can call: the routes of the loaded plugins, so whoever connects the ERP does not have to ask. *@
 <div class="card" style="margin-top:24px;">
     <h2>@T["apikeys.endpoints"]</h2>

@@ -59,6 +59,9 @@ namespace MatCMS.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ApiKeyId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -81,6 +84,10 @@ namespace MatCMS.Data.Migrations
 
                     b.Property<int?>("ScopePageId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Status")
                         .IsRequired()

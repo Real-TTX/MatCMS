@@ -27,6 +27,34 @@
         </div>
     </div>
 
+    @* The site's own content, for an AI client through the MCP server (/mcp). *@
+    <div class="card">
+        <h2>@T["apikeys.coreTitle"]</h2>
+        <table class="data">
+            <thead><tr><th>@T["apikeys.coreArea"]</th><th>@T["apikeys.read"]</th><th>@T["apikeys.write"]</th></tr></thead>
+            <tbody>
+                @foreach (var (area, read) in MatCMS.Pages.Admin.ApiKeys.CreateModel.CoreAreas)
+                {
+                    <tr>
+                        <td><strong>@T["apikeys.area." + area[5..]]</strong> <span class="muted mono">@area</span></td>
+                        <td>
+                            @if (read)
+                            {
+                                <input type="checkbox" name="rights" value="@(area + ":read")" aria-label="@T["apikeys.area." + area[5..]] @T["apikeys.read"]" />
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
+                        <td><input type="checkbox" name="rights" value="@(area + ":write")" aria-label="@T["apikeys.area." + area[5..]] @T["apikeys.write"]" /></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="help">@T["apikeys.coreHint"]</p>
+    </div>
+
     <div class="card">
         <h2>@T["apikeys.colRights"]</h2>
         @if (Model.Plugins.Count == 0)

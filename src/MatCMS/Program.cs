@@ -246,6 +246,8 @@ builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantAgent>();
 builder.Services.AddScoped<MatCMS.Services.Assistant.AssistantService>();
 builder.Services.AddSingleton<MatCMS.Services.Assistant.AssistantRunner>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<MatCMS.Services.Assistant.AssistantRunner>());
+// The site's own MCP server (/mcp) on the assistant's tools — off until the admin switches it on (Admin → API-Schlüssel).
+MatCMS.Services.Mcp.SiteMcpServer.AddTo(builder.Services);
 builder.Services.AddSingleton<PluginRegistry>();
 builder.Services.AddSingleton<AdminNav>();
 builder.Services.AddSingleton<MatCMS.Services.Plugins.PluginDataService>();
@@ -724,7 +726,8 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) ||   // the maintenance page itself uses them
         p.StartsWith("/pwa/", StringComparison.OrdinalIgnoreCase) ||     // the back office's app files (manifest, worker, offline page)
-        p.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase);     // other programs (an ERP) keep working while the site is prepared
+        p.StartsWith("/api/v1", StringComparison.OrdinalIgnoreCase) ||   // other programs (an ERP) keep working while the site is prepared
+        p.StartsWith("/mcp", StringComparison.OrdinalIgnoreCase);        // an AI client working on the site while it is prepared (own key check)
     if (exempt)
     {
         await next();
@@ -818,6 +821,8 @@ app.MapRazorPages();
 app.MapDynamicPageRoute<MatCMS.Services.Plugins.PluginRouteTransformer>("{**plugin}", null!, -100);
 // The plugins' API for other programs (an ERP filling the shop): /api/v1/{plugin}/…, authenticated by the site's API keys, JSON only.
 MatCMS.Services.Plugins.PluginApiEndpoint.Map(app);
+// The site's own MCP server for AI clients (Claude, ChatGPT …): /mcp, the same keys with core rights, 404 while switched off.
+MatCMS.Services.Mcp.SiteMcpServer.Map(app);
 
 // Serves a file attached to a template (see TemplateAsset). Public and cacheable — these are static
 // site assets (scripts, styles, fonts) a template brings with it, referenced via {{asset:name}}.

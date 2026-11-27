@@ -71,6 +71,9 @@
          Pure managed code, no native library to ship in the image; the text goes to the model like any other text, so a
          PDF works with every provider and not only with the ones that accept files. Apache-2.0. -->
     <PackageReference Include="PdfPig" Version="0.1.*" />
+    <!-- The site's own MCP server (/mcp, Services/Mcp/SiteMcpServer.cs) so an AI client works on a site WITHOUT a cloud. The same package the
+         cloud's MCP server uses (official C# SDK), MIT. -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -26,7 +26,7 @@ public static partial class DomainRoutes
     [
         "admin", "api", "login", "logout", "anmelden", "registrieren", "uploads", "thumb", "thumbs", "plugin", "plugin-assets", "template-assets",
         "_content", "_framework", "_status", "_preview.webp", "error", "set-language", "sso", "oauth", "fonts", "pwa", "css", "js", "lib", "img",
-        "favicon.ico", "sitemap.xml", "robots.txt", ".well-known"
+        "favicon.ico", "sitemap.xml", "robots.txt", ".well-known", "mcp"
     ];
 
     /// <summary>

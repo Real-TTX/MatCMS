@@ -50,6 +50,11 @@ public static class SettingKeys
     // "1" = allowed. OFF by default; the operator of the site decides, and a cloud profile can roll it out.
     public const string AllowNativePlugins = "plugins.allowNative";
 
+    // The site's own MCP server at /mcp (Services/Mcp/SiteMcpServer.cs): "1" = on. OFF by default. It is a door into the whole content of
+    // the site for whoever holds a key with core rights, so only the site's own admin opens it (Admin → API-Schlüssel) — never a cloud
+    // rollout, a content operation or a restore (Protected), and a backup does not carry it (NotInBackup): a copy elsewhere starts closed.
+    public const string McpEnabled = "mcp.enabled";
+
     // The MatCMS Store (matcms.de), see MatcmsStoreClient. MatcmsStore = the site's OWN switch, used while no cloud is connected: anything
     // but "0" = may install from it (on by default). MatcmsStoreCloud = the cloud operator's word for a connected site ("1" = allowed),
     // written ONLY by CloudSyncService from InstanceConfig.MatcmsStore; never written = not allowed. Both protected (below).
@@ -218,6 +223,7 @@ public static class SettingKeys
     /// <summary>One of the site's own AI keys (the fixed ones or a profile's sign-in) — never in a backup.</summary>
     /// <summary>Keys a backup never carries: the site's own AI keys and the maintenance PIN's hash.</summary>
     public static bool NotInBackup(string? key) => IsAiOwn(key) || string.Equals(key, MaintenancePin, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(key, McpEnabled, StringComparison.OrdinalIgnoreCase)
         || string.Equals(key, MaintenanceLastChange, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsAiOwn(string? key) => key is not null
@@ -349,5 +355,5 @@ public static class SettingKeys
     /// operator through the ONE dedicated profile/instance switch (<c>InstanceConfig.NativePlugins</c>, applied by
     /// <c>CloudSyncService.ApplyNativePluginsAsync</c>), never through a generic path.
     /// </summary>
-    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, MatcmsStore, MatcmsStoreCloud, MaintenancePin, .. AiOwn];
+    public static readonly string[] Protected = [.. Cloud, AllowNativePlugins, MatcmsStore, MatcmsStoreCloud, MaintenancePin, McpEnabled, .. AiOwn];
 }

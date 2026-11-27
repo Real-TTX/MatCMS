@@ -19,6 +19,18 @@ public static class PluginApiEndpoint
 
     private static readonly ConcurrentDictionary<int, (long Minute, int Count)> Calls = new();
 
+    /// <summary>Counts one call of a key; false once it is over <see cref="CallsPerMinute"/> in this minute. ONE counter for <c>/api/v1</c> and the
+    /// MCP server (<c>/mcp</c>): a key is one caller, whichever door it uses.</summary>
+    public static bool CountCall(int keyId)
+    {
+        var minute = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMinute;
+        var c = Calls.AddOrUpdate(keyId, _ => (minute, 1), (_, e) => e.Minute == minute ? (minute, e.Count + 1) : (minute, 1));
+        return c.Count <= CallsPerMinute;
+    }
+
+    /// <summary>The key a request presents: <c>Authorization: Bearer …</c>, else <c>X-Api-Key</c>.</summary>
+    public static string PresentedKey(HttpRequest r) => Presented(r);
+
     public static void Map(WebApplication app)
     {
         app.MapGet("/api/v1", IndexAsync).DisableAntiforgery();
@@ -53,9 +65,7 @@ public static class PluginApiEndpoint
             http.Response.Headers.WWWAuthenticate = "Bearer error=\"invalid_token\"";
             return (null, Error(401, "Der API-Schlüssel ist unbekannt, widerrufen oder abgelaufen.", http));
         }
-        var minute = DateTime.UtcNow.Ticks / TimeSpan.TicksPerMinute;
-        var c = Calls.AddOrUpdate(key.Id, _ => (minute, 1), (_, e) => e.Minute == minute ? (minute, e.Count + 1) : (minute, 1));
-        if (c.Count > CallsPerMinute)
+        if (!CountCall(key.Id))
         {
             http.Response.Headers.RetryAfter = (60 - DateTime.UtcNow.Second).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return (null, Error(429, $"Zu viele Aufrufe (höchstens {CallsPerMinute} pro Minute und Schlüssel). Mehrere Zeilen gehen in einem Aufruf.", http));

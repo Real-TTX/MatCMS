@@ -716,6 +716,37 @@ public sealed partial class AssistantTools
         return Ok($"Grafik „{name}.svg“ gezeichnet und in die Mediathek gelegt", new JsonObject { ["url"] = url, ["chars"] = safe.Length }, warnings, null, changed: true);
     }
 
+    /// <summary>
+    /// A file sent by a program (the site's MCP server's <c>upload_media</c>), stored by the SAME rules as an upload in the admin
+    /// (<see cref="MediaUpload"/>: types, sizes, SafeSvg, random name). Not in the assistant's own catalogue — a model cannot send bytes.
+    /// An identical file already in the library is reused and then NOT journalled: undo must not delete a picture the run did not bring.
+    /// </summary>
+    public async Task<ToolOutcome> UploadMediaAsync(string fileName, byte[] content, string? alt, CancellationToken ct)
+    {
+        try
+        {
+            var env = _services.GetRequiredService<IWebHostEnvironment>();
+            var thumbs = _services.GetRequiredService<ThumbnailService>();
+            var saved = await MediaUpload.SaveAsync(_db, env, thumbs, fileName, content, null, reuse: true, ct);
+            if (!saved.Ok || saved.Url is null) return Fail("Datei abgelehnt", saved.Error ?? "Die Datei wurde nicht angenommen.");
+            var media = await _db.Media.FirstAsync(m => m.Url == saved.Url, ct);
+            if (!saved.Existing)
+            {
+                if (alt is { Length: > 0 }) media.Alt = Cap(alt.Trim(), 300);
+                Journal("media", media.Id.ToString(), null);
+                await _db.SaveChangesAsync(ct);
+            }
+            _blocks.KnowMedia(saved.Url);
+            return Ok(saved.Existing ? $"„{media.FileName}“ war schon in der Mediathek" : $"„{media.FileName}“ in die Mediathek gelegt",
+                new JsonObject { ["url"] = saved.Url, ["id"] = media.Id, ["existing"] = saved.Existing }, null, null, changed: !saved.Existing);
+        }
+        catch (Exception e) when (e is DbUpdateException or IOException or InvalidOperationException)
+        {
+            Discard();
+            return Fail("Hochladen fehlgeschlagen", e.GetBaseException().Message);
+        }
+    }
+
     // ============================================================================================== journal (for undo)
 
     private bool Journalled(string kind, string key) =>

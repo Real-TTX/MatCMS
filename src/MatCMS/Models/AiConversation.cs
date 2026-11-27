@@ -43,6 +43,16 @@ public class AiConversation
 
     /// <summary>Tokens the provider reported for this conversation, summed.</summary>
     public int Tokens { get; set; }
+
+    /// <summary>"" = the site's own assistant; "mcp" = the log of an outside AI client working through the site's MCP server
+    /// (<c>Services/Mcp/SiteMcpServer.cs</c>): every write call is one run with its action step and its undo journal — nobody types into it.</summary>
+    public string Source { get; set; } = "";
+
+    /// <summary>For an MCP log: the site API key (<see cref="SiteApiKey"/>) whose calls it records.</summary>
+    public int? ApiKeyId { get; set; }
+
+    public bool IsMcp => Source == SourceMcp;
+    public const string SourceMcp = "mcp";
 }
 
 /// <summary>One visible step of a conversation, in order. The editor sees exactly these.</summary>

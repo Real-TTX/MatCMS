@@ -20,9 +20,23 @@ public class CreateModel : PageModel
 
     public void OnGet() => Load();
 
-    private void Load() => Plugins = _registry.ApiRoutes.GroupBy(r => r.Owner)
-        .Select(g => (g.Key, g.First().Info.Name, (IReadOnlyList<ApiAccess>)g.Select(r => r.Options.Access).Distinct().OrderBy(a => a).ToList()))
+    /// <summary>A plugin is listed for its API routes AND for the operations it describes (which the site's MCP server offers): both are reached
+    /// with the same rights.</summary>
+    private void Load() => Plugins = _registry.ApiRoutes.Select(r => (r.Owner, r.Info.Name, r.Options.Access))
+        .Concat(_registry.Operations.Where(o => o.Spec is { Internal: false }).SelectMany(o => OperationRights(o).Select(a => (o.Owner, o.Info.Name, a))))
+        .GroupBy(r => r.Owner)
+        .Select(g => (g.Key, g.First().Name, (IReadOnlyList<ApiAccess>)g.Select(r => r.Item3).Distinct().OrderBy(a => a).ToList()))
         .OrderBy(p => p.Name).ToList();
+
+    private static IEnumerable<ApiAccess> OperationRights(PluginRegistry.OperationEntry o)
+    {
+        if (o.Spec!.PersonalData) yield return ApiAccess.PersonalData;
+        yield return o.Spec.Writes ? ApiAccess.Write : ApiAccess.Read;
+    }
+
+    /// <summary>The site's own areas for the MCP server (<see cref="SiteApiKeyService.CoreAreas"/>) and which kinds each offers.</summary>
+    public static readonly (string Area, bool Read)[] CoreAreas =
+        [("core.pages", true), ("core.media", true), ("core.forms", true), ("core.design", true), ("core.settings", false)];
 
     public async Task<IActionResult> OnPostAsync(string? name, List<string>? rights, DateTime? expires)
     {

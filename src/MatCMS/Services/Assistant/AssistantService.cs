@@ -51,6 +51,8 @@ public sealed class AssistantService
         if (!_ai.Enabled) return (false, "KI ist für diese Website nicht aktiviert.");
         var conv = await _db.AiConversations.FirstOrDefaultAsync(c => c.Id == conversationId, ct);
         if (conv is null) return (false, "Gespräch nicht gefunden.");
+        // An MCP log records what an OUTSIDE client did; a message here would hand that history (and its write rights) to the site's assistant.
+        if (conv.IsMcp) return (false, "Das ist das Protokoll eines MCP-Zugangs – hier kann man nur lesen und rückgängig machen.");
         if (conv.Status == "running" || _runner.IsRunning(conv.Id)) return (false, "Die KI arbeitet noch – warte, bis sie fertig ist, oder brich ab.");
         message = (message ?? "").Trim();
         var attached = await _files.AcceptAsync(conv.Id, files, ct);

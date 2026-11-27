@@ -58,10 +58,17 @@ public sealed partial class AssistantTools
 
     private Plugins.PluginContributions Plugins => _services.GetRequiredService<Plugins.PluginContributions>();
 
+    /// <summary>
+    /// Which plugin operations a caller other than the assistant may run — the site's MCP server sets it from the API key's rights. Null = the
+    /// assistant's own set (<see cref="Plugins.PluginContributions.AssistantOperations"/>: never customers' data, every answer it reads goes to a
+    /// model provider). Internal operations are in neither set.
+    /// </summary>
+    public Func<MatCMS.Services.PluginRegistry.OperationEntry, bool>? OperationFilter { get; set; }
+
     /// <summary>The assistant's operation of this name — qualified (<c>shop.product.create</c>) or a short name only one plugin offers.</summary>
     private MatCMS.Services.PluginRegistry.OperationEntry AssistantOperation(string name)
     {
-        var allowed = Plugins.AssistantOperations;
+        var allowed = OperationFilter is { } filter ? Plugins.ExternalOperations.Where(filter).ToList() : Plugins.AssistantOperations;
         if (Plugins.FindOperation(name) is { } found && allowed.Contains(found)) return found;
         throw new ToolError($"Unbekannte Plugin-Aktion „{name}“",
             $"Die Aktion \"{name}\" gibt es nicht (oder ihr Plugin ist aus, oder sie ist für den Assistenten gesperrt). Verfügbar: {string.Join(", ", allowed.Select(o => o.QualifiedName))}.");

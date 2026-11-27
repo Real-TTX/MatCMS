@@ -71,6 +71,8 @@ public sealed class ForumPlugin : IPlugin
         b.On("site.search", SiteSearchAsync);
         // The discussion under an article (see ForumDiscussion.cs): one thread per piece of content, shown where the content is.
         b.On("content.discussion", ForumPublic.DiscussionAsync);
+        // What the back office does, as described operations for the site's AI assistant, the cloud and MCP (ForumOps.cs).
+        ForumOps.Register(b);
 
         // A fresh forum is not an empty page: one category with one board to start in. Only on the first load ever — a board deleted later stays deleted.
         b.Lifecycle.OnInstall(async ctx =>

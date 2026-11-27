@@ -149,6 +149,12 @@ verifies the credentials against its own user table before accepting them. The c
 for this one operation only and are not stored. For this the instance has to be reachable once –
 after that everything is outbound again.
 
+**Way 3 – MatOS connects it (the binding `cms.cloud`).** In MatOS, install MatCMS Cloud and then MatCMS
+(or the other way round): MatOS binds every MatCMS to the cloud and gives it `MAT_CMS_CLOUD_URL`,
+`MAT_CMS_CLOUD_INTERNAL_URL` and `MAT_CMS_CLOUD_KEY`. The site joins the **default profile** by itself
+within a minute (`POST /api/provides/cms.cloud/register` with the key instead of a join code); nobody
+copies a code. See *MatOS* below.
+
 Whether a new instance is active right away or has to be approved first is controlled by the
 **Auto-approve** switch on the profile.
 
@@ -197,6 +203,37 @@ In MatCMS the other side lives under *Settings → Cloud*. The API behind it:
 > variable `MATCMS_IMAGE` can report its own image (for display only).
 
 ---
+
+## MatOS: one sign-in, mail and connected sites
+
+The cloud speaks the platform contract of the Mat apps (MatDesign `docs/PLATFORM.md`, through the
+copy of MatPlatform in `MatPlatform/`): MatOS installs it from its store and connects it. **None of
+these variables is required**; without them the cloud behaves exactly as before.
+
+| Variable | Meaning |
+| --- | --- |
+| `MAT_API_KEY` | the key of `/api/*` (MatOS sets it): `/api`, `/api/health`, `/api/state`, `/api/bindings` |
+| `MATIDENTITY_AUTHORITY` | MatIdentity's address: set = `/login` goes straight on to MatIdentity (redirect `/signin-oidc`, signed out `/signout-callback-oidc`, back-channel logout `/signout-backchannel`); the own form stays at `/login?local=1` |
+| `MATIDENTITY_CLIENT_ID` | the client at MatIdentity (default `matcmscloud`) |
+| `MATIDENTITY_CLIENT_SECRET` | its secret |
+| `MATIDENTITY_INTERNAL_URL` | where the cloud reaches MatIdentity inside Docker |
+| `MATSMTP_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`, `_FROM`, `_TLS` | set = every mail of the cloud (notifications, relayed site mail) goes through MatSMTP; *Settings → SMTP* shows it as fixed (only the sender name stays editable) |
+| `MAT_FRAME_ANCESTORS` | the origins that may show the cloud in a frame (MatOS's window) |
+| `MATCMSCLOUD_ADMIN_PASSWORD` | the password of the account `admin` of an EMPTY database (else `admin`); MatOS generates it |
+
+- **Who is who with MatIdentity:** the first person who comes through MatIdentity becomes an
+  *Admin*, everyone after an *Operator* (who sees only the sites given to them); when MatIdentity
+  decides the roles of the app it sends `admin` or `operator`, and the cloud follows it at every
+  sign-in. An existing account with the same e-mail is never entered by the address alone: the cloud
+  asks for that account's password (and second factor) once, then links it. MatIdentity's own second
+  step replaces the cloud's (*2FA required* does not apply to such a session).
+- **`cms.cloud`** (version 1, a key capability) is what the cloud provides: a broker binds a MatCMS
+  site through `PUT /api/bindings/cms.cloud/<site>` (MatPlatform keeps a key per site, only its hash),
+  the site gets the three `MAT_CMS_CLOUD_*` variables and enrols with
+  `POST /api/provides/cms.cloud/register` (`Authorization: Bearer <key>`, the body and the answer of
+  `/api/instances/register`) into the default profile, under its *Auto-approve* rule.
+- **Docker in MatOS:** MatOS's catalog entry mounts no socket. MatOS updates the sites it installed;
+  the cloud sees them as *remote* and only reports an update.
 
 ## CI/CD & versioning
 

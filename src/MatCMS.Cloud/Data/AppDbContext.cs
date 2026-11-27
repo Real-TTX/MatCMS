@@ -74,6 +74,8 @@ public class AppDbContext : DbContext
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).
         // Marking an existing column as a token only changes the generated WHERE clause — no migration.
         b.Entity<User>().Property(u => u.RecoveryCodes).IsConcurrencyToken();
+        // One account per MatIdentity person (SQLite unique indexes ignore NULLs: accounts without MatIdentity are not affected).
+        b.Entity<User>().HasIndex(u => u.ExternalSubject).IsUnique();
 
         // AI usage ledger: one row per instance per month; cascades with the instance.
         b.Entity<AiUsage>().HasIndex(u => new { u.InstanceId, u.Period }).IsUnique();

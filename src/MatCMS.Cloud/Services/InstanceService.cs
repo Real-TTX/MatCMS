@@ -131,7 +131,23 @@ public class InstanceService
     {
         var profile = await _profiles.FindByJoinCodeAsync(request.JoinCode);
         if (profile is null) return new(null, null, "Ungültiger Join-Code.");
+        return await RegisterIntoAsync(profile, request, $"über Profil \"{profile.Name}\"", ct);
+    }
 
+    /// <summary>
+    /// Enrolment through a binding of <c>cms.cloud</c> (MatDesign docs/PLATFORM.md "Bindings"): a broker such as MatOS bound the site to this
+    /// cloud and gave it a key, which takes the place of a join code. The site lands in the DEFAULT profile, under that profile's approval
+    /// policy, exactly as if it had typed the default profile's join code. <paramref name="consumer"/> is the id the broker bound it as.
+    /// </summary>
+    public async Task<RegisterResult> RegisterBoundAsync(RegisterRequest request, string consumer, CancellationToken ct = default)
+    {
+        var profile = await _profiles.DefaultProfileAsync();
+        if (profile is null) return new(null, null, "Kein Standardprofil.");
+        return await RegisterIntoAsync(profile, request, $"über die Verbindung \"{consumer}\" (Profil \"{profile.Name}\")", ct);
+    }
+
+    private async Task<RegisterResult> RegisterIntoAsync(Profile profile, RegisterRequest request, string via, CancellationToken ct)
+    {
         var token = NewToken();
         var instance = new Instance
         {
@@ -154,8 +170,8 @@ public class InstanceService
         await ClassifyAsync(instance, ct);
         Log(instance, InstanceEventKind.Connected,
             instance.Status == InstanceStatus.Approved
-                ? $"Instanz hat sich über Profil \"{profile.Name}\" angemeldet und wurde automatisch angenommen."
-                : $"Instanz hat sich über Profil \"{profile.Name}\" angemeldet und wartet auf Freigabe.");
+                ? $"Instanz hat sich {via} angemeldet und wurde automatisch angenommen."
+                : $"Instanz hat sich {via} angemeldet und wartet auf Freigabe.");
         await _db.SaveChangesAsync(ct);
 
         return new(instance, token, null);

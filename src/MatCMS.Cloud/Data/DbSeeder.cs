@@ -8,6 +8,9 @@ namespace MatCMS.Cloud.Data;
 /// it runs on every start without touching existing data.</summary>
 public static class DbSeeder
 {
+    /// <summary>The password of the first account of an empty database (else "admin").</summary>
+    public const string AdminPasswordVariable = "MATCMSCLOUD_ADMIN_PASSWORD";
+
     public static async Task SeedAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
@@ -15,13 +18,16 @@ public static class DbSeeder
 
         if (!await db.Users.AnyAsync())
         {
+            // MATCMSCLOUD_ADMIN_PASSWORD (MatOS generates it and shows it with the app's credentials) replaces the well-known "admin" of a
+            // fresh install. Read only here, for an empty database: changing it later changes nothing.
+            var initial = services.GetRequiredService<IConfiguration>()[AdminPasswordVariable];
             db.Users.Add(new User
             {
                 Username = "admin",
                 Email = "admin@localhost",
                 DisplayName = "Administrator",
                 Role = "Admin",
-                PasswordHash = auth.HashPassword("admin")
+                PasswordHash = auth.HashPassword(string.IsNullOrWhiteSpace(initial) ? "admin" : initial.Trim())
             });
         }
 

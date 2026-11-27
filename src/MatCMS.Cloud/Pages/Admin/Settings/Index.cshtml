@@ -103,25 +103,29 @@
     <form method="post" asp-page-handler="Smtp">
         <div class="card">
             <h2>@T["settings.smtpHeading"]</h2>
+            @if (Model.MailRelayed)
+            {
+                <div class="alert alert-info">@T["settings.smtpFixed", Model.MailRelay ?? ""]</div>
+            }
             <div class="form-grid">
                 <div class="form-row">
                     <div class="form-field">
                         <label>@T["settings.smtpHost"]</label>
-                        <input name="host" value="@Model.Get(SettingKeys.SmtpHost)" spellcheck="false" />
+                        <input name="host" disabled="@(Model.MailRelayed ? "disabled" : null)" value="@Model.Get(SettingKeys.SmtpHost)" spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label>@T["settings.smtpPort"]</label>
-                        <input name="port" value="@Model.Get(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" />
+                        <input name="port" disabled="@(Model.MailRelayed ? "disabled" : null)" value="@Model.Get(SettingKeys.SmtpPort)" placeholder="587" inputmode="numeric" />
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-field">
                         <label>@T["settings.smtpUser"]</label>
-                        <input name="user" value="@Model.Get(SettingKeys.SmtpUser)" spellcheck="false" />
+                        <input name="user" disabled="@(Model.MailRelayed ? "disabled" : null)" value="@Model.Get(SettingKeys.SmtpUser)" spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label>@T["settings.smtpPassword"]</label>
-                        <input name="password" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
+                        <input name="password" disabled="@(Model.MailRelayed ? "disabled" : null)" type="password" autocomplete="new-password" placeholder="@T["settings.smtpPasswordKeep"]" />
                         @* An empty field means "keep", so without this there is no way to get rid of a
                            stored password at all — the operator could only ever replace it. *@
                         @if (!string.IsNullOrEmpty(Model.Get(SettingKeys.SmtpPassword)))
@@ -136,7 +140,7 @@
                 <div class="form-row">
                     <div class="form-field">
                         <label>@T["settings.smtpFromEmail"]</label>
-                        <input name="fromEmail" value="@Model.Get(SettingKeys.SmtpFromEmail)" spellcheck="false" />
+                        <input name="fromEmail" disabled="@(Model.MailRelayed ? "disabled" : null)" value="@Model.Get(SettingKeys.SmtpFromEmail)" spellcheck="false" />
                     </div>
                     <div class="form-field">
                         <label>@T["settings.smtpFromName"]</label>
@@ -145,7 +149,7 @@
                 </div>
             </div>
             <label class="checkbox-row">
-                <input type="checkbox" name="ssl" value="true" checked="@(Model.Flag(SettingKeys.SmtpSsl) ? "checked" : null)" />
+                <input type="checkbox" name="ssl" disabled="@(Model.MailRelayed ? "disabled" : null)" value="true" checked="@(Model.Flag(SettingKeys.SmtpSsl) ? "checked" : null)" />
                 @T["settings.smtpSsl"]
             </label>
             <div><button type="submit" class="btn">@T["settings.save"]</button></div>

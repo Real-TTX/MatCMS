@@ -57,6 +57,10 @@
     <!-- Official Model Context Protocol server SDK: exposes the operator API as MCP tools at /mcp so
          ChatGPT/Claude connect to the cloud directly. HTTP (streamable) transport for a remote server. -->
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.*" />
+    <!-- MatPlatform (the copy in MatPlatform/, MatDesign's platform contract): the sign-in through MatIdentity (OpenID Connect)
+         and the tokens of MatIdentity on /api (JWT bearer). -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1939,6 +1939,12 @@ namespace MatCMS.Cloud.Data.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ExternalSubject")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("IdentitySignedOutAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1965,6 +1971,9 @@ namespace MatCMS.Cloud.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExternalSubject")
+                        .IsUnique();
 
                     b.HasIndex("Username")
                         .IsUnique();

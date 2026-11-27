@@ -74,7 +74,8 @@ public class PluginOperationsRuleTests
     {
         var root = PluginsRoot();
         // A spec as the plugins write it: "PluginOperationSpec X = new(" or "new PluginOperationSpec(" — not any other new("…") (string tables).
-        var spec = new Regex(@"(?:PluginOperationSpec\s+\w+\s*=\s*new|new\s+PluginOperationSpec)\s*\(\s*""[a-z][a-z0-9_.-]*""(?<rest>[^;]*);", RegexOptions.Singleline);
+        // The rest of the spec up to its closing ")": strings (which may hold ";" or ")") are skipped whole.
+        var spec = new Regex(@"(?:PluginOperationSpec\s+\w+\s*=\s*new|new\s+PluginOperationSpec)\s*\(\s*""[a-z][a-z0-9_.-]*""(?<rest>(?:""(?:[^""\\]|\\.)*""|[^"";)])*)", RegexOptions.Singleline);
         foreach (var folder in Directory.EnumerateDirectories(root).Where(d => File.Exists(Path.Combine(d, "meta.json"))))
         {
             var text = string.Join("\n", Sources(folder).Select(File.ReadAllText));

@@ -30,7 +30,7 @@ public static class ScriptPluginOps
     public static string Name(AppFactory app, string key, string name)
     {
         var plugins = app.Services.GetRequiredService<PluginContributions>();
-        return plugins.HasOperation(key + "." + name) ? key + "." + name : name;
+        return name.StartsWith(key + ".", StringComparison.Ordinal) || !plugins.HasOperation(key + "." + name) ? name : key + "." + name;
     }
 
     /// <summary>Every declared operation is there, with exactly these flags (W = writes, P = personal data, I = internal).</summary>
@@ -44,7 +44,7 @@ public static class ScriptPluginOps
         {
             var full = Name(app, key, name);
             Assert.True(plugins.HasOperation(full), full + " missing");
-            var spec = mine.Single(o => o.Name == full).Spec;
+            var spec = mine.Single(o => o.QualifiedName == full || o.Name == full).Spec;
             Assert.NotNull(spec);
             Assert.False(string.IsNullOrWhiteSpace(spec!.Description), name + " has no description");
             Assert.True(spec.Writes == flags.Contains('W'), name + ": Writes");
@@ -69,7 +69,8 @@ public static class ScriptPluginOps
         var name = undo["name"]!.GetValue<string>();
         using (var scope = app.Services.CreateScope())
         {
-            var spec = scope.ServiceProvider.GetRequiredService<PluginRegistry>().Operations.Single(o => o.Name == Name(app, key, name)).Spec;
+            // The host qualifies an undo name with its plugin ("todo-verwaltung-beispiel.todo.restore"); an older host leaves it short.
+            var spec = scope.ServiceProvider.GetRequiredService<PluginRegistry>().Operations.Single(o => o.Owner == key && (o.QualifiedName == name || o.Name == name)).Spec;
             Assert.True(spec!.Internal, name + " (an undo) must be internal");
         }
         // A public caller may not run it.

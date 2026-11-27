@@ -6,9 +6,13 @@ Start neu geschrieben, so dass eine Seite nie eigene Korrekturen behalten konnte
 Instanzen bleiben diese Zeilen unverändert stehen; neue Instanzen bekommen ein Plugin nur noch über den
 Store der Cloud oder einen Bundle-Import.
 
+**Jedes Plugin beschreibt seine Inhalte als Operationen** (auflisten, lesen, anlegen, ändern, löschen bzw. abschalten — mit
+Rückgängig), damit der KI-Assistent, das MCP der Cloud und der MCP-Server der Website damit arbeiten können. Welches Plugin
+welche hat und warum ein Plugin keine hat: `OPERATIONS.md`; die Regel: `docs/plugin-system-v2.md` §3.2a.
+
 | Ordner | Plugin | Stand |
 | --- | --- | --- |
-| `leserstimmen/` | Leserstimmen — Rezensionen mit Sternen/Flammen/Herzen; Deutsch und Englisch (Admin, Block-Editor, Block auf `/en/…`-Seiten, Mail in der Standardsprache der Seite) | 1.4, im Global Store |
+| `leserstimmen/` | Leserstimmen — Rezensionen mit Sternen/Flammen/Herzen; Deutsch und Englisch (Admin, Block-Editor, Block auf `/en/…`-Seiten, Mail in der Standardsprache der Seite) | 1.5, im Global Store |
 | `cookie-consent/` | Cookie-Banner — Einwilligung für Statistik/Marketing/externe Medien, blockiert bis zur Zustimmung; Deutsch und Englisch (Admin; Banner-Standardtexte folgen der Sprache der Seite, eigene Texte bleiben wie geschrieben) | 1.1, im Global Store |
 | `bewertungen/` | Bewertungen (früher eingebaut) | Altbestand, ersetzt durch Leserstimmen (dort „Aus Bewertungen übernehmen“) |
 | `google-reviews/` | Google Bewertungen (früher eingebaut) | Altbestand; Vorgabe-Konfiguration steht in `meta.json` unter `DefaultConfig` (reist nicht im Bundle mit) |

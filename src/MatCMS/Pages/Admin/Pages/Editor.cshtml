@@ -32,17 +32,20 @@
     };
 }
 <!DOCTYPE html>
-<html data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
+@* MatUi like every other back-office page (density, tokens, the bridge): without it the editor was the one screen with square
+   buttons in capitals, its own greys and its own fonts. The bridge comes before editor-v2.css, which only lays the screen out. *@
+<html data-app="matcms" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@p.Title – @T["ev2.title"] – @Site.SiteName</title>
-    <link href="/fonts/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/tabler-icons/tabler-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     @* Multi-select fields in the block editor are built from the public forms' dropdown. *@
     <link rel="stylesheet" href="~/css/mat-richselect.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/editor-v2.css" asp-append-version="true" />
     <link rel="icon" href="@Site.FaviconUrl" />
     @* Own confirm/alert/prompt dialogs — loaded early, inline page scripts call MatDialog. *@
@@ -50,7 +53,7 @@
 </head>
 @* .admin: the back office's own scope — without it the slim admin buttons (.admin .btn) and every
    other admin-scoped rule stay off, and the editor drifts away from the rest of the application. *@
-<body class="admin ev2" data-page-id="@p.Id"
+<body class="admin admin--matui ev2" data-page-id="@p.Id"
       data-render-url="@Url.Page("Editor", "RenderPreview", new { id = p.Id })"
       data-save-url="@Url.Page("Editor", "SaveAll", new { id = p.Id })"
       data-meta-url="@Url.Page("Editor", "Meta", new { id = p.Id, back = "json" })">

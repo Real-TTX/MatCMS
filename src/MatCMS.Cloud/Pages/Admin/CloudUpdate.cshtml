@@ -1,24 +1,28 @@
 @page
 @model MatCMS.Cloud.Pages.Admin.CloudUpdateModel
 @inject MatCMS.Cloud.Services.CloudContext Cloud
+@inject MatCMS.Cloud.Services.AuthService Auth
 @{
     Layout = null;
     var run = Model.Run!;
+    var theme = await Auth.ThemeAsync(User);
 }
 <!DOCTYPE html>
-<html lang="de">
+@* MatUi's card like the sign-in pages (login-matui): it was the one cloud page without MatUi, in its own fonts. *@
+<html lang="de" data-app="matcms" data-theme="@theme" data-density="compact">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@T["cloudupdate.screen.title"] – @Cloud.CloudName</title>
-    <link href="/fonts/css2?family=Geologica:wght@@500;600;700&family=Inter:wght@@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/lib/matui/matui.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/cloud.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/_content/MatCMS.Shared.Web/css/admin-matui.css" asp-append-version="true" />
     <link rel="icon" href="@Cloud.FaviconUrl" />
 </head>
 @* No sidebar, no links: while the cloud swaps its own container there is nothing that could safely be done. *@
-<body class="admin cu-screen">
+<body class="admin login-matui cu-screen">
     <main class="cu-box"
           data-labels='@System.Text.Json.JsonSerializer.Serialize(new {
               restarting = T["cloudupdate.screen.restarting"], working = T["cloudupdate.screen.working"],

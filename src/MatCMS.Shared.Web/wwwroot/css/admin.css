@@ -165,7 +165,7 @@ table.cleanup-list td { overflow: hidden; text-overflow: ellipsis; }
 /* A matrix table (recipients × events): centred tick columns, group rows set apart, the "+" row last. */
 table.notify-matrix .notify-cell { width: 96px; text-align: center; }
 table.notify-matrix tr.notify-group td { background: var(--surface-2); }
-table.notify-matrix tr.notify-add td { border-top: 2px solid #e2e5ea; }
+table.notify-matrix tr.notify-add td { border-top: 2px solid var(--line); }
 
 .admin-nav-foot { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; display: flex; flex-direction: column; gap: 1px; }
 .admin-nav-foot a, .admin-nav-foot .linklike {
@@ -363,7 +363,7 @@ textarea.cp-sample-inp { resize: vertical; min-height: 0; }
 .media-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 
 /* Mini tag chips (read-only preview + add-suggestions) */
-.mini-chip { display: inline-block; font-size: 11px; line-height: 1.5; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: #555; border: 1px solid transparent; }
+.mini-chip { display: inline-block; font-size: 11px; line-height: 1.5; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-muted); border: 1px solid transparent; }
 .mini-chip-add { cursor: pointer; background: var(--surface); border-color: var(--line); color: var(--accent); font: inherit; font-size: 11px; }
 .mini-chip-add:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
 
@@ -664,6 +664,10 @@ button.icon-current-preview.is-empty { background: var(--bg-alt); color: var(--m
     font-family: var(--font-mono, ui-monospace, monospace);
 }
 .color-field .hex:focus { outline: none; border: 0; }
+
+/* Toolbar above a code or mail field: placeholder chips (.token-chip, their look in admin-matui.css) that insert {{token}}. */
+.code-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; }
+.code-toolbar .code-hint { font-size: 12px; color: var(--muted); margin-right: 4px; }
 
 /* Form section sub-heading + code textareas (template editor) */
 .form-section { margin: 22px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 6px; }

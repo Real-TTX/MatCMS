@@ -797,7 +797,19 @@ Live site pictures in tile views (`.instance-tile-shot`, `.payload-tile-shot`) a
 `admin-shell.js` (`--shot-scale`), never by a fixed factor. The sign-in, 2FA, OAuth and error
 pages (`body.login-page.login-matui`) are MatUi's auth card through the same bridge. A state is a tint behind the WHOLE item
 plus icon and words (MatUi COLOR-04/08) — never a coloured bar on one side: the bridge turns the old bars of the attention
-rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor (own full-screen layout, `editor-v2.css`) is not moved yet.
+rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor (own full-screen layout) and the
+cloud's self-update screen load `matui.css` + the bridge like every other back-office page (2026-11-27); `editor-v2.css` only lays the
+editor out and reads MatUi's tokens.
+**One scale for every control** (bridge section 3f, "Kraut und Rüben" pass 2026-11-27): every control — a button of any size, a
+field, a picker, a segmented switch, an icon button — has `--mat-radius` (`--mat-btn-radius` is set to it, so MatUi's own small
+button too); cards, dialogs and tables `--mat-radius-lg`; pills and chips are round. A field is exactly as tall as the button beside
+it (`--mat-control-h`, padding 0 — 6 px of padding made fields 35 px against 34 px buttons); a button says its words in 14 px
+(small 13), never in capitals; a `.badge` is `.mat-pill`'s 24 px; a checkbox MatUi's 18 px; a label over a group (`.form-section`,
+`.ui-subnav-label` …) is MatUi's group heading in sentence case. The list view switch (`.view-toggle`/`.vt-btn`) and the period/level
+filters (`.gallery-filter`) are drawn as `.mat-seg`. `admin-fields.js` makes a picker small ONLY in a table row or beside a `.btn-sm`
+(a list toolbar is normal size), and leaves `.color-field`/`.optcolor` alone (they are one field already). Measured with
+Playwright before and after over ~120 pages: one height per size, one radius, one font size per size. A new control with a size
+or a corner of its own is a regression.
 
 **On a phone a record table is a stack of cards** (MatUi TABLE-02): `admin-shell.js` writes each cell's column name as `data-label`
 (from the table head) and adds `.has-labels`; `admin-matui.css` (≤ 600 px) draws title, label/value rows and actions. Left as they

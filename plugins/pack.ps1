@@ -2,10 +2,11 @@
 # shape PluginPackager.Export writes (Format 1), so the cloud store and an instance import it unchanged.
 #   ./pack.ps1 -Key leserstimmen                → plugins/dist/leserstimmen-<version>.zip
 #   ./pack.ps1 -Key leserstimmen -Out x.zip
+#   ./pack.ps1 -Key my-plugin -Root D:\elsewhere    → packs D:\elsewhere\my-plugin\, bundle into D:\elsewhere\dist\ (plugins kept outside this repo)
 # Upload to the store: POST /api/v1/store/plugins with the zip as body (key right CanManageStore).
-param([Parameter(Mandatory)][string]$Key, [string]$Out)
+param([Parameter(Mandatory)][string]$Key, [string]$Out, [string]$Root = $PSScriptRoot)
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
-$dir = Join-Path $PSScriptRoot $Key
+$dir = Join-Path $Root $Key
 if (-not (Test-Path (Join-Path $dir 'plugin.csx'))) { throw "Kein Plugin unter $dir" }
 $meta = Get-Content (Join-Path $dir 'meta.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($meta.Key -ne $Key) { throw "meta.json nennt Key '$($meta.Key)', Ordner heisst '$Key'" }
@@ -15,7 +16,7 @@ $manifest = [ordered]@{
     Description = $meta.Description; Code = $code; Mapping = ''
 } | ConvertTo-Json -Depth 3
 if (-not $Out) {
-    $dist = Join-Path $PSScriptRoot 'dist'
+    $dist = Join-Path $Root 'dist'
     New-Item -ItemType Directory -Force $dist | Out-Null
     $Out = Join-Path $dist "$Key-$($meta.Version).zip"
 }

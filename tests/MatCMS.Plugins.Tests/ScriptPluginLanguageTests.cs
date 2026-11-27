@@ -89,7 +89,7 @@ public class ScriptPluginStringsTests
 }
 
 /// <summary>Shared set-up of the two language tests below: a site with German and English pages and a script plugin from plugins/.</summary>
-internal static class ScriptPluginSite
+public static class ScriptPluginSite
 {
     public static string Fixture(string path) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures", path));
 

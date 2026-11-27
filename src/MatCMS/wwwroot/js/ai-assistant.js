@@ -96,6 +96,7 @@
         var empty = document.getElementById('ai-empty');
         if (empty) empty.remove();
         var box = runBox(step.run);
+        lastRun = Math.max(lastRun, step.run);
         var d = step.data || {};
         if (step.kind === 'user') {
             var u = el('div', 'ai-msg ai-msg-user');
@@ -105,13 +106,14 @@
             u.appendChild(t);
             (d.files || []).forEach(function (f) {
                 var chip = el('span', 'ai-file' + (f.error ? ' is-error' : ''));
-                chip.appendChild(el('i', 'ti ' + (f.kind === 'image' ? 'ti-photo' : 'ti-file-text')));
+                chip.appendChild(el('i', 'ti ' + (f.kind === 'image' ? 'ti-photo' : f.kind === 'table' ? 'ti-table' : 'ti-file-text')));
                 chip.appendChild(document.createTextNode(' ' + f.name + (f.error ? ' – ' + f.error : '')));
                 if (f.url && f.kind === 'image') chip.title = f.url;
                 u.appendChild(chip);
             });
             box.appendChild(u);
         } else if (step.kind === 'assistant') {
+            stats(step.run).calls++;
             var a = el('div', 'ai-msg ai-msg-ai');
             var who = el('div', 'ai-who', W.ai);
             if (d.model) who.appendChild(el('span', 'ai-meta', ' · ' + d.model));
@@ -141,6 +143,9 @@
                 head.appendChild(go);
             }
             c.appendChild(head);
+            if (ok && d.tool === 'propose_plan' && d.result && d.result.plan) c.appendChild(planCard(d.result.plan));
+            if (d.tool === 'plugin_batch' && d.result && d.result.items) c.appendChild(batchSummary(d.result));
+            if (d.changed) stats(step.run).changes += (d.result && typeof d.result.applied === 'number') ? d.result.applied : 1;
             if (warn) {
                 var ul = el('ul', 'ai-warn');
                 d.warnings.forEach(function (w) { ul.appendChild(el('li', null, w)); });
@@ -173,23 +178,111 @@
         }
     }
 
+    // What a run has done so far (model answers, changes) — shown on the "working" line, so a long import reads as progress.
+    var runStats = {};
+    function stats(run) { return runStats[run] || (runStats[run] = { calls: 0, changes: 0 }); }
+    var lastRun = 0;
+
+    function fmt(template) {
+        var args = Array.prototype.slice.call(arguments, 1);
+        return String(template || '').replace(/\{(\d)\}/g, function (_, i) { return args[+i] != null ? args[+i] : ''; });
+    }
+
+    // The plan the AI proposed before a bulk write: title, steps, how many entries, and a preview table. Everything is TEXT (textContent) —
+    // the cells come from an attachment and the model, never markup.
+    function planCard(plan) {
+        var card = el('div', 'ai-plan');
+        card.appendChild(el('div', 'ai-plan-title', plan.title || ''));
+        if (plan.steps && plan.steps.length) {
+            var ol = el('ol', 'ai-plan-steps');
+            plan.steps.forEach(function (s) { ol.appendChild(el('li', null, s)); });
+            card.appendChild(ol);
+        }
+        if (typeof plan.count === 'number') card.appendChild(el('div', 'ai-plan-count muted', fmt(W.planCount, plan.count.toLocaleString())));
+        if (plan.table && plan.table.columns && plan.table.columns.length) {
+            var wrap = el('div', 'ai-plan-table');
+            var table = el('table', 'data');
+            var tr = el('tr');
+            plan.table.columns.forEach(function (c) { tr.appendChild(el('th', null, c)); });
+            var thead = el('thead'); thead.appendChild(tr); table.appendChild(thead);
+            var tbody = el('tbody');
+            (plan.table.rows || []).forEach(function (r) {
+                var row = el('tr');
+                plan.table.columns.forEach(function (_, i) { row.appendChild(el('td', null, r[i] != null ? r[i] : '')); });
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            wrap.appendChild(table);
+            card.appendChild(wrap);
+        }
+        return card;
+    }
+
+    // A batch of the same plugin action: the counts on one line, the entries with their status on demand.
+    function batchSummary(r) {
+        var box = el('div', 'ai-batch');
+        var line = el('div', 'ai-batch-line');
+        line.appendChild(el('span', 'badge badge-on', fmt(W.batchSummary, r.applied, r.total)));
+        if (r.skipped) line.appendChild(el('span', 'badge', fmt(W.batchSkipped, r.skipped)));
+        if (r.failed) line.appendChild(el('span', 'badge badge-err', fmt(W.batchFailed, r.failed)));
+        box.appendChild(line);
+        var det = el('details', 'ai-details');
+        det.appendChild(el('summary', null, W.batchItems + ' (' + r.items.length + ')'));
+        var ul = el('ul', 'ai-batch-items');
+        r.items.forEach(function (it) {
+            var li = el('li', 'is-' + (it.status === 'applied' ? 'ok' : it.status === 'failed' ? 'error' : 'skip'));
+            li.appendChild(el('i', 'ti ' + (it.status === 'applied' ? 'ti-check' : it.status === 'failed' ? 'ti-x' : 'ti-minus')));
+            li.appendChild(document.createTextNode(' ' + (it.i + 1) + '. ' + (it.message || it.status)));
+            ul.appendChild(li);
+        });
+        det.appendChild(ul);
+        box.appendChild(det);
+        return box;
+    }
+
     // How a run ended, as ONE clear line at its end: done, waiting for you, stopped (with "Weitermachen", which sends "weiter" —
     // no typing), failed, cancelled. Only the newest run keeps its button.
     function endLine(step, state) {
         var map = {
             done: ['is-done', 'ti-circle-check', W.endDone],
             waiting: ['is-waiting', 'ti-message-question', W.endWaiting],
+            plan: ['is-waiting', 'ti-list-check', W.endPlan],
             limit: ['is-stopped', 'ti-player-pause', W.endStopped],
             stalled: ['is-stopped', 'ti-player-pause', W.endStopped],
             error: ['is-error', 'ti-alert-circle', W.endError],
             cancelled: ['is-stopped', 'ti-player-stop', W.endCancelled]
         };
         var m = map[state] || map.stalled;
+        // Only the newest run keeps its buttons (go on, carry out the plan).
+        log.querySelectorAll('.ai-goon').forEach(function (b) { b.remove(); });
         var line = el('div', 'ai-end ' + m[0]);
         line.appendChild(el('i', 'ti ' + m[1]));
         var txt = el('span', 'ai-end-text', m[2]);
         line.appendChild(txt);
-        if (step.text && state !== 'done' && state !== 'waiting' && state !== 'cancelled') line.appendChild(el('span', 'ai-end-why', step.text));
+        if (step.text && state !== 'done' && state !== 'waiting' && state !== 'cancelled' && state !== 'plan') line.appendChild(el('span', 'ai-end-why', step.text));
+        // A plan: "Plan ausführen" sends the approval, "Ändern …" starts a message saying what to change. Only the newest run keeps them.
+        if (state === 'plan') {
+            log.querySelectorAll('.ai-goon').forEach(function (b) { b.remove(); });
+            var goPlan = el('button', 'btn btn-sm ai-goon');
+            goPlan.type = 'button';
+            goPlan.innerHTML = '<i class="ti ti-player-play"></i> ';
+            goPlan.appendChild(document.createTextNode(W.planGo));
+            goPlan.addEventListener('click', function () {
+                if (running) return;
+                input.value = W.planGoText;
+                form.requestSubmit();
+            });
+            var change = el('button', 'btn btn-ghost btn-sm ai-goon');
+            change.type = 'button';
+            change.textContent = W.planChange;
+            change.addEventListener('click', function () {
+                input.value = W.planChangeText;
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            });
+            line.appendChild(goPlan);
+            line.appendChild(change);
+        }
         if (state === 'limit' || state === 'stalled' || state === 'error') {
             log.querySelectorAll('.ai-goon').forEach(function (b) { b.remove(); });
             var go = el('button', 'btn btn-sm ai-goon');
@@ -239,7 +332,11 @@
         if (on && !working) {
             working = el('div', 'ai-line ai-working');
             working.appendChild(el('span', 'ai-spinner'));
-            working.appendChild(document.createTextNode(' ' + W.working));
+            working.appendChild(el('span', 'ai-working-text', ' ' + W.working));
+        }
+        if (working) {
+            var st = stats(lastRun);
+            working.querySelector('.ai-working-text').textContent = ' ' + W.working + (st.calls ? ' · ' + fmt(W.progress, st.calls, st.changes) : '');
         }
         if (on) log.appendChild(working); else if (working) working.remove();
         scrollDown();

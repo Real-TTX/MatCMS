@@ -1735,6 +1735,23 @@ a.tab { display: inline-block; text-decoration: none; }
 .ai-end.is-waiting { background: var(--info-bg); color: var(--info-fg); border-color: transparent; }
 .ai-end.is-stopped { background: var(--warn-bg); color: var(--warn-fg); border-color: transparent; }
 .ai-end.is-error { background: var(--err-bg); color: var(--err-fg); border-color: transparent; }
+.ai-end .ai-goon + .ai-goon { margin-left: 0; }
+/* The plan the assistant proposes before a bulk write, and the counts of a batch of plugin actions. */
+.ai-plan { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+.ai-plan-title { font-weight: 600; margin-bottom: 4px; }
+.ai-plan-steps { margin: 4px 0 6px 18px; padding: 0; }
+.ai-plan-steps li { margin: 2px 0; }
+.ai-plan-count { font-size: 12px; margin-bottom: 6px; }
+.ai-plan-table { overflow-x: auto; max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.ai-plan-table table.data { margin: 0; font-size: 12px; }
+.ai-plan-table th { position: sticky; top: 0; background: var(--surface); }
+.ai-batch { margin-top: 6px; }
+.ai-batch-line { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-batch-items { list-style: none; margin: 4px 0 0; padding: 0; max-height: 260px; overflow-y: auto; font-size: 12px; }
+.ai-batch-items li { padding: 1px 0; }
+.ai-batch-items li.is-ok .ti { color: var(--ok-fg); }
+.ai-batch-items li.is-error { color: var(--err-fg); }
+.ai-batch-items li.is-skip { color: var(--text-muted); }
 .ai-spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent, #2563eb); border-radius: 50%; animation: ai-spin .8s linear infinite; }
 @keyframes ai-spin { to { transform: rotate(360deg); } }
 .ai-undo { align-self: flex-start; }

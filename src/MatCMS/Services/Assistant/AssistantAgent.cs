@@ -282,6 +282,15 @@ public sealed class AssistantAgent
                     : "Du darfst NUR diese Seite ändern. Lesen darfst du alles.");
         }
         else lines.Add("Der Nutzer arbeitet an der ganzen Website.");
+        // Which plugins are on — so "leg das im Shop an" is understood, and a request for a plugin that is OFF gets that answer instead of a guess.
+        var plugins = await _db.Plugins.AsNoTracking().OrderBy(p => p.Name).Select(p => new { p.Name, p.Key, p.Enabled }).ToListAsync(ct);
+        if (plugins.Count > 0)
+        {
+            var on = plugins.Where(p => p.Enabled).Select(p => $"{p.Name} ({p.Key})").ToList();
+            var off = plugins.Where(p => !p.Enabled).Select(p => p.Name).ToList();
+            lines.Add("Eingeschaltete Plugins: " + (on.Count > 0 ? string.Join(", ", on) : "keine") + "."
+                + (off.Count > 0 ? " Ausgeschaltet (ihre Aktionen fehlen, der Nutzer schaltet sie unter Plugins ein): " + string.Join(", ", off) + "." : ""));
+        }
         return string.Join("\n", lines);
     }
 

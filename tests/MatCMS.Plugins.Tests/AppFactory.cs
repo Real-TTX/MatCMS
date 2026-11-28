@@ -19,6 +19,9 @@ public sealed class AppFactory : WebApplicationFactory<Program>
     /// <summary>Services to replace before the application starts (a fake AI in place of the relay). Set it before the first request.</summary>
     public Action<IServiceCollection>? ExtraServices { get; init; }
 
+    /// <summary>Configuration values as a broker's environment would set them (<c>MATSMTP_HOST</c>, <c>MATIDENTITY_AUTHORITY</c> …). Set it before the first request.</summary>
+    public Dictionary<string, string>? Variables { get; init; }
+
     public AppFactory()
     {
         Directory.CreateDirectory(Root);
@@ -34,6 +37,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
         builder.UseContentRoot(Root);
         builder.UseSetting("ConnectionStrings:Default", "Data Source=" + Path.Combine(Root, "appdata", "matcms.db"));
         builder.UseEnvironment("Production");
+        foreach (var (key, value) in Variables ?? []) builder.UseSetting(key, value);
         if (ExtraServices is { } extra) builder.ConfigureServices(extra);
     }
 

@@ -74,6 +74,10 @@
     <!-- The site's own MCP server (/mcp, Services/Mcp/SiteMcpServer.cs) so an AI client works on a site WITHOUT a cloud. The same package the
          cloud's MCP server uses (official C# SDK), MIT. -->
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.*" />
+    <!-- MatPlatform (the copy in MatPlatform/, MatDesign docs/PLATFORM.md): the OPTIONAL sign-in of back-office admins through MatIdentity
+         (OpenID Connect) and its bearer tokens. Only used when MATIDENTITY_AUTHORITY is set; the cloud references the same two. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.*" />
   </ItemGroup>
 
   <ItemGroup>

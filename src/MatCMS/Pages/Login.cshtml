@@ -26,6 +26,14 @@
         {
             <div class="alert alert-error">@Model.Error</div>
         }
+        @if (Model.PendingLink is not null)
+        {
+            <div class="alert alert-info">@T["login.linkIntro"]</div>
+        }
+        else if (Model.LinkExpired)
+        {
+            <div class="alert alert-error">@T["login.linkExpired"]</div>
+        }
         <form method="post">
             <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
             <div class="form-field">
@@ -41,9 +49,24 @@
             </label>
             <button type="submit" class="btn btn-block">@T["login.submit"]</button>
         </form>
-        @if (Model.SsoAvailable)
+        @if (Model.PendingLink is not null)
+        {
+            <form method="post" asp-page-handler="CancelLink">
+                <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                <button type="submit" class="btn btn-ghost btn-block">@T["login.linkCancel"]</button>
+            </form>
+        }
+        else if (Model.IdentityEnabled)
         {
             <div style="text-align:center;color:#9aa0a6;font-size:13px;margin:14px 0 10px;">@T["login.or"]</div>
+            <a class="btn btn-ghost btn-block" href="@Model.IdentitySignInUrl"><i class="ti ti-id-badge-2" aria-hidden="true"></i> @T["login.identity"]</a>
+        }
+        @if (Model.SsoAvailable && Model.PendingLink is null)
+        {
+            if (!Model.IdentityEnabled)
+            {
+                <div style="text-align:center;color:#9aa0a6;font-size:13px;margin:14px 0 10px;">@T["login.or"]</div>
+            }
             @* target="_blank": Läuft dieser Login im Cloud-iFrame (Instanz-Ansicht), MUSS der OAuth-Ablauf
                in einem neuen Tab (First-Party) laufen — im Cross-Site-iFrame blockt der Browser die
                Anmelde-Cookies (das ließ sich mit SameSite=None/CHIPS nicht zuverlässig lösen, v. a. Brave).

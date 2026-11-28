@@ -1030,6 +1030,12 @@ namespace MatCMS.Data.Migrations
                     b.Property<string>("Email")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ExternalSubject")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("IdentitySignedOutAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("MaintenanceSeen")
                         .HasColumnType("TEXT");
 
@@ -1059,6 +1065,9 @@ namespace MatCMS.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExternalSubject")
+                        .IsUnique();
 
                     b.HasIndex("Username")
                         .IsUnique();

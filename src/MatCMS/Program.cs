@@ -8,6 +8,7 @@ using MatCMS.Content;
 using MatCMS.Data;
 using MatCMS.Services;
 using MatCMS.Shared;
+using MatPlatform;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Localization;
@@ -117,7 +118,18 @@ else
     embedAuth = v.Trim().ToLowerInvariant() is "1" or "true" or "on" or "yes";
 }
 
-// --- Authentication: cookie based, login only via /login ---
+// --- The Mat platform (MatDesign docs/PLATFORM.md), both parts OPTIONAL -----------------------------
+// A broker such as MatOS injects these variables when it binds a capability; they are runtime environment, not site settings (no
+// MatCms:* key, nothing in the database, so no backup or rollout carries them). Without them the site is exactly what it was:
+//  - mail.smtp      MATSMTP_*             → EmailService sends through MatSMTP (after the cloud relay, before the site's own SMTP).
+//  - identity.oidc  MATIDENTITY_AUTHORITY → back-office admins sign in through MatIdentity (members stay local); /login?local=1 always stays.
+// MatPlatform/ is a COPY of MatDesign's src/MatPlatform (tools/matplatform-copy.js), never edited here. Only these two parts of it are
+// used: the platform's /api is not mapped (the site's own /api/… routes, and the catalog entry describes MatCMS instead).
+var platform = MatPlatform.MatPlatformSettings.From(builder.Configuration, MatCMS.Services.SiteIdentityUsers.AppId);
+builder.Services.AddSingleton(platform);
+builder.Services.AddSingleton(MatPlatform.MatSmtpSettings.From(builder.Configuration));
+
+// --- Authentication: cookie based, login via /login; with MATIDENTITY_AUTHORITY also through MatIdentity ---
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -131,6 +143,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = embedAuth ? SameSiteMode.None : SameSiteMode.Lax;
         if (embedAuth) options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         MatCMS.Services.RelativeAuthRedirects.Apply(options);   // behind the edge the Host is the node's address, not the browser's
+        // A session that came through MatIdentity ends when MatIdentity ends it (back-channel logout). A local or cloud-SSO session is
+        // not looked at, so without MatIdentity this costs nothing.
+        options.Events.OnValidatePrincipal = MatCMS.Services.AuthService.ValidatePrincipalAsync;
+    })
+    // Sign-in of back-office admins through MatIdentity — only when MATIDENTITY_AUTHORITY is set (otherwise this adds no scheme at all).
+    .AddMatIdentitySignIn<MatCMS.Services.SiteIdentityUsers>(platform, o =>
+    {
+        o.CookieScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        o.LoginPath = "/login";
+        o.AccessDeniedPath = "/login?local=1&denied=1";
     })
     // A SECOND, independent scheme for public-site visitors (the "guest area" login). Its own cookie
     // and login path, kept apart from the admin one so the two audiences never bleed into each other.
@@ -668,6 +690,7 @@ app.Use(async (ctx, next) =>
     if (p.StartsWith("/admin", StringComparison.OrdinalIgnoreCase)
         && ctx.User?.Identity?.IsAuthenticated == true
         && ctx.User.FindFirst("amr")?.Value != "sso"   // federated logins get their factor from the cloud
+        && !MatCMS.Services.AuthService.IsIdentitySession(ctx.User)   // ... or from MatIdentity, which has its own second step
         && !p.StartsWith("/admin/account/twofactor", StringComparison.OrdinalIgnoreCase))
     {
         var site = ctx.RequestServices.GetRequiredService<SiteContext>();
@@ -722,6 +745,8 @@ app.Use(async (ctx, next) =>
         p.StartsWith("/login", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/logout", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/sso/", StringComparison.OrdinalIgnoreCase) ||     // "Mit der Cloud anmelden" on the sign-in page — was answered with the maintenance page
+        p.StartsWith("/signin-oidc", StringComparison.OrdinalIgnoreCase) ||   // MatIdentity's callback and sign-out (only mapped with MATIDENTITY_AUTHORITY)
+        p.StartsWith("/signout-", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/_status", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/set-language", StringComparison.OrdinalIgnoreCase) ||
         p.StartsWith("/fonts/", StringComparison.OrdinalIgnoreCase) ||   // the maintenance page itself uses them
@@ -812,6 +837,8 @@ MatCMS.Shared.Web.Pwa.MapPwa(app, ctx =>
     return new MatCMS.Shared.Web.PwaInfo(name, MatCMS.Shared.Web.Pwa.ShortName(name), "matcms", "/admin", string.IsNullOrEmpty(lang) ? "de" : lang);
 });
 app.MapRazorPages();
+// MatIdentity's back-channel logout (POST /signout-backchannel) — mapped only with MATIDENTITY_AUTHORITY, else nothing (404).
+MatPlatform.MatIdentitySignIn.MapMatIdentityBackchannelLogout(app);
 
 // Public plugin routes. ASP.NET cannot unregister an endpoint, so plugins do not get endpoints of their
 // own: this ONE catch-all asks the plugin registry whether the path is theirs, and says "not mine" for
@@ -1032,9 +1059,13 @@ app.MapGet("/sso/callback", async (HttpContext ctx, MatCMS.Services.SiteContext 
     var claims = await cloud.ExchangeSsoCodeAsync(code, verifier, redirectUri, ctx.RequestAborted);
     if (claims is null) return Results.Redirect("/login?sso=failed");
 
-    // JIT: match by username (= e-mail on this instance), create as Admin if new (no local password).
-    var email = claims.Email.Trim();
-    var user = await db.Users.FirstOrDefaultAsync(u => u.Username == email);
+    // JIT: match by e-mail or username (= e-mail on this instance) without regard to case, create as Admin if new (no local password).
+    // It was `Username == email` exactly: "Max@Example.de" from the cloud next to an account "max@example.de" — or one whose address
+    // only lives in Email — became a second admin account instead of the same person. The cloud has checked the address; this
+    // trust is the SSO's own and unrelated to MatIdentity, which never links by address (SiteIdentityUsers).
+    var email = (claims.Email ?? "").Trim();
+    if (email.Length == 0) return Results.Redirect("/login?sso=failed");
+    var user = await auth.FindByLoginAsync(email);
     if (user is null)
     {
         user = new MatCMS.Models.User

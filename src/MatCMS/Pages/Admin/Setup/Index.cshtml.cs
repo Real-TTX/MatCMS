@@ -13,7 +13,11 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly AuthService _auth;
-    public IndexModel(AppDbContext db, AuthService auth) { _db = db; _auth = auth; }
+    private readonly EmailService _email;
+    public IndexModel(AppDbContext db, AuthService auth, EmailService email) { _db = db; _auth = auth; _email = email; }
+
+    /// <summary>MatSMTP is set: the SMTP step has nothing to ask, and must not write the (empty) fields over the site's own values.</summary>
+    public bool UsesMatSmtp => _email.UsesMatSmtp;
 
     [BindProperty] public string AdminEmail { get; set; } = "";
     [BindProperty] public string? AdminName { get; set; }
@@ -74,8 +78,8 @@ public class IndexModel : PageModel
             foreach (var t in all) t.IsActive = string.Equals(t.Name, ThemeName, StringComparison.OrdinalIgnoreCase);
         }
 
-        // 3) SMTP
-        foreach (var key in SettingKeys.Smtp)
+        // 3) SMTP (not with MatSMTP: the step shows no fields then)
+        foreach (var key in UsesMatSmtp ? [] : SettingKeys.Smtp)
         {
             var val = Smtp.TryGetValue(key, out var v) ? (v ?? "") : "";
             var row = await _db.SiteSettings.FirstOrDefaultAsync(s => s.Key == key);

@@ -180,6 +180,20 @@ from then on the cloud can:
 → **Full docs: [src/MatCMS.Cloud/README.md](src/MatCMS.Cloud/README.md)**
 (image `ghcr.io/real-ttx/matcms-cloud`, port `9100`).
 
+## In MatOS (optional)
+
+MatCMS runs on its own; nothing below is needed. Installed by **MatOS**, a site can also use two engines
+of the Mat platform directly — each only when its variables are set, and without them everything stays
+as described above:
+
+| Capability | Variables | What changes |
+| --- | --- | --- |
+| `mail.smtp` — **MatSMTP** | `MATSMTP_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD`, `_FROM`, `_TLS` | Every mail of the site (forms, members, plugins, shop) goes through MatSMTP, after the cloud relay and before the site's own SMTP. The sender is MatSMTP's one address with the site's name; the site's own address becomes the Reply-To. Settings → SMTP shows the connection as fixed. |
+| `identity.oidc` — **MatIdentity** | `MATIDENTITY_AUTHORITY`, `_CLIENT_ID` (default `matcms`), `_CLIENT_SECRET`, `_INTERNAL_URL` | Back-office admins sign in through MatIdentity (members keep their own sign-in). An existing account with the same address is linked only after its own password. `/login?local=1` is always the site's own form, so an outage of MatIdentity never locks anybody out. |
+
+The values are runtime environment from the broker: they are not stored, so no backup and no cloud rollout
+carries or overwrites them.
+
 ## Pricing & license
 
 MatCMS is **source-available**: the code is here to read, run and change – under the [MatCMS License](LICENSE.md).

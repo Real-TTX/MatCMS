@@ -62,6 +62,12 @@
 
         <div class="wiz-panel" data-panel="2" hidden>
             <h2>@T["setup.smtp"]</h2>
+            @if (Model.UsesMatSmtp)
+            {
+                <div class="alert alert-info">@T["setup.smtpMatSmtp"]</div>
+            }
+            else
+            {
             <p class="muted">@T["setup.smtpIntro"]</p>
             <div class="form-grid">
                 <div class="form-field"><label>@T["settings.smtpHost"]</label><input name="Smtp[@SettingKeys.SmtpHost]" value="@SmtpV(SettingKeys.SmtpHost)" placeholder="smtp.example.com" /></div>
@@ -71,6 +77,7 @@
                 <div class="form-field"><label>@T["settings.smtpFromEmail"]</label><input name="Smtp[@SettingKeys.SmtpFromEmail]" value="@SmtpV(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" /></div>
                 <div class="form-field"><label>@T["settings.smtpFromName"]</label><input name="Smtp[@SettingKeys.SmtpFromName]" value="@SmtpV(SettingKeys.SmtpFromName)" /></div>
             </div>
+            }
         </div>
 
         <div class="wiz-panel" data-panel="3" hidden>

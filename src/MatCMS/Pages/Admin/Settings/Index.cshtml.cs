@@ -122,6 +122,17 @@ public class IndexModel : PageModel
     /// </summary>
     public bool SmtpConfigured { get; private set; }
 
+    /// <summary>MatSMTP is set (the MATSMTP_* variables of a broker such as MatOS): the connection fields are shown as fixed with its
+    /// values, only the sender name and the own address (now the reply address) stay editable. Read from the environment, never stored.</summary>
+    public bool UsesMatSmtp => _email.UsesMatSmtp;
+
+    /// <summary>The MatSMTP connection for the fixed fields (its password is never rendered).</summary>
+    public MatPlatform.MatSmtpSettings MatSmtp => _email.MatSmtp;
+
+    /// <summary>The keys the SMTP form may write while MatSMTP is set: the fixed fields post nothing, and writing them would wipe the
+    /// site's own connection, which applies again the day the variables are gone.</summary>
+    private static readonly string[] SmtpKeysBesideMatSmtp = [SettingKeys.SmtpFromEmail, SettingKeys.SmtpFromName, SettingKeys.SmtpFromSiteName];
+
     public async Task OnGetAsync(bool preview = false)
     {
         UsesCloudRelay = await _email.UseCloudRelayAsync();
@@ -382,7 +393,7 @@ public class IndexModel : PageModel
 
     public async Task<IActionResult> OnPostSmtpAsync()
     {
-        await SaveKeysAsync(SettingKeys.Smtp);
+        await SaveKeysAsync(UsesMatSmtp ? SmtpKeysBesideMatSmtp : SettingKeys.Smtp);
         TempData["Flash"] = "SMTP-Einstellungen gespeichert.";
         return RedirectToPage(new { tab = "smtp" });
     }
@@ -483,6 +494,19 @@ public class IndexModel : PageModel
     /// <summary>Sends a test e-mail using the values currently entered (no need to save first).</summary>
     public async Task<IActionResult> OnPostTestSmtpAsync()
     {
+        if (UsesMatSmtp)
+        {
+            // The connection is MatSMTP's: test exactly what every mail of the site uses (the posted fields are fixed and post nothing).
+            var used = await _email.GetConfigAsync();
+            var own = Values.TryGetValue(SettingKeys.SmtpFromEmail, out var o) ? (o ?? "").Trim() : "";
+            _ = int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var uid);
+            var me = await _db.Users.AsNoTracking().Where(u => u.Id == uid).Select(u => u.Email).FirstOrDefaultAsync();
+            var target = own.Length > 0 ? own : !string.IsNullOrWhiteSpace(me) ? me! : used.FromEmail;
+            var (sent, failure) = await _email.SendTestAsync(used, target);
+            TempData[sent ? "Flash" : "FlashError"] = sent ? $"Test-E-Mail an {target} gesendet." : $"Test fehlgeschlagen: {failure}";
+            return RedirectToPage(new { tab = "smtp" });
+        }
+
         string V(string k) => Values.TryGetValue(k, out var v) ? (v ?? "") : "";
         if (!int.TryParse(V(SettingKeys.SmtpPort), out var port) || port <= 0) port = 587;
         var ssl = V(SettingKeys.SmtpSsl).Trim().ToLowerInvariant();

@@ -710,6 +710,40 @@ basic instruction, fallback, sources, customer data, limits and history are its 
   conversation lives in `sessionStorage` (this tab). A site that switches the bot on needs a paragraph in its privacy statement.
 - Tests: `BotTests` (whole app, `FakeAi`, shop on: own orders yes, another customer's no, members-only page, limits, history roles, chats).
 
+## The Mat platform on a site: MatSMTP and MatIdentity (optional)
+
+A site installed by **MatOS** (broker, `../Mattiverse`) may consume `mail.smtp` and `identity.oidc` directly — what the cloud already
+does (`src/MatCMS.Cloud/Platform/`). **Rule no. 1: standalone.** Every variable is optional; without them the site is byte for byte the
+old one (`MatPlatformSiteTests.Without_the_variables_nothing_changes`). The variables are the broker's runtime injection under the
+platform contract (MatDesign `docs/PLATFORM.md`), like `Services/CloudBinding.cs` — not site settings: no `MatCms:*` key, nothing in
+the database, so no backup, restore or rollout carries or overwrites them.
+- **`src/MatCMS/MatPlatform/` is a second COPY** of MatDesign's `src/MatPlatform` (the cloud has the first), byte-identical, never
+  edited here: `node tools/matplatform-copy.js <app folder>` in MatDesign refreshes it — refresh BOTH copies together. Only two parts are
+  used: `MatSmtpSettings` and `AddMatIdentitySignIn` (+ the back-channel logout). The platform's `/api` is NOT mapped (`AddMatPlatform`/
+  `MapMatPlatform` are not called): it would collide with the site's own `/api/…`, and MatOS's catalog entry describes MatCMS instead.
+- **MatSMTP** (`MATSMTP_*`, `EmailService`): order cloud relay → MatSMTP → own `smtp.*`. MatSMTP allows ONE sender (`MATSMTP_FROM`), so
+  the From is that address with the site's sender NAME (falling back to the site name), and the site's own `smtp.fromEmail` becomes the
+  Reply-To (`SmtpConfig.ReplyTo`; a caller's Reply-To — a form's visitor — wins). Every sender ends in `SendCoreAsync` (forms, members,
+  `ctx.Mail`, the shop), so there is no second place to fix. Settings → SMTP and the setup wizard show the connection as fixed and save
+  only sender name / own address / site-name switch — the fixed fields post nothing, and writing them would wipe the site's own
+  connection, which applies again the day the variables are gone.
+- **MatIdentity** (`MATIDENTITY_AUTHORITY`, client id default `matcms` = the catalog id) is for **back-office admins only**; `SiteMember`
+  stays local. `Services/SiteIdentityUsers.cs`: by `User.ExternalSubject` (`sub`, unique); an unlinked account with the same e-mail /
+  user name is NEVER entered by the address — `LinkRequired` → `/login?local=1&link=1`, linked after its own password AND second factor
+  (`TakeLinkAsync` in `Login` and `Login2fa`); else a new Admin. One back-office role: no role claim or `admin` = in, any other role =
+  refused. The cookie keeps `mat_sub`/`mat_sid`/`mat_id_token`/`mat_issued`; `AuthService.ValidatePrincipalAsync` (the admin cookie's
+  `OnValidatePrincipal`) ends it after a back-channel logout (`sid` in memory, `User.IdentitySignedOutAt` for `sub`) and touches nothing
+  for a local or cloud-SSO session. `/login` challenges MatIdentity unless `?local=1|signedOut|ssoError|denied|link`, `twofa` or `sso`; an
+  unreachable MatIdentity shows the local form with a note. Logout ends the MatIdentity session too and lands on `/login?signedOut=1`.
+  The "2FA erforderlich" gate lets a MatIdentity session through (its own second step), like `amr=sso`. `ExternalSubject` is NOT in
+  backups (a link is a fact of this site and its MatIdentity). `signin-oidc`, `signout-callback-oidc`, `signout-backchannel` are system
+  segments (`DomainRoutes`, `PluginRoutePattern.Reserved`) and exempt from maintenance mode.
+- **Cloud SSO** (`/sso/callback`) is unchanged in trust (the cloud checked the address), but finds the account through
+  `AuthService.FindByLoginAsync` — e-mail, then user name, case-insensitive. It was `Username == email` exactly and made a second admin for
+  "Max@Example.de" next to "max@example.de".
+- Tests: `MatPlatformSiteTests` (no variables; MatSMTP against a fake SMTP server; the SMTP tab; MatIdentity down; sign-in by `sub`, link
+  only after the password, back-channel by `sid` and `sub`, a foreign role refused; the case-insensitive lookup).
+
 ## Domain routing (one site, several domains)
 
 Settings → Domains (`site.domainRoutes`, `Services/DomainRoutes.cs`, middleware in `Program.cs` right after the https-proxy one): a further domain shows

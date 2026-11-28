@@ -13,6 +13,17 @@ public class User
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // --- MatIdentity (optional, MATIDENTITY_AUTHORITY) -------------------------
+    // Only back-office accounts are ever linked; the site's members (SiteMember) stay local.
+
+    /// <summary>The MatIdentity person (<c>sub</c>) this account belongs to; null = not linked. Set when the person is first created
+    /// through MatIdentity or after the account's own password proved a match by address — never from the address alone.</summary>
+    public string? ExternalSubject { get; set; }
+
+    /// <summary>When MatIdentity last signed this person out everywhere (back-channel logout without a <c>sid</c>): a MatIdentity
+    /// session cookie issued before it is rejected.</summary>
+    public DateTime? IdentitySignedOutAt { get; set; }
+
     /// <summary>The admin bar over the public site for THIS user: null = follow the site setting
     /// (site.adminBar), "on" / "off" = the user's own choice. A login through the cloud's switcher shows
     /// it regardless (see SiteContext.ShowAdminBar).</summary>

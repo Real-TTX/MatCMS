@@ -421,6 +421,10 @@
                 {
                     <span class="badge badge-on">@T["settings.mailViaCloud"]</span>
                 }
+                else if (Model.UsesMatSmtp)
+                {
+                    <span class="badge badge-on">@T["settings.mailViaMatSmtp"]</span>
+                }
                 else if (Model.SmtpConfigured)
                 {
                     <span class="badge badge-on">@T["settings.mailViaSmtp"]</span>
@@ -433,6 +437,7 @@
         </div>
         <div class="help">
             @(Model.UsesCloudRelay ? T["settings.mailViaCloudHint"]
+              : Model.UsesMatSmtp ? T["settings.mailViaMatSmtpHint"]
               : Model.SmtpConfigured ? T["settings.mailViaSmtpHint"]
               : T["settings.mailNoneHint"])
         </div>
@@ -443,6 +448,38 @@
             <h2>@T["settings.smtpHeading"]</h2>
             <p class="muted">@T["settings.smtpIntro"]</p>
             <div class="form-grid">
+                @if (Model.UsesMatSmtp)
+                {
+                    @* The connection is MatSMTP's (MATSMTP_*): shown, not editable, never posted — the site's own values stay stored and
+                       apply again once the variables are gone. The password is never rendered. *@
+                    <div class="form-field">
+                        <label>@T["settings.smtpHost"]</label>
+                        <input value="@Model.MatSmtp.Host" disabled data-native />
+                        <div class="help">@T["settings.smtpFixed"]</div>
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpPort"]</label>
+                        <input value="@Model.MatSmtp.Port" disabled data-native />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpUser"]</label>
+                        <input value="@Model.MatSmtp.Username" disabled data-native />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpPassword"]</label>
+                        <input type="password" value="@(Model.MatSmtp.Password is null ? "" : "••••••••")" disabled data-native />
+                    </div>
+                    <div class="form-field">
+                        <label>@T["settings.smtpSsl"]</label>
+                        <input value="@Model.MatSmtp.TlsName" disabled data-native />
+                    </div>
+                    <div class="form-field">
+                        <label>MatSMTP – @T["settings.smtpFromEmail"]</label>
+                        <input value="@Model.MatSmtp.FromAddress" disabled data-native />
+                    </div>
+                }
+                else
+                {
                 <div class="form-field">
                     <label>@T["settings.smtpHost"]</label>
                     <input name="Values[@SettingKeys.SmtpHost]" value="@V(SettingKeys.SmtpHost)" placeholder="smtp.example.com" />
@@ -459,6 +496,7 @@
                     <label>@T["settings.smtpPassword"]</label>
                     <input type="password" name="Values[@SettingKeys.SmtpPassword]" value="@V(SettingKeys.SmtpPassword)" autocomplete="new-password" />
                 </div>
+                }
                 <div class="form-field">
                     <label>@T["settings.smtpFromEmail"]</label>
                     <input name="Values[@SettingKeys.SmtpFromEmail]" value="@V(SettingKeys.SmtpFromEmail)" placeholder="noreply@example.com" />
@@ -474,6 +512,8 @@
                         <option value="1" selected="@(V(SettingKeys.SmtpFromSiteName) == "1")">@T["settings.smtpFromSiteNameOn"]</option>
                     </select>
                 </div>
+                @if (!Model.UsesMatSmtp)
+                {
                 <div class="form-field">
                     <label>@T["settings.smtpSsl"]</label>
                     <select name="Values[@SettingKeys.SmtpSsl]">
@@ -482,6 +522,7 @@
                     </select>
                     <div class="help">@T["settings.smtpSslHelp"]</div>
                 </div>
+                }
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn">@T["settings.save"]</button>

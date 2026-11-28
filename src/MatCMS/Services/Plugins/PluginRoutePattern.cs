@@ -110,7 +110,8 @@ public sealed class PluginRoutePattern
     /// <summary>Path prefixes no plugin may claim: the host's own areas. A public plugin route there would
     /// shadow the back office, the login or the uploaded files.</summary>
     public static readonly string[] Reserved =
-        ["admin", "api", "login", "logout", "anmelden", "registrieren", "uploads", "thumbs", "plugin", "plugin-assets", "_content", "_framework", "error", "set-language", "sso", "oauth", "mcp"];
+        ["admin", "api", "login", "logout", "anmelden", "registrieren", "uploads", "thumbs", "plugin", "plugin-assets", "_content", "_framework", "error", "set-language", "sso", "oauth", "mcp",
+         "signin-oidc", "signout-callback-oidc", "signout-backchannel"];
 
     /// <summary>True when the first literal segment belongs to the host.</summary>
     public bool IsReserved =>

@@ -47,6 +47,8 @@ public class AppDbContext : DbContext
         b.Entity<AiStep>().HasOne<AiConversation>().WithMany().HasForeignKey(s => s.ConversationId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<AiChange>().HasOne<AiConversation>().WithMany().HasForeignKey(c => c.ConversationId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        // One MatIdentity person = at most one account here (SQLite allows any number of NULLs in a unique index).
+        b.Entity<User>().HasIndex(u => u.ExternalSubject).IsUnique();
         // Optimistic-concurrency guard so two simultaneous logins can't spend the same single-use
         // recovery code twice: the second UPDATE matches 0 rows and throws (handled in TwoFactorService).
         // Marking an existing column as a token only changes the generated WHERE clause — no migration.

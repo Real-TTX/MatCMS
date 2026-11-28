@@ -26,7 +26,9 @@ public static partial class DomainRoutes
     [
         "admin", "api", "login", "logout", "anmelden", "registrieren", "uploads", "thumb", "thumbs", "plugin", "plugin-assets", "template-assets",
         "_content", "_framework", "_status", "_preview.webp", "error", "set-language", "sso", "oauth", "fonts", "pwa", "css", "js", "lib", "img",
-        "favicon.ico", "sitemap.xml", "robots.txt", ".well-known", "mcp"
+        "favicon.ico", "sitemap.xml", "robots.txt", ".well-known", "mcp",
+        // MatIdentity (OpenID Connect): its callback, the sign-out return and the back-channel logout.
+        "signin-oidc", "signout-callback-oidc", "signout-backchannel"
     ];
 
     /// <summary>

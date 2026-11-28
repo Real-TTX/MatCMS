@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using MatCMS.Data;
+using MatPlatform;
 using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
@@ -15,26 +16,42 @@ namespace MatCMS.Services;
 /// STARTTLS (port 587/25). The built-in System.Net.Mail.SmtpClient can't do implicit SSL, which is
 /// why IONOS on 465 failed. Never throws to the caller; failures come back as (false, error) so a
 /// form submission is never lost because mail is down.
+/// <para>Which way a mail leaves, in this order: the cloud relay (a profile said <c>mail.transport = cloud</c>), then MatSMTP (the
+/// <c>MATSMTP_*</c> variables a broker such as MatOS writes when it binds <c>mail.smtp</c>, <see cref="MatSmtpSettings"/>), then the
+/// site's own <c>smtp.*</c>. Without the variables nothing changes. MatSMTP lets this app send as exactly ONE address
+/// (<c>MATSMTP_FROM</c>), so the site's name goes into the sender NAME and its own sender address only into Reply-To. Every mail of
+/// the site — forms, members, plugins' <c>ctx.Mail</c>, the shop — ends in <see cref="SendCoreAsync"/>, so this holds for all of them
+/// at once. The values come from the environment only and are never stored: no backup and no rollout can carry or overwrite them.</para>
 /// </summary>
 public class EmailService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<EmailService> _log;
     private readonly IServiceProvider _services;
+    private readonly MatSmtpSettings _matSmtp;
 
     // CloudService is resolved on demand rather than injected: it is only needed when a profile
     // switched this site to the relay, and taking it as a constructor dependency would tie every
     // page that sends a mail to the whole cloud stack.
-    public EmailService(AppDbContext db, IServiceProvider services, ILogger<EmailService> log)
+    public EmailService(AppDbContext db, IServiceProvider services, ILogger<EmailService> log, MatSmtpSettings? matSmtp = null)
     {
         _db = db;
         _services = services;
         _log = log;
+        _matSmtp = matSmtp ?? new MatSmtpSettings();   // null: a caller outside DI (tests) — no MatSMTP
     }
 
+    /// <summary>MatSMTP is set (<c>MATSMTP_HOST</c>): the site's own SMTP connection is shown as fixed and not used.</summary>
+    public bool UsesMatSmtp => _matSmtp.IsConfigured;
+
+    /// <summary>The MatSMTP connection, for the fixed fields of the SMTP tab (which never show its password).</summary>
+    public MatSmtpSettings MatSmtp => _matSmtp;
+
+    /// <param name="Mode">The TLS mode when it is known exactly (MatSMTP says it); null = derived from the port and <paramref name="Ssl"/>.</param>
+    /// <param name="ReplyTo">The Reply-To when the caller gives none: with MatSMTP the site's own sender address, which may not be the From.</param>
     public sealed record SmtpConfig(
         string Host, int Port, string User, string Password,
-        string FromEmail, string FromName, bool Ssl)
+        string FromEmail, string FromName, bool Ssl, SecureSocketOptions? Mode = null, string? ReplyTo = null)
     {
         public bool IsConfigured => !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(FromEmail);
     }
@@ -49,17 +66,33 @@ public class EmailService
         string G(string k) => map.TryGetValue(k, out var v) ? (v ?? "") : "";
         if (!int.TryParse(G(SettingKeys.SmtpPort), out var port) || port <= 0) port = 587;
         var ssl = G(SettingKeys.SmtpSsl).Trim().ToLowerInvariant();
+        // "The site's name as sender": one address for many sites (a cloud profile's), each mail still says whose it is.
+        var fromName = (G(SettingKeys.SmtpFromSiteName).Trim() == "1" && G(SettingKeys.SiteName).Trim().Length > 0
+            ? G(SettingKeys.SiteName) : G(SettingKeys.SmtpFromName)).Trim();
+
+        if (_matSmtp.IsConfigured)
+        {
+            // MatSMTP: its host, port, relay user, TLS mode and its ONE sender address win. The NAME stays the site's (falling back
+            // to the site's name, so a mail never arrives as a bare relay address), and the site's own address can only be the
+            // Reply-To — MatSMTP refuses any other From for this app.
+            var own = G(SettingKeys.SmtpFromEmail).Trim();
+            var from = _matSmtp.FromAddress ?? own;
+            return new SmtpConfig(
+                _matSmtp.Host!, _matSmtp.Port, _matSmtp.Username ?? "", _matSmtp.Password ?? "",
+                from,
+                fromName.Length > 0 ? fromName : G(SettingKeys.SiteName).Trim(),
+                _matSmtp.UseTls || _matSmtp.UseStartTls,
+                _matSmtp.UseTls ? SecureSocketOptions.SslOnConnect : _matSmtp.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.None,
+                own.Length > 0 && !string.Equals(own, from, StringComparison.OrdinalIgnoreCase) ? own : null);
+        }
 
         return new SmtpConfig(
             G(SettingKeys.SmtpHost).Trim(), port, G(SettingKeys.SmtpUser), G(SettingKeys.SmtpPassword),
-            G(SettingKeys.SmtpFromEmail).Trim(),
-            // "The site's name as sender": one address for many sites (a cloud profile's), each mail still says whose it is.
-            (G(SettingKeys.SmtpFromSiteName).Trim() == "1" && G(SettingKeys.SiteName).Trim().Length > 0
-                ? G(SettingKeys.SiteName) : G(SettingKeys.SmtpFromName)).Trim(),
+            G(SettingKeys.SmtpFromEmail).Trim(), fromName,
             ssl is "true" or "on" or "1" or "yes");
     }
 
-    /// <summary>Whether this site can send mail at all — by SMTP of its own, or because the cloud
+    /// <summary>Whether this site can send mail at all — by SMTP of its own or MatSMTP's, or because the cloud
     /// does it. Asked by the UI before it tells an operator that nothing will be delivered.</summary>
     public async Task<bool> IsConfiguredAsync() =>
         await UseCloudRelayAsync() || (await GetConfigAsync()).IsConfigured;
@@ -157,8 +190,10 @@ public class EmailService
             foreach (var r in recipients)
                 try { msg.To.Add(MailboxAddress.Parse(r)); } catch { /* skip malformed address */ }
             if (msg.To.Count == 0) return (false, "Keine gültige Empfängeradresse.");
-            if (!string.IsNullOrWhiteSpace(replyTo))
-                try { msg.ReplyTo.Add(MailboxAddress.Parse(replyTo)); } catch { /* ignore bad reply-to */ }
+            // The caller's Reply-To (a form's visitor) wins; else the config's (with MatSMTP the site's own address).
+            var reply = !string.IsNullOrWhiteSpace(replyTo) ? replyTo : cfg.ReplyTo;
+            if (!string.IsNullOrWhiteSpace(reply))
+                try { msg.ReplyTo.Add(MailboxAddress.Parse(reply)); } catch { /* ignore bad reply-to */ }
             msg.Subject = subject;
             // An HTML mail goes out as multipart/alternative with a text version derived from the
             // markup — never HTML alone. Spam filters score an HTML-only message worse, and a client
@@ -174,9 +209,10 @@ public class EmailService
 
             // Pick the right TLS mode: port 465 = implicit SSL on connect; otherwise STARTTLS (opportunistic
             // when the SSL switch is off, so a plain server still works). This is what makes IONOS:465 work.
-            var secure = cfg.Port == 465
+            // MatSMTP names its mode exactly ("none" on the Docker network means plain, not "STARTTLS when offered").
+            var secure = cfg.Mode ?? (cfg.Port == 465
                 ? SecureSocketOptions.SslOnConnect
-                : cfg.Ssl ? SecureSocketOptions.StartTls : SecureSocketOptions.StartTlsWhenAvailable;
+                : cfg.Ssl ? SecureSocketOptions.StartTls : SecureSocketOptions.StartTlsWhenAvailable);
 
             _log.LogInformation("SMTP: connecting to {Host}:{Port} mode={Secure} user={User} ssl={Ssl}",
                 cfg.Host, cfg.Port, secure, string.IsNullOrWhiteSpace(cfg.User) ? "(none)" : cfg.User, cfg.Ssl);

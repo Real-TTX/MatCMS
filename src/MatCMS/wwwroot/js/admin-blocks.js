@@ -46,6 +46,7 @@
         return { serialize: serialize, applyConditions: applyConditions, collectors: collectors };
     }
     window.MatBlockFields = { build: build };
+    var fieldUid = 0;
 
     function buildField(field, value) {
         var type = (field.type || "text").toLowerCase();
@@ -206,6 +207,11 @@
             wrap.appendChild(it);
             get = function () { return it.value; };
         }
+
+        // The label names its field: a click on it focuses the field, a screen reader reads it, and MatUi's picker
+        // (admin-fields.js) takes its panel title from it — without it a select's panel was headed by MatUi's "Choose …".
+        var ctl = label && wrap.querySelector("select, textarea, input[type=text]");
+        if (ctl) { if (!ctl.id) ctl.id = "bf-" + (++fieldUid); label.htmlFor = ctl.id; }
 
         if (field.help) {
             var h = document.createElement("div");

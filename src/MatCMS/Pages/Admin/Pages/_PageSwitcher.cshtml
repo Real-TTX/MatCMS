@@ -5,6 +5,8 @@
    admin-page-switcher.js opens it, searches, drives the keyboard and asks before leaving unsaved work
    (data-dirty-probe = a global returning true while something is unsaved — the editor's page settings are
    part of its draft, so no settings forms are watched here; the form editor's own switcher lists some).
+   The question's wording is data-ps-ask*, NOT data-confirm: matui.js answers a click anywhere inside a [data-confirm]
+   element with that question, so every click into the menu asked "unsaved work?" with the raw template.
 *@
 @{
     var url = Model.CurrentUrl;
@@ -14,9 +16,9 @@
         (v.Title + " " + v.Url + " " + v.Locale + " " + MatCMS.Services.Localizer.DisplayName(v.Locale)).ToLowerInvariant();
 }
 <div class="mat-rs le-pagepick" data-page-switch
-     data-confirm="@T["editor.switchUnsaved"]"
-     data-confirm-block="@T["editor.switchUnsavedBlock"]"
-     data-confirm-settings="@T["editor.switchUnsavedSettings"]"
+     data-ps-ask="@T["editor.switchUnsaved"]"
+     data-ps-ask-block="@T["editor.switchUnsavedBlock"]"
+     data-ps-ask-settings="@T["editor.switchUnsavedSettings"]"
      data-dirty-probe="@Model.DirtyProbe">
     @{
         var curIsPrimary = Model.CurrentGroup?.Versions.FirstOrDefault(v => v.Id == Model.Current.Id)?.IsPrimary != false;

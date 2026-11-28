@@ -223,7 +223,7 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
    shows that state too. */
 @media (max-width: 1440px) {
     .ev2-title .le-pagepick .mat-rs-trigger { max-width: 320px; }
-    .ev2-title > .badge { display: none; }
+    .ev2-title > .badge:not(.ev2-lang-btn) { display: none; }   /* the language button is a .badge too, and the only way to the language versions */
     .ev2-status { font-size: 0; gap: 0; }
     .ev2-status .ti { font-size: 17px; }
 }
@@ -243,7 +243,7 @@ body.ev2 .ev2-tree-toggle, .ev2-insp-close { display: none; }
     body.ev2 { grid-template-columns: 1fr; grid-template-rows: 56px minmax(0, 1fr); }
     .ev2-top { height: 56px; gap: 6px; padding-right: 8px; }
     .ev2-back { width: auto; height: 56px; padding: 0 8px; border-right: 0; background: none; }
-    .ev2-back span, .ev2-status, #ev2-redo, .ev2-title > .badge, .ev2-sp, body.ev2 .ev2-dev { display: none; }
+    .ev2-back span, .ev2-status, #ev2-redo, .ev2-title > .badge:not(.ev2-lang-btn), .ev2-sp, body.ev2 .ev2-dev { display: none; }
     .ev2-title { flex: 1; min-width: 0; padding-left: 0; }
     .ev2-title .le-pagepick { flex: 1 1 auto; }
     .ev2-title .le-pagepick .mat-rs-trigger { max-width: 100%; }

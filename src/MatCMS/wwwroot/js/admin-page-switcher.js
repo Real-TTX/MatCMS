@@ -60,11 +60,15 @@
         .filter(function (f) { return !!f; })
         .map(function (f) { return { form: f, pristine: snapshot(f) }; });
 
+    // The probe answers true (the open item is unsaved — the form editor) or, where one probe sees both
+    // pots, { block, settings } (the page editor: its page settings are part of its draft, not a watched
+    // form) — a plain true named "the open block" even when only the page settings had changed.
     function lostWork() {
         var parts = [];
-        if (probeName && typeof window[probeName] === "function" && window[probeName]())
+        var r = probeName && typeof window[probeName] === "function" ? window[probeName]() : false;
+        if (r === true || (r && r.block))
             parts.push(root.getAttribute("data-ps-ask-block") || "");
-        if (watched.some(function (w) { return snapshot(w.form) !== w.pristine; }))
+        if ((r && r.settings) || watched.some(function (w) { return snapshot(w.form) !== w.pristine; }))
             parts.push(root.getAttribute("data-ps-ask-settings") || "");
         return parts.filter(function (p) { return !!p; });
     }

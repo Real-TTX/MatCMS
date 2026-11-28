@@ -210,16 +210,16 @@
                 </div>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageAccess"]</div>
                 <div class="field">
-                    <label for="ev2-meta-access">Zugriff</label>
+                    <label for="ev2-meta-access">@T["ev2.metaAccess"]</label>
                     <select name="Meta.Access" id="ev2-meta-access">
-                        <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
-                        <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
+                        <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">@T["ev2.metaAccessPublic"]</option>
+                        <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">@T["ev2.metaAccessMembers"]</option>
                     </select>
                 </div>
                 <div class="field">
-                    <label for="ev2-meta-required-role">Benötigte Rolle</label>
+                    <label for="ev2-meta-required-role">@T["ev2.metaRequiredRole"]</label>
                     <select name="Meta.RequiredRole" id="ev2-meta-required-role">
-                        <option value="">— jede/r Angemeldete —</option>
+                        <option value="">@T["ev2.metaAnyMember"]</option>
                         @foreach (var role in Model.AllRoles)
                         {
                             <option value="@role" selected="@(p.RequiredRole == role ? "selected" : null)">@role</option>
@@ -228,9 +228,9 @@
                 </div>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageDesign"]</div>
                 <div class="field">
-                    <label for="ev2-meta-template-id">Template</label>
+                    <label for="ev2-meta-template-id">@T["ev2.metaTemplate"]</label>
                     <select name="Meta.TemplateId" id="ev2-meta-template-id">
-                        <option value="">— Aktives Template —</option>
+                        <option value="">@T["ev2.metaActiveTemplate"]</option>
                         @foreach (var t in Model.AllTemplates)
                         {
                             <option value="@t.Id" selected="@(p.TemplateId == t.Id ? "selected" : null)">@t.Name</option>
@@ -243,15 +243,15 @@
                     <div class="help">@T["editor.pageCss.help"]</div>
                 </div>
                 <div class="field">
-                    <label for="ev2-meta-template-params-json">Template-Parameter (JSON)</label>
+                    <label for="ev2-meta-template-params-json">@T["ev2.metaTemplateParams"]</label>
                     <textarea name="Meta.TemplateParamsJson" id="ev2-meta-template-params-json" rows="3" spellcheck="false" class="mono" placeholder='{ "bereich": "intern" }'>@p.TemplateParamsJson</textarea>
                     @if (Model.DeclaredParams.Count > 0)
                     {
-                        <div class="help">Überschreibt Parameter dieser Seite. Verfügbar: <span class="mono">@string.Join(", ", Model.DeclaredParams)</span></div>
+                        <div class="help">@T["ev2.metaTemplateParamsAvailable"] <span class="mono">@string.Join(", ", Model.DeclaredParams)</span></div>
                     }
                     else
                     {
-                        <div class="help">Überschreibt Template-Parameter nur für diese Seite (z. B. um mit <code>{{#if:…}}</code> ein anderes Menü zu zeigen). Das Template muss Parameter deklarieren.</div>
+                        <div class="help">@T["ev2.metaTemplateParamsHelp"]</div>
                     }
                 </div>
             </form>

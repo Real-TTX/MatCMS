@@ -922,7 +922,8 @@
     popover("ev2-langs-open", "ev2-langs");
     // The shared page switcher (admin-page-switcher.js) asks about unsaved work through this probe and,
     // once the operator agreed, calls matBeforeLeave — so the browser's own "leave page?" stays quiet.
-    window.ev2Dirty = function () { return dirty(); };
+    // For the page switcher: which of the two pots is unsaved, so its question names the right one.
+    window.ev2Dirty = function () { var b = blocksDirty(), s = pageDirty(); return b || s ? { block: b, settings: s } : false; };
     window.matBeforeLeave = function () { leaving = true; };
 
     // ---------- KI ----------

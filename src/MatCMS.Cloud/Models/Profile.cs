@@ -14,6 +14,17 @@ public static class MailSources
     /// and delivers it with its OWN sender address.</summary>
     public const string Cloud = "cloud";
 
+    /// <summary>Where a profile's mail really goes. "Global" while MatSMTP sets the cloud's mail (MATSMTP_*, MatOS) is the
+    /// RELAY: the cloud's own settings are then MatSMTP's relay user, which may send only as the cloud's ONE sender address and is
+    /// reachable only on MatOS's Docker network — not a credential to hand to every site. Rolling out the stored SMTP rows instead
+    /// (what "global" did) sent the sites an old configuration the cloud itself no longer uses. Through the relay the sites'
+    /// mail reaches MatSMTP via the cloud; without MatSMTP "global" is what it always was.</summary>
+    public static string Delivered(string? source, bool matSmtp)
+    {
+        var s = Normalise(source);
+        return matSmtp && s == Global ? Cloud : s;
+    }
+
     public static string Normalise(string? v) => v?.Trim().ToLowerInvariant() switch
     {
         Global => Global,

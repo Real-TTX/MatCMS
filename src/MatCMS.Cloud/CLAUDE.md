@@ -70,8 +70,14 @@ here). Every variable is optional: without them the cloud is exactly the app des
   an account with the same address only after its own password and second factor (`LoginModel.TakeLinkAsync`, also from `Login2fa`);
   else a new account (MatIdentity's `role`, else Admin for the first person through MatIdentity, Operator after). The cookie keeps
   `mat_sub`/`mat_sid`/`mat_id_token`; `AuthService.ValidatePrincipalAsync` ends it after a back-channel logout (`sid` in memory,
-  `User.IdentitySignedOutAt` for `sub`). The 2FA policy does not apply to such a session (MatIdentity has its own second step).
+  `User.IdentitySignedOutAt` for `sub`). The 2FA policy does not apply to such a session (MatIdentity has its own second step) —
+  in BOTH gates: the `/admin` middleware and `/oauth/authorize` (`GateEnrolmentAsync`; it once lacked it, so opening a site
+  sent a MatIdentity session to the cloud's enrolment). A new 2FA gate needs the same `AuthService.IsIdentitySession` exemption.
 - `EmailService` — with `MATSMTP_*` every mail goes through MatSMTP (`MatSmtpSettings`), the SMTP tab shows it as fixed.
+  A profile's mail source "global" then means the RELAY (`MailSources.Delivered`, used by `ProfileService.BuildConfigAsync`,
+  `MailSpool` and the pages): MatSMTP's relay user may send only as the cloud's one sender and is reachable only on MatOS's Docker
+  network, so it is never rolled out — and the stored SMTP rows it used to roll out are not what the cloud sends with any more.
+  Without MatSMTP "global" rolls those rows out as before. Tests: `MatOsBindingTests`.
 - `DbSeeder` — `MATCMSCLOUD_ADMIN_PASSWORD` is the password of `admin` in an empty database.
 
 ### Schema changes: migrations, not a wipe

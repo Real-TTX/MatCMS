@@ -11,7 +11,14 @@ namespace MatCMS.Cloud.Services;
 public class MailSpool
 {
     private readonly AppDbContext _db;
-    public MailSpool(AppDbContext db) => _db = db;
+    private readonly bool _matSmtp;
+
+    /// <param name="matSmtp">The cloud's MatSMTP binding: with it, a "global" profile sends through here (<see cref="MailSources.Delivered"/>).</param>
+    public MailSpool(AppDbContext db, MatPlatform.MatSmtpSettings? matSmtp = null)
+    {
+        _db = db;
+        _matSmtp = matSmtp?.IsConfigured == true;
+    }
 
     /// <summary>Messages one instance may hand over per hour. Generous for form notifications and
     /// low enough that a compromised site cannot turn the cloud's mail server into a spam relay
@@ -39,7 +46,7 @@ public class MailSpool
             : null;
         // With what it inherits: a profile below one that sends through the cloud sends through the cloud too.
         var profile = own is null ? null : await ProfileInheritance.EffectiveAsync(_db, own, ct);
-        if (profile is null || !profile.SyncSmtp || profile.MailSource != MailSources.Cloud)
+        if (profile is null || !profile.SyncSmtp || MailSources.Delivered(profile.MailSource, _matSmtp) != MailSources.Cloud)
             return new Result(false, "Für dieses Profil ist der Mailversand über die Cloud nicht aktiviert.");
 
         var recipients = (req.To ?? [])

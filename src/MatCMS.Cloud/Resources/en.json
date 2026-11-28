@@ -374,6 +374,7 @@
   "profiles.overriddenLocally": "overridden locally",
   "profiles.useGlobalSmtp": "Roll out the global SMTP settings",
   "profiles.useGlobalSmtpHint": "Takes the SMTP configuration from Settings, SMTP. The profile's own settings still override individual keys.",
+  "profiles.globalViaMatSmtpHint": "This cloud sends through MatSMTP (MatOS). With Global, the sites' mail therefore goes through the cloud, which sends it through MatSMTP with its own sender address. The MatSMTP credentials stay in the cloud.",
   "profiles.newInstead": "Create a new one instead",
   "profiles.userPasswordHint": "When editing, leaving this empty keeps the current password.",
   "profiles.userDeleteConfirm": "Remove this user from the profile? Accounts already rolled out stay on the instances.",

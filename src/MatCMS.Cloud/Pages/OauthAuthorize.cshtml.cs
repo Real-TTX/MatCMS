@@ -110,9 +110,12 @@ public class OauthAuthorizeModel : PageModel
 
     /// <summary>The same "2FA required" gate the /admin middleware applies, ported here because this
     /// path is outside /admin: an un-enrolled account must not federate into an instance while the
-    /// mandate is on. Returns a redirect to enrolment, or null to continue.</summary>
+    /// mandate is on. Returns a redirect to enrolment, or null to continue.
+    /// Same exemption as there: a MatIdentity session has had MatIdentity's own second step — without it, a person signed in
+    /// through MatIdentity reached the back office freely but was sent to the cloud's enrolment the moment they opened a site.</summary>
     private async Task<IActionResult?> GateEnrolmentAsync()
     {
+        if (AuthService.IsIdentitySession(User)) return null;
         if (_scope.UserId is int uid && _cloud.Flag(SettingKeys.Require2fa))
         {
             var enrolled = await _db.Users.AsNoTracking()

@@ -14,11 +14,15 @@ public class ProfileService
 {
     private readonly AppDbContext _db;
     private readonly SecretProtector _secrets;
+    private readonly bool _matSmtp;
 
-    public ProfileService(AppDbContext db, SecretProtector secrets)
+    /// <param name="matSmtp">The cloud's MatSMTP binding (null = none, as in most tests): with it, "global" mail is the relay
+    /// (<see cref="MailSources.Delivered"/>).</param>
+    public ProfileService(AppDbContext db, SecretProtector secrets, MatPlatform.MatSmtpSettings? matSmtp = null)
     {
         _db = db;
         _secrets = secrets;
+        _matSmtp = matSmtp?.IsConfigured == true;
     }
 
     /// <summary>
@@ -362,9 +366,11 @@ public class ProfileService
                 // because the instance will not be sending anything itself. Own SMTP below another own or global block
                 // (inheritance) only overrides what it fills in.
                 var overlay = false;
+                // Under MatSMTP "global" is the relay (MailSources.Delivered) — never the stored rows the cloud itself no longer uses.
+                var source = MailSources.Delivered(layer.MailSource, _matSmtp);
                 if (layer.SyncSmtp)
                 {
-                    if (layer.MailSource == MailSources.Global)
+                    if (source == MailSources.Global)
                     {
                         DropSmtp();
                         var smtpKeys = SettingKeys.Smtp;
@@ -374,10 +380,10 @@ public class ProfileService
                             From("setting", row.Key, layer);
                         }
                     }
-                    else if (layer.MailSource == MailSources.Cloud) DropSmtp();
+                    else if (source == MailSources.Cloud) DropSmtp();
                     else if (mailState is MailSources.Own or MailSources.Global) overlay = true;
                     else DropSmtp();
-                    mailState = layer.MailSource;
+                    mailState = source;
                 }
 
                 // The layer's own rows. Each group only while its own switch is on: values stay stored here so
@@ -386,7 +392,7 @@ public class ProfileService
                 {
                     if (IsSmtpKey(local.Key))
                     {
-                        if (!layer.SyncSmtp || layer.MailSource != MailSources.Own) continue;
+                        if (!layer.SyncSmtp || source != MailSources.Own) continue;
                         var value = local.IsSecret ? _secrets.Unprotect(local.Value) : local.Value;
                         // Over SMTP values from above, an empty field is "not mine to say" — a child that only needs another
                         // sender address enters only that. A profile on its own rolls out exactly what it stores.
@@ -410,7 +416,7 @@ public class ProfileService
             // "The site's name as sender name" travels with SMTP the instance sends through itself; for the relay the
             // cloud names the sender on each message (MailSpool). Always written while such SMTP is in effect, so switching
             // it off reaches the sites too. An older instance stores it as an unknown row and ignores it.
-            if (eff.SyncSmtp && eff.MailSource != MailSources.Cloud)
+            if (eff.SyncSmtp && MailSources.Delivered(eff.MailSource, _matSmtp) != MailSources.Cloud)
                 settings[SmtpFromSiteNameKey] = eff.MailFromSiteName ? "1" : "0";
 
             config.Settings = settings;
@@ -419,7 +425,7 @@ public class ProfileService
         // How the instance should send. Only when this profile actually decides mail delivery —
         // otherwise the site keeps doing whatever it was doing, which is the whole point of the
         // group switch.
-        if (eff.SyncSmtp && eff.MailSource == MailSources.Cloud)
+        if (eff.SyncSmtp && MailSources.Delivered(eff.MailSource, _matSmtp) == MailSources.Cloud)
             config.MailTransport = "cloud";
 
         // AI: when the profile's AI group is on, the instance relays model calls through the cloud.

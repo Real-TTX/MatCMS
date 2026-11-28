@@ -172,7 +172,8 @@ public class DetailsModel : PageModel, IAsyncPageFilter
 
     /// <summary>True when this instance's profile actually routes mail through the cloud — the tab
     /// then explains itself instead of showing an empty table nobody asked for.</summary>
-    public bool UsesRelay => EffectiveProfile is { SyncSmtp: true } p && p.MailSource == MailSources.Cloud;
+    public bool UsesRelay => EffectiveProfile is { SyncSmtp: true } p
+        && MailSources.Delivered(p.MailSource, HttpContext.RequestServices.GetRequiredService<MatPlatform.MatSmtpSettings>().IsConfigured) == MailSources.Cloud;
 
     /// <summary>The instance's profile with what it inherits (null without a profile) — what the site actually gets.</summary>
     public Profile? EffectiveProfile { get; private set; }

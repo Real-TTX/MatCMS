@@ -33,6 +33,10 @@
                 @T["add.fromGlobal"]
             </label>
             <div class="help">@T["profiles.useGlobalSmtpHint"]</div>
+            @if (Model.GlobalIsRelayed)
+            {
+                <div class="help">@T["profiles.globalViaMatSmtpHint"]</div>
+            }
             <label class="checkbox-row">
                 <input type="radio" name="mailSource" value="@MailSources.Own" data-mail-source
                        checked="@(Model.Owner.MailSource == MailSources.Own ? "checked" : null)" />

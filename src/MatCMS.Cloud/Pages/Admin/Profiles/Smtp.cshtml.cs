@@ -20,10 +20,11 @@ public class SmtpModel : PageModel
     private readonly AppDbContext _db;
     private readonly ProfileService _profiles;
     private readonly SecretProtector _secrets;
+    private readonly MatPlatform.MatSmtpSettings _matSmtp;
 
-    public SmtpModel(AppDbContext db, ProfileService profiles, SecretProtector secrets)
+    public SmtpModel(AppDbContext db, ProfileService profiles, SecretProtector secrets, MatPlatform.MatSmtpSettings matSmtp)
     {
-        _db = db; _profiles = profiles; _secrets = secrets;
+        _db = db; _profiles = profiles; _secrets = secrets; _matSmtp = matSmtp;
     }
 
     public Profile Owner { get; private set; } = new();
@@ -36,7 +37,11 @@ public class SmtpModel : PageModel
     /// <summary>What a field shows: the global value while the global configuration is in use, the
     /// profile's own otherwise. Read-only in the first case, so the operator sees what would
     /// actually be rolled out instead of a set of empty boxes.</summary>
-    public string Field(string key) => Owner.MailSource == MailSources.Global ? Global(key) : Setting(key);
+    public string Field(string key) => Owner.MailSource == MailSources.Global ? (GlobalIsRelayed ? "" : Global(key)) : Setting(key);
+
+    /// <summary>MatSMTP sets the cloud's mail: "global" then sends through the cloud (the relay), no SMTP values reach the sites
+    /// (<see cref="MailSources.Delivered"/>) — the stored global rows are not shown, they are not what is used.</summary>
+    public bool GlobalIsRelayed => _matSmtp.IsConfigured;
 
     /// <summary>Whether the SMTP fields are the operator's to fill. Only the profile's own values
     /// are: the global ones belong to the cloud's settings, and with the relay nothing is rolled out
@@ -130,7 +135,9 @@ public class SmtpModel : PageModel
         {
             await _db.SaveChangesAsync();
             await _profiles.TouchAsync(profileId);
-            TempData["Flash"] = "Globale SMTP-Einstellungen werden ausgerollt.";
+            TempData["Flash"] = GlobalIsRelayed
+                ? "Mail läuft über die Cloud und MatSMTP (die Cloud versendet über MatSMTP)."
+                : "Globale SMTP-Einstellungen werden ausgerollt.";
             return RedirectToPage("Edit", new { id = profileId, tab = "settings" });
         }
 

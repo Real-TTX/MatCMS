@@ -374,6 +374,7 @@
   "profiles.overriddenLocally": "lokal überschrieben",
   "profiles.useGlobalSmtp": "Globale SMTP-Einstellungen ausrollen",
   "profiles.useGlobalSmtpHint": "Nimmt die SMTP-Konfiguration aus Einstellungen → SMTP. Eigene Einstellungen des Profils überschreiben einzelne Schlüssel weiterhin.",
+  "profiles.globalViaMatSmtpHint": "Diese Cloud versendet über MatSMTP (MatOS). Damit geht Mail der Websites mit „Global“ über die Cloud: die Cloud versendet sie über MatSMTP, mit ihrer eigenen Absenderadresse. Die Zugangsdaten von MatSMTP bleiben in der Cloud.",
   "profiles.newInstead": "Stattdessen neu anlegen",
   "profiles.userPasswordHint": "Beim Bearbeiten leer lassen heißt: Passwort bleibt unverändert.",
   "profiles.userDeleteConfirm": "Benutzer aus dem Profil entfernen? Bereits ausgerollte Konten bleiben auf den Instanzen bestehen.",

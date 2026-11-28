@@ -418,6 +418,11 @@ html[data-theme] .admin--matui .admin-content:has(.live-editor) > .alert-error {
 .admin--matui td .alert { white-space: normal; min-width: 0; }
 .admin--matui table.data td:last-child:has(> .alert) { width: 60%; white-space: normal; }   /* the actions column rule (1%, nowrap) is not for a text column */
 
+/* MatDialog.confirm/alert/prompt hand their text to MatUi, which writes it into one <p>: the line breaks the questions carry ("• …" lists
+   of what would be lost) ran into one line. mat-dialogs.js's own dialog kept them (.mat-dlg-msg, pre-line); so do MatUi's built ones
+   (a dialog matui.js built for such a question: its id is mat-dlg-…, and it is data-static). */
+dialog.mat-dialog[id^="mat-dlg-"][data-static] .mat-dialog__body > p { white-space: pre-line; overflow-wrap: anywhere; }
+
 /* The dialog "Wartungsmodus geändert" (MaintenanceNotice): what changed, the state now as a tinted line (COLOR-04, no side bar), the admins' note. */
 #maint-seen .mat-dialog__title { display: flex; align-items: center; gap: 8px; }
 #maint-seen .maint-seen__list { margin: 0 0 var(--mat-space-3); padding-left: 1.2em; }

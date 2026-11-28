@@ -34,7 +34,7 @@
 <!DOCTYPE html>
 @* MatUi like every other back-office page (density, tokens, the bridge): without it the editor was the one screen with square
    buttons in capitals, its own greys and its own fonts. The bridge comes before editor-v2.css, which only lays the screen out. *@
-<html data-app="matcms" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
+<html data-app="matcms" data-density="compact" data-dlg-ok="@T["dialog.ok"]" data-dlg-cancel="@T["action.cancel"]" data-dlg-close="@T["action.close"]" data-dlg-confirm="@T["dialog.confirm"]" data-dlg-notice="@T["dialog.notice"]" data-dlg-input="@T["dialog.input"]" data-mat-sprite="@Url.Content("~/_content/MatCMS.Shared.Web/lib/matui/matui-icons.svg")" data-theme="@Site.ThemeFor(User)" lang="@(System.Globalization.CultureInfo.CurrentUICulture.Name.Split('-', 2)[0] is { Length: > 0 } lc ? lc : MatCMS.Services.Localizer.ResourceFallbackCulture)">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -96,9 +96,9 @@
         }
         @if (Model.PublicUrl.Length > 0)
         {
-            <a class="btn btn-ghost btn-sm ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
+            <a class="btn btn-ghost ev2-hide-s" href="@Model.PublicUrl" target="_blank" rel="noopener"><i class="ti ti-external-link" aria-hidden="true"></i> @T["ev2.view"]</a>
         }
-        <button type="button" class="btn btn-sm" id="ev2-save" disabled>@T["ev2.save"]</button>
+        <button type="button" class="btn" id="ev2-save" disabled>@T["ev2.save"]</button>
     </header>
 
     <aside class="ev2-nav" aria-label="@T["ev2.tree"]">
@@ -150,8 +150,8 @@
                 <label class="check ev2-published"><input type="checkbox" name="Meta.IsPublished" value="true" @(p.IsPublished ? "checked" : "") /> @T["editor.published"]</label>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageGeneral"]</div>
                 <div class="field">
-                    <label>@T["editor.metaTitle"]</label>
-                    <input type="text" name="Meta.Title" value="@p.Title" required />
+                    <label for="ev2-meta-title">@T["editor.metaTitle"]</label>
+                    <input type="text" name="Meta.Title" id="ev2-meta-title" value="@p.Title" required />
                 </div>
                 @if (p.OwnerPlugin is not null)
                 {
@@ -173,16 +173,16 @@
                 else
                 {
                 <div class="field">
-                    <label>@T["editor.slug"]</label>
-                    <input type="text" name="Meta.Slug" value="@p.Slug" required spellcheck="false" />
+                    <label for="ev2-meta-slug">@T["editor.slug"]</label>
+                    <input type="text" name="Meta.Slug" id="ev2-meta-slug" value="@p.Slug" required spellcheck="false" />
                     <div class="help mono" id="ev2-page-url">@Model.PublicUrl</div>
                 </div>
                 }
                 @if (p.OwnerPlugin is null && Model.SupportedLocales.Count > 1)
                 {
                     <div class="field">
-                        <label>@T["editor.locale"]</label>
-                        <select name="Meta.Locale">
+                        <label for="ev2-meta-locale">@T["editor.locale"]</label>
+                        <select name="Meta.Locale" id="ev2-meta-locale">
                             @foreach (var loc in Model.SupportedLocales)
                             {
                                 <option value="@loc" selected="@(loc == p.Locale)">@T["lang." + loc]</option>
@@ -196,7 +196,7 @@
                 }
                 <div class="admin-nav-label ev2-group">@T["ev2.pageSeo"]</div>
                 <div class="field">
-                    <label>@T["editor.metaDescription"]</label>
+                    <label for="ev2-meta-description">@T["editor.metaDescription"]</label>
                     <textarea name="Meta.MetaDescription" id="ev2-meta-description" rows="3">@p.MetaDescription</textarea>
                     @if (Model.AiEnabled)
                     {
@@ -210,15 +210,15 @@
                 </div>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageAccess"]</div>
                 <div class="field">
-                    <label>Zugriff</label>
-                    <select name="Meta.Access">
+                    <label for="ev2-meta-access">Zugriff</label>
+                    <select name="Meta.Access" id="ev2-meta-access">
                         <option value="Public" selected="@(p.Access == MatCMS.Models.PageAccess.Public ? "selected" : null)">Öffentlich</option>
                         <option value="Members" selected="@(p.Access == MatCMS.Models.PageAccess.Members ? "selected" : null)">Nur angemeldete Mitglieder</option>
                     </select>
                 </div>
                 <div class="field">
-                    <label>Benötigte Rolle</label>
-                    <select name="Meta.RequiredRole">
+                    <label for="ev2-meta-required-role">Benötigte Rolle</label>
+                    <select name="Meta.RequiredRole" id="ev2-meta-required-role">
                         <option value="">— jede/r Angemeldete —</option>
                         @foreach (var role in Model.AllRoles)
                         {
@@ -228,8 +228,8 @@
                 </div>
                 <div class="admin-nav-label ev2-group">@T["ev2.pageDesign"]</div>
                 <div class="field">
-                    <label>Template</label>
-                    <select name="Meta.TemplateId">
+                    <label for="ev2-meta-template-id">Template</label>
+                    <select name="Meta.TemplateId" id="ev2-meta-template-id">
                         <option value="">— Aktives Template —</option>
                         @foreach (var t in Model.AllTemplates)
                         {
@@ -238,13 +238,13 @@
                     </select>
                 </div>
                 <div class="field">
-                    <label>@T["editor.pageCss"]</label>
-                    <textarea name="Meta.CustomCss" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
+                    <label for="ev2-meta-custom-css">@T["editor.pageCss"]</label>
+                    <textarea name="Meta.CustomCss" id="ev2-meta-custom-css" rows="5" spellcheck="false" class="mono">@p.CustomCss</textarea>
                     <div class="help">@T["editor.pageCss.help"]</div>
                 </div>
                 <div class="field">
-                    <label>Template-Parameter (JSON)</label>
-                    <textarea name="Meta.TemplateParamsJson" rows="3" spellcheck="false" class="mono" placeholder='{ "bereich": "intern" }'>@p.TemplateParamsJson</textarea>
+                    <label for="ev2-meta-template-params-json">Template-Parameter (JSON)</label>
+                    <textarea name="Meta.TemplateParamsJson" id="ev2-meta-template-params-json" rows="3" spellcheck="false" class="mono" placeholder='{ "bereich": "intern" }'>@p.TemplateParamsJson</textarea>
                     @if (Model.DeclaredParams.Count > 0)
                     {
                         <div class="help">Überschreibt Parameter dieser Seite. Verfügbar: <span class="mono">@string.Join(", ", Model.DeclaredParams)</span></div>
@@ -314,7 +314,7 @@
                 @* An existing page in a language this one lacks becomes its version (joins this translation group). *@
                 <form method="post" asp-page-handler="LinkTranslation" asp-route-id="@p.Id" class="ev2-langs-form ev2-langs-link">
                     <label for="ev2-link-target" class="admin-nav-label ev2-pop-head">@T["editor.translationLink"]</label>
-                    <select name="targetId" id="ev2-link-target" data-native>
+                    <select name="targetId" id="ev2-link-target">
                         @foreach (var c in Model.LinkCandidates)
                         {
                             <option value="@c.Id">[@c.Locale.ToUpperInvariant()] @c.Title</option>
@@ -353,6 +353,11 @@
         @await Html.PartialAsync("_AiSeoDialog")
     }
 
+    @* MatUi's behaviour like in _AdminLayout: its dialogs (MatDialog hands over to them, data-confirm is answered by matui.js
+       alone) and every native field as one of its pickers (admin-fields.js — the inspector's fields are built later, its
+       observer takes them as they arrive). Before the editor's own scripts, so they meet the pickers already in place. *@
+    <script src="~/_content/MatCMS.Shared.Web/lib/matui/matui.js" asp-append-version="true"></script>
+    <script src="~/_content/MatCMS.Shared.Web/js/admin-fields.js" asp-append-version="true"></script>
     <script src="~/js/media-picker.js" asp-append-version="true"></script>
     <script src="~/js/mat-richselect.js" asp-append-version="true"></script>
     <script src="~/js/admin-blocks.js" asp-append-version="true"></script>

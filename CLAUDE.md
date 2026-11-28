@@ -831,7 +831,10 @@ pages (`body.login-page.login-matui`) are MatUi's auth card through the same bri
 plus icon and words (MatUi COLOR-04/08) — never a coloured bar on one side: the bridge turns the old bars of the attention
 rows, the dashboard tiles and the assistant's steps into that; do not add a new one. The page editor (own full-screen layout) and the
 cloud's self-update screen load `matui.css` + the bridge like every other back-office page (2026-11-27); `editor-v2.css` only lays the
-editor out and reads MatUi's tokens.
+editor out and reads MatUi's tokens. Since 2026-11-28 the page editor also loads `matui.js` + `admin-fields.js` (its selects are pickers, its
+questions MatUi's dialogs). Because matui.js answers a click ANYWHERE inside a `[data-confirm]` element, never put `data-confirm` on a container
+to carry wording for a script — the page switcher's is `data-ps-ask*` (it used to ask "unsaved?" on every click into the form editor's
+switcher). A label names its field with `for` (MatUi's picker takes its panel title from it; without, the panel was headed "Meta.Access").
 **One scale for every control** (bridge section 3f, "Kraut und Rüben" pass 2026-11-27): every control — a button of any size, a
 field, a picker, a segmented switch, an icon button — has `--mat-radius` (`--mat-btn-radius` is set to it, so MatUi's own small
 button too); cards, dialogs and tables `--mat-radius-lg`; pills and chips are round. A field is exactly as tall as the button beside

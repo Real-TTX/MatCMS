@@ -63,9 +63,9 @@
     function lostWork() {
         var parts = [];
         if (probeName && typeof window[probeName] === "function" && window[probeName]())
-            parts.push(root.getAttribute("data-confirm-block") || "");
+            parts.push(root.getAttribute("data-ps-ask-block") || "");
         if (watched.some(function (w) { return snapshot(w.form) !== w.pristine; }))
-            parts.push(root.getAttribute("data-confirm-settings") || "");
+            parts.push(root.getAttribute("data-ps-ask-settings") || "");
         return parts.filter(function (p) { return !!p; });
     }
 
@@ -74,7 +74,7 @@
     function mayLeave(title) {
         var parts = lostWork();
         if (!parts.length) return Promise.resolve(true);
-        var tpl = root.getAttribute("data-confirm") || "{0}\n\n{1}";
+        var tpl = root.getAttribute("data-ps-ask") || "{0}\n\n{1}";
         return MatDialog.confirm(tpl.replace("{0}", "• " + parts.join("\n• ")).replace("{1}", title || ""));
     }
 
